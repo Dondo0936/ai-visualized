@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linear Equations: y = mx + b - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Linear Equations: y = mx + b</h1>
+      <span class="topic-desc">Drag m and b to fit the line through the data points</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        y = <span class="value" id="ov-eq">1.00x + 0.00</span> &nbsp; Error: <span class="value" id="ov-err">0.00</span>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Every neuron starts with a line</div>
+        <div class="guide-text">
+          The equation <strong>y = mx + b</strong> is the most important equation in AI. Every single neuron in a neural network computes a weighted sum of its inputs (that's mx) plus a bias (that's b), then decides what to output. Before we can understand deep learning, we need to <em>feel</em> what m and b do.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Slope (m) &mdash; "how steep"</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>m</span>
+            <span class="slider-value" id="m-val">1.00</span>
+          </div>
+          <input type="range" id="m-slider" min="-5" max="5" step="0.05" value="1">
+        </div>
+        <div class="info-box" style="margin-top:6px" id="m-explain">
+          <strong>m = 1.00</strong> &mdash; For every 1 step right, the line goes up 1 step. A positive slope tilts up-right. In a neuron, m is the <strong>weight</strong> &mdash; how much this input matters.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Y-Intercept (b) &mdash; "where it crosses"</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>b</span>
+            <span class="slider-value" id="b-val">0.00</span>
+          </div>
+          <input type="range" id="b-slider" min="-5" max="5" step="0.05" value="0">
+        </div>
+        <div class="info-box" style="margin-top:6px" id="b-explain">
+          <strong>b = 0.00</strong> &mdash; The line crosses the y-axis at 0. In a neuron, b is the <strong>bias</strong> &mdash; it shifts the decision threshold up or down.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Data Points</h3>
+        <div class="btn-group" style="flex-wrap:wrap">
+          <button class="btn btn-secondary active" data-data="linear">Linear</button>
+          <button class="btn btn-secondary" data-data="noisy">Noisy</button>
+          <button class="btn btn-secondary" data-data="steep">Steep</button>
+          <button class="btn btn-secondary" data-data="negative">Negative</button>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+          Click on the graph to add your own points
+        </div>
+        <button class="btn btn-secondary" id="btn-clear" style="width:100%;margin-top:6px">Clear Points</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Auto-Fit</h3>
+        <button class="btn btn-primary" id="btn-fit" style="width:100%">Find Best Line (Least Squares)</button>
+        <div class="info-box" style="margin-top:8px">
+          "Best line" means the one that <strong>minimizes the total error</strong> (sum of squared distances from each point to the line). This is exactly what <a href="gradient-descent.html">gradient descent</a> does in ML &mdash; but for millions of parameters instead of just m and b.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Error Visualization</h3>
+        <div class="toggle-chips">
+          <div class="chip active" id="tog-residuals">Residual Lines</div>
+          <div class="chip" id="tog-squares">Error Squares</div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);margin-top:8px;text-align:center;">
+          Total Error (MSE): <span style="color:var(--cyan);font-weight:700" id="mse-val">0.00</span>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Try This!</h3>
+        <div class="info-box">
+          <strong>1.</strong> Load "Noisy" data, then click "Find Best Line." Watch m and b snap to the optimal values.<br>
+          <strong>2.</strong> Turn on "Error Squares." The best line is the one that makes the total area of all squares as small as possible.<br>
+          <strong>3.</strong> Try to beat the auto-fit by hand! Drag m and b to get the lowest MSE you can.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>The Bridge to Neural Networks</h3>
+        <div class="learn-more" style="margin:0">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            From y = mx + b to a neuron
+          </button>
+          <div class="learn-more-content">
+            A single neuron computes: <code>output = activation(w*x + b)</code>. That's just y = mx + b wrapped in an <a href="activation-functions.html">activation function</a>! With multiple inputs: <code>output = activation(w1*x1 + w2*x2 + ... + b)</code>. That's a <a href="vectors.html">dot product</a> plus bias. Stack thousands of these, and you have a neural network.
+          </div>
+        </div>
+        <div class="learn-more">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            What is "training"?
+          </button>
+          <div class="learn-more-content">
+            Training = finding the best m and b (or millions of weights). You start with random values, measure the error, then nudge m and b in the direction that reduces error. That nudging process IS <a href="gradient-descent.html">gradient descent</a>. The <a href="slopes-and-derivatives.html">derivative</a> tells you which direction to nudge.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  let m = 1, b = 0;
+  let points = [];
+  let showResiduals = true, showSquares = false;
+  const xR = [-6,6], yR = [-6,6];
+
+  const datasets = {
+    linear:   [[−3,−2.5],[−2,−1.8],[−1,−0.5],[0,0.3],[1,1.2],[2,1.9],[3,3.1],[4,3.8]],
+    noisy:    [[−3,−1.8],[−2,−2.5],[−1,0.2],[0,−0.5],[0.5,1.5],[1,0.8],[2,2.5],[2.5,1.2],[3,3.5],[4,2.8]],
+    steep:    [[−2,−4.5],[−1,−2.8],[0,−0.2],[0.5,0.8],[1,2.1],[1.5,3.2],[2,4.5]],
+    negative: [[−3,3.2],[−2,2.5],[−1,1.8],[0,0.5],[1,−0.2],[2,−1.5],[3,−2.8],[4,−3.5]],
+  };
+  // Fix unicode minus
+  datasets.linear = [[-3,-2.5],[-2,-1.8],[-1,-0.5],[0,0.3],[1,1.2],[2,1.9],[3,3.1],[4,3.8]];
+  datasets.noisy = [[-3,-1.8],[-2,-2.5],[-1,0.2],[0,-0.5],[0.5,1.5],[1,0.8],[2,2.5],[2.5,1.2],[3,3.5],[4,2.8]];
+  datasets.steep = [[-2,-4.5],[-1,-2.8],[0,-0.2],[0.5,0.8],[1,2.1],[1.5,3.2],[2,4.5]];
+  datasets.negative = [[-3,3.2],[-2,2.5],[-1,1.8],[0,0.5],[1,-0.2],[2,-1.5],[3,-2.8],[4,-3.5]];
+
+  points = [...datasets.linear];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+  function toD(px,py){ return [xR[0]+(px/W)*(xR[1]-xR[0]), yR[0]+((H-py)/H)*(yR[1]-yR[0])]; }
+
+  function computeMSE(){
+    if(!points.length) return 0;
+    let sum=0;
+    for(const p of points){ const err=p[1]-(m*p[0]+b); sum+=err*err; }
+    return sum/points.length;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=Math.ceil(xR[0]);x<=xR[1];x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=Math.ceil(yR[0]);y<=yR[1];y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
+    for(let x=-5;x<=5;x++){if(!x)continue;const[px]=toC(x,0);ctx.fillText(x,px,oy+14);}
+    ctx.textAlign='right';
+    for(let y=-5;y<=5;y++){if(!y)continue;const[,py]=toC(0,y);ctx.fillText(y,ox-6,py+4);}
+
+    // Residuals & squares
+    for(const p of points){
+      const predicted = m*p[0]+b;
+      const [px,py] = toC(p[0], p[1]);
+      const [,predY] = toC(p[0], predicted);
+
+      if(showSquares){
+        const errPx = Math.abs(py - predY);
+        ctx.fillStyle='rgba(248,113,113,0.08)';
+        ctx.strokeStyle='rgba(248,113,113,0.2)'; ctx.lineWidth=1;
+        const left = Math.min(px, px-errPx);
+        const top = Math.min(py, predY);
+        ctx.fillRect(px, top, errPx, Math.abs(py-predY));
+        ctx.strokeRect(px, top, errPx, Math.abs(py-predY));
+      }
+      if(showResiduals){
+        ctx.strokeStyle='rgba(248,113,113,0.4)'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,predY); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Line y = mx + b
+    const x0=xR[0], x1=xR[1];
+    const y0=m*x0+b, y1=m*x1+b;
+    const [lx0,ly0]=toC(x0,y0), [lx1,ly1]=toC(x1,y1);
+    ctx.strokeStyle='#fbbf24'; ctx.lineWidth=3;
+    ctx.shadowColor='rgba(251,191,36,0.3)'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.moveTo(lx0,ly0); ctx.lineTo(lx1,ly1); ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // Y-intercept dot
+    const [bx,by]=toC(0,b);
+    ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(bx,by,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(bx,by,2.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fbbf24'; ctx.font='11px JetBrains Mono'; ctx.textAlign='left';
+    ctx.fillText('b = '+b.toFixed(1), bx+10, by-8);
+
+    // Slope triangle (rise/run) near origin
+    if(Math.abs(m)>0.1){
+      const triX = 0.5, runW = 1.5;
+      const triY0 = m*triX+b, triY1 = m*(triX+runW)+b;
+      const [tx0,ty0]=toC(triX,triY0), [tx1,ty1]=toC(triX+runW,triY0), [tx2,ty2]=toC(triX+runW,triY1);
+      ctx.strokeStyle='rgba(99,102,241,0.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(tx0,ty0); ctx.lineTo(tx1,ty1); ctx.lineTo(tx2,ty2); ctx.stroke();
+      ctx.fillStyle='rgba(99,102,241,0.6)'; ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
+      ctx.fillText('run',(tx0+tx1)/2,ty0+14);
+      ctx.textAlign='left';
+      ctx.fillText('rise',tx1+4,(ty1+ty2)/2+4);
+    }
+
+    // Points
+    for(const p of points){
+      const [px,py]=toC(p[0],p[1]);
+      ctx.fillStyle='#6366f1';
+      ctx.shadowColor='rgba(99,102,241,0.4)'; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(px,py,2.5,0,Math.PI*2); ctx.fill();
+    }
+
+    // Equation label
+    ctx.fillStyle='rgba(14,14,26,0.85)';
+    ctx.beginPath(); ctx.roundRect(W-180,12,168,32,8); ctx.fill();
+    ctx.strokeStyle='#fbbf24'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(W-180,12,168,32,8); ctx.stroke();
+    ctx.fillStyle='#fbbf24'; ctx.font='bold 13px JetBrains Mono'; ctx.textAlign='right';
+    const sign = b>=0?'+':'';
+    ctx.fillText(`y = ${m.toFixed(2)}x ${sign} ${b.toFixed(2)}`, W-20, 34);
+    ctx.textAlign='left';
+
+    // Update overlay
+    const mse = computeMSE();
+    document.getElementById('ov-eq').textContent = `${m.toFixed(2)}x ${sign} ${b.toFixed(2)}`;
+    document.getElementById('ov-err').textContent = mse.toFixed(3);
+    document.getElementById('mse-val').textContent = mse.toFixed(3);
+  }
+
+  function updateExplains(){
+    const mAbs = Math.abs(m);
+    let mText = `<strong>m = ${m.toFixed(2)}</strong> &mdash; `;
+    if(mAbs < 0.1) mText += 'Nearly flat &mdash; the output barely changes with input. A weight of 0 means "this input doesn\'t matter."';
+    else if(m > 0) mText += `For every 1 step right, y goes up ${m.toFixed(1)} steps. ${mAbs>2?'Steep!':''} In a neuron, this means the input has a <strong>strong positive effect</strong> on the output.`;
+    else mText += `For every 1 step right, y goes down ${mAbs.toFixed(1)} steps. Negative slope = the input has an <strong>inverse effect</strong> on output.`;
+    document.getElementById('m-explain').innerHTML = mText;
+
+    document.getElementById('b-explain').innerHTML =
+      `<strong>b = ${b.toFixed(2)}</strong> &mdash; The line crosses the y-axis at ${b.toFixed(1)}. ${Math.abs(b)<0.1?'Right at the origin.':b>0?'Shifted up.':'Shifted down.'} In a neuron, bias controls the <strong>default activation</strong> when all inputs are zero.`;
+  }
+
+  // Sliders
+  document.getElementById('m-slider').addEventListener('input', e=>{
+    m=parseFloat(e.target.value); document.getElementById('m-val').textContent=m.toFixed(2);
+    updateExplains(); draw();
+  });
+  document.getElementById('b-slider').addEventListener('input', e=>{
+    b=parseFloat(e.target.value); document.getElementById('b-val').textContent=b.toFixed(2);
+    updateExplains(); draw();
+  });
+
+  // Dataset buttons
+  document.querySelectorAll('[data-data]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-data]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      points=[...datasets[btn.dataset.data]]; draw();
+    });
+  });
+
+  // Click to add point
+  canvas.addEventListener('click', e=>{
+    const r=canvas.getBoundingClientRect();
+    const [x,y]=toD(e.clientX-r.left, e.clientY-r.top);
+    points.push([x,y]); draw();
+  });
+
+  // Clear
+  document.getElementById('btn-clear').addEventListener('click',()=>{ points=[]; draw(); });
+
+  // Auto-fit (least squares)
+  document.getElementById('btn-fit').addEventListener('click',()=>{
+    if(points.length<2) return;
+    let sx=0,sy=0,sxx=0,sxy=0,n=points.length;
+    for(const p of points){ sx+=p[0]; sy+=p[1]; sxx+=p[0]*p[0]; sxy+=p[0]*p[1]; }
+    const det = n*sxx - sx*sx;
+    if(Math.abs(det)<0.001) return;
+    m = (n*sxy - sx*sy)/det;
+    b = (sy - m*sx)/n;
+    // Clamp to slider range
+    m=Math.max(-5,Math.min(5,m)); b=Math.max(-5,Math.min(5,b));
+    document.getElementById('m-slider').value=m;
+    document.getElementById('b-slider').value=b;
+    document.getElementById('m-val').textContent=m.toFixed(2);
+    document.getElementById('b-val').textContent=b.toFixed(2);
+
+    // Animate sliders to final value
+    updateExplains(); draw();
+  });
+
+  // Toggles
+  document.getElementById('tog-residuals').addEventListener('click',function(){
+    showResiduals=!showResiduals; this.classList.toggle('active'); draw();
+  });
+  document.getElementById('tog-squares').addEventListener('click',function(){
+    showSquares=!showSquares; this.classList.toggle('active'); draw();
+  });
+
+  resize(); updateExplains();
+  window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

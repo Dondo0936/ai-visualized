@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What is a Function? - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>What is a Function?</h1>
+      <span class="topic-desc">Drag the input slider and watch the output change</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        Input: <span class="value" id="ov-x">0.00</span> &rarr; Output: <span class="value" id="ov-y">0.00</span>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">A function is a machine</div>
+        <div class="guide-text">
+          You put a number in, and a specific number comes out. <strong>Every input gives exactly one output.</strong> That's it! The graph below is just a picture of every input-output pair drawn as a dot.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Pick a Function</h3>
+        <div class="btn-group" style="flex-wrap:wrap">
+          <button class="btn btn-secondary active" data-fn="linear">y = 2x + 1</button>
+          <button class="btn btn-secondary" data-fn="quadratic">y = x&sup2;</button>
+          <button class="btn btn-secondary" data-fn="cubic">y = x&sup3;</button>
+        </div>
+        <div class="btn-group" style="flex-wrap:wrap;margin-top:6px">
+          <button class="btn btn-secondary" data-fn="abs">y = |x|</button>
+          <button class="btn btn-secondary" data-fn="sine">y = sin(x)</button>
+          <button class="btn btn-secondary" data-fn="step">y = step(x)</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Input (x)</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Drag to change x</span>
+            <span class="slider-value" id="x-val">0.00</span>
+          </div>
+          <input type="range" id="x-slider" min="-5" max="5" step="0.05" value="0">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>The Machine</h3>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center;padding:16px 0;">
+          <div style="background:var(--accent);color:white;padding:10px 18px;border-radius:10px;font-family:var(--font-mono);font-size:1.1rem;font-weight:700;" id="machine-in">0.00</div>
+          <div style="font-size:1.5rem;color:var(--text-muted);">&rarr;</div>
+          <div style="background:var(--bg-card);border:2px solid var(--accent);padding:12px 16px;border-radius:12px;text-align:center;">
+            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Function</div>
+            <div style="font-family:var(--font-mono);font-weight:700;color:var(--accent-light);font-size:0.95rem;" id="machine-rule">2x + 1</div>
+          </div>
+          <div style="font-size:1.5rem;color:var(--text-muted);">&rarr;</div>
+          <div style="background:var(--cyan);color:#08080f;padding:10px 18px;border-radius:10px;font-family:var(--font-mono);font-size:1.1rem;font-weight:700;" id="machine-out">1.00</div>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Try This!</h3>
+        <div class="info-box">
+          <strong>1.</strong> Pick <code>y = x&sup2;</code>. What happens when x is negative?<br>
+          <strong>2.</strong> Try <code>y = |x|</code>. Can the output ever be negative?<br>
+          <strong>3.</strong> Look at <code>y = step(x)</code>. This is how a neuron "decides" &mdash; it outputs 0 or 1. This exact function is used in the <a href="perceptron.html">Perceptron</a>!
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Why This Matters for AI</h3>
+        <div class="info-box">
+          Neural networks are built from functions stacked together. Each neuron applies a function to its inputs. The <a href="activation-functions.html">activation functions</a> you'll see later (ReLU, Sigmoid) are just functions like the ones above &mdash; but chosen because they help networks learn.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Key Vocabulary</h3>
+        <div class="learn-more" style="margin:0">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Domain & Range
+          </button>
+          <div class="learn-more-content">
+            <strong>Domain</strong> = all possible inputs (x values). <strong>Range</strong> = all possible outputs (y values). For y = x&sup2;, the domain is all numbers, but the range is only 0 and above (you can't get a negative output by squaring).
+          </div>
+        </div>
+        <div class="learn-more">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Continuous vs Discrete
+          </button>
+          <div class="learn-more-content">
+            Most functions we've seen are <strong>continuous</strong> &mdash; you can draw them without lifting your pen. The step function is <strong>discontinuous</strong> &mdash; it jumps. This matters in AI because smooth functions are easier to optimize (gradient descent needs smoothness).
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  const fns = {
+    linear:    { fn: x => 2*x+1,       label: '2x + 1',   color: '#6366f1' },
+    quadratic: { fn: x => x*x,         label: 'x\u00B2',  color: '#22d3ee' },
+    cubic:     { fn: x => x*x*x,       label: 'x\u00B3',  color: '#34d399' },
+    abs:       { fn: x => Math.abs(x),  label: '|x|',      color: '#fb923c' },
+    sine:      { fn: x => Math.sin(x),  label: 'sin(x)',   color: '#f472b6' },
+    step:      { fn: x => x >= 0 ? 1:0, label: 'step(x)',  color: '#fbbf24' },
+  };
+
+  let current = 'linear';
+  let xVal = 0;
+  const xRange = [-5.5, 5.5], yRange = [-6, 6];
+
+  function resize(){
+    const r = canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xRange[0])/(xRange[1]-xRange[0])*W, H-(y-yRange[0])/(yRange[1]-yRange[0])*H]; }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=Math.ceil(xRange[0]);x<=xRange[1];x++){
+      const [px]=toC(x,0); ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
+    }
+    for(let y=Math.ceil(yRange[0]);y<=yRange[1];y++){
+      const [,py]=toC(0,y); ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W,py); ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1.5;
+    const [ox,oy]=toC(0,0);
+    ctx.beginPath(); ctx.moveTo(0,oy); ctx.lineTo(W,oy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,0); ctx.lineTo(ox,H); ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
+    for(let x=-5;x<=5;x++){if(!x)continue; const [px]=toC(x,0); ctx.fillText(x,px,oy+14);}
+    ctx.textAlign='right';
+    for(let y=-5;y<=5;y++){if(!y)continue; const [,py]=toC(0,y); ctx.fillText(y,ox-6,py+4);}
+
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='13px Inter,sans-serif'; ctx.textAlign='left';
+    ctx.fillText('x',W-18,oy-8); ctx.fillText('y',ox+8,16);
+
+    // Draw curve
+    const f = fns[current];
+    ctx.strokeStyle=f.color; ctx.lineWidth=3; ctx.beginPath();
+    let started=false;
+    for(let px=0;px<W;px++){
+      const x=xRange[0]+(px/W)*(xRange[1]-xRange[0]);
+      const y=f.fn(x);
+      const [cx,cy]=toC(x,y);
+      if(cy<-50||cy>H+50){started=false;continue;}
+      if(!started){ctx.moveTo(cx,cy);started=true;}else ctx.lineTo(cx,cy);
+    }
+    ctx.stroke();
+
+    // Probe: vertical line from x to curve, horizontal to y-axis
+    const yVal = f.fn(xVal);
+    const [px,py]=toC(xVal, yVal);
+    const [_,axY]=toC(0,0);
+    const [axX]=toC(0,0);
+
+    // Dashed lines
+    ctx.setLineDash([5,5]); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px,axY); ctx.lineTo(px,py); ctx.stroke(); // vertical
+    ctx.beginPath(); ctx.moveTo(axX,py); ctx.lineTo(px,py); ctx.stroke(); // horizontal
+    ctx.setLineDash([]);
+
+    // Input dot on x-axis
+    ctx.fillStyle=fns[current].color; ctx.globalAlpha=0.3;
+    ctx.beginPath(); ctx.arc(px,axY,8,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px,axY,4,0,Math.PI*2); ctx.fill();
+
+    // Output dot on curve
+    if(py>-20&&py<H+20){
+      ctx.shadowColor=f.color; ctx.shadowBlur=12;
+      ctx.fillStyle=f.color;
+      ctx.beginPath(); ctx.arc(px,py,7,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill();
+
+      // Label
+      ctx.fillStyle='rgba(14,14,26,0.85)'; ctx.strokeStyle=f.color; ctx.lineWidth=1;
+      const lx=px+12, ly=py-12;
+      const label=`(${xVal.toFixed(1)}, ${yVal.toFixed(1)})`;
+      ctx.font='12px JetBrains Mono'; const tw=ctx.measureText(label).width;
+      ctx.beginPath(); ctx.roundRect(lx-4,ly-14,tw+8,20,6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.fillText(label,lx,ly);
+    }
+
+    // Function name label
+    ctx.fillStyle='rgba(14,14,26,0.85)';
+    ctx.beginPath(); ctx.roundRect(W-120,12,108,32,8); ctx.fill();
+    ctx.strokeStyle=f.color; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(W-120,12,108,32,8); ctx.stroke();
+    ctx.fillStyle=f.color; ctx.font='bold 14px JetBrains Mono'; ctx.textAlign='right';
+    ctx.fillText('y = '+f.label, W-20, 34);
+    ctx.textAlign='left';
+  }
+
+  // Slider
+  const slider = document.getElementById('x-slider');
+  function updateX(){
+    xVal = parseFloat(slider.value);
+    const yVal = fns[current].fn(xVal);
+    document.getElementById('x-val').textContent = xVal.toFixed(2);
+    document.getElementById('ov-x').textContent = xVal.toFixed(2);
+    document.getElementById('ov-y').textContent = yVal.toFixed(2);
+    document.getElementById('machine-in').textContent = xVal.toFixed(2);
+    document.getElementById('machine-out').textContent = yVal.toFixed(2);
+    draw();
+  }
+  slider.addEventListener('input', updateX);
+
+  // Function buttons
+  document.querySelectorAll('[data-fn]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-fn]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      current = btn.dataset.fn;
+      document.getElementById('machine-rule').textContent = fns[current].label;
+      updateX();
+    });
+  });
+
+  // Mouse drag on canvas
+  canvas.addEventListener('mousemove', e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left;
+    const x=xRange[0]+(mx/W)*(xRange[1]-xRange[0]);
+    xVal=Math.max(-5,Math.min(5,x));
+    slider.value=xVal;
+    updateX();
+  });
+
+  resize(); updateX();
+  window.addEventListener('resize', resize);
+})();
+</script>
+</body>
+</html>

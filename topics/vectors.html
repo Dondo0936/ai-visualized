@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vectors: Arrows in Space - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Vectors: Arrows in Space</h1>
+      <span class="topic-desc">Drag the arrow tips to explore vector addition, scaling, and the dot product</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Drag the colored arrow tips to move them</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">A vector is a number with a direction</div>
+        <div class="guide-text">
+          A regular number (like 5) tells you "how much." A <strong>vector</strong> tells you "how much" AND "which way." Think of it as an <strong>arrow</strong>: the length is the magnitude, the direction is... the direction. Velocity, force, and wind are all vectors.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Show</h3>
+        <div class="toggle-chips">
+          <div class="chip active" id="tog-sum">A + B (Sum)</div>
+          <div class="chip" id="tog-dot">Dot Product</div>
+          <div class="chip" id="tog-proj">Projection</div>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Vector A <span style="color:#6366f1">(purple)</span></h3>
+        <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);line-height:1.8" id="info-a">
+          A = (2.0, 1.0)<br>|A| = 2.24
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Vector B <span style="color:#22d3ee">(cyan)</span></h3>
+        <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);line-height:1.8" id="info-b">
+          B = (1.0, 2.0)<br>|B| = 2.24
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-sum">
+        <h3>A + B <span style="color:#34d399">(green)</span></h3>
+        <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);line-height:1.8" id="info-sum">
+          A + B = (3.0, 3.0)<br>|A+B| = 4.24
+        </div>
+        <div class="info-box" style="margin-top:8px">
+          To add vectors, put B's tail at A's tip. The sum goes from A's tail to B's tip. Think of walking: go 3 blocks east, then 2 blocks north &mdash; the <strong>sum</strong> is where you end up.
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-dot" style="display:none">
+        <h3>Dot Product</h3>
+        <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;text-align:center;padding:10px 0;" id="dot-val">
+          A &middot; B = <span style="color:var(--yellow)">4.00</span>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-secondary);text-align:center" id="dot-angle">
+          Angle: 36.9&deg;
+        </div>
+        <div class="info-box" style="margin-top:8px">
+          The dot product measures <strong>how much two vectors point in the same direction</strong>.<br><br>
+          <strong>Positive:</strong> same-ish direction<br>
+          <strong>Zero:</strong> perpendicular (90&deg;)<br>
+          <strong>Negative:</strong> opposite-ish direction<br><br>
+          Formula: A &middot; B = A<sub>x</sub>B<sub>x</sub> + A<sub>y</sub>B<sub>y</sub>
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-proj" style="display:none">
+        <h3>Projection</h3>
+        <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);line-height:1.8" id="info-proj">
+          proj<sub>B</sub>A = (0.0, 0.0)
+        </div>
+        <div class="info-box" style="margin-top:8px">
+          The <strong>projection</strong> of A onto B answers: "How much of A goes in B's direction?" It's like casting A's shadow onto B using a flashlight perpendicular to B. This is used everywhere in AI &mdash; attention mechanisms compute projections of queries onto keys.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Presets</h3>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-secondary" data-preset="same">Same direction</button>
+          <button class="btn btn-secondary" data-preset="perp">Perpendicular (90&deg;)</button>
+          <button class="btn btn-secondary" data-preset="opposite">Opposite directions</button>
+          <button class="btn btn-secondary" data-preset="unit">Unit vectors (length 1)</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Connection to AI</h3>
+        <div class="info-box">
+          In neural networks, every neuron computes a <strong>dot product</strong>: it multiplies its input vector by a weight vector, then sums them up. That's literally A &middot; B. The <a href="perceptron.html">Perceptron</a> is just: step(weights &middot; input + bias). Word embeddings, attention, and similarity search all use vectors and dot products.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  // Vectors (in domain coords)
+  let A = [2, 1], B = [1, 2];
+  let showSum = true, showDot = false, showProj = false;
+  let dragging = null; // 'a' or 'b'
+  const xR = [-5,5], yR = [-5,5];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+  function toD(px,py){ return [xR[0]+(px/W)*(xR[1]-xR[0]), yR[0]+((H-py)/H)*(yR[1]-yR[0])]; }
+  function mag(v){ return Math.sqrt(v[0]*v[0]+v[1]*v[1]); }
+  function dot(a,b){ return a[0]*b[0]+a[1]*b[1]; }
+
+  function drawArrow(from, to, color, lw, label, dashed){
+    const [x1,y1] = toC(from[0],from[1]);
+    const [x2,y2] = toC(to[0],to[1]);
+    ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.fillStyle=color;
+    if(dashed) ctx.setLineDash([6,4]); else ctx.setLineDash([]);
+
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrowhead
+    const angle = Math.atan2(y1-y2, x1-x2);
+    const headLen = 12;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2+headLen*Math.cos(angle+0.35), y2+headLen*Math.sin(angle+0.35));
+    ctx.lineTo(x2+headLen*Math.cos(angle-0.35), y2+headLen*Math.sin(angle-0.35));
+    ctx.closePath(); ctx.fill();
+
+    // Tip circle (draggable indicator)
+    ctx.beginPath(); ctx.arc(x2,y2,6,0,Math.PI*2);
+    ctx.fillStyle=color; ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x2,y2,2.5,0,Math.PI*2); ctx.fill();
+
+    // Label
+    if(label){
+      const mx=(x1+x2)/2, my=(y1+y2)/2;
+      const nx=-(y2-y1), ny=x2-x1;
+      const nl=Math.sqrt(nx*nx+ny*ny)||1;
+      const off=18;
+      ctx.fillStyle=color; ctx.font='bold 13px Inter,sans-serif'; ctx.textAlign='center';
+      ctx.fillText(label, mx+nx/nl*off, my+ny/nl*off);
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=Math.ceil(xR[0]);x<=xR[1];x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=Math.ceil(yR[0]);y<=yR[1];y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
+    for(let x=-4;x<=4;x++){if(!x)continue;const[px]=toC(x,0);ctx.fillText(x,px,oy+14);}
+    ctx.textAlign='right';
+    for(let y=-4;y<=4;y++){if(!y)continue;const[,py]=toC(0,y);ctx.fillText(y,ox-6,py+4);}
+
+    // Sum: parallelogram + result vector
+    if(showSum){
+      const S = [A[0]+B[0], A[1]+B[1]];
+      // Parallelogram
+      const [pA]=[[A,B],[B,A]];
+      ctx.strokeStyle='rgba(52,211,153,0.15)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+      const [cA0,cA1]=toC(A[0],A[1]), [cB0,cB1]=toC(B[0],B[1]), [cS0,cS1]=toC(S[0],S[1]);
+      ctx.beginPath(); ctx.moveTo(cA0,cA1); ctx.lineTo(cS0,cS1); ctx.lineTo(cB0,cB1); ctx.stroke();
+      ctx.setLineDash([]);
+      // Fill
+      const [co0,co1]=toC(0,0);
+      ctx.fillStyle='rgba(52,211,153,0.04)';
+      ctx.beginPath(); ctx.moveTo(co0,co1); ctx.lineTo(cA0,cA1); ctx.lineTo(cS0,cS1); ctx.lineTo(cB0,cB1); ctx.closePath(); ctx.fill();
+
+      drawArrow([0,0], S, '#34d399', 2.5, 'A+B');
+    }
+
+    // Projection
+    if(showProj){
+      const bMag2 = dot(B,B);
+      if(bMag2 > 0.001){
+        const scalar = dot(A,B)/bMag2;
+        const P = [scalar*B[0], scalar*B[1]];
+        // Projection vector
+        drawArrow([0,0], P, '#fbbf24', 2, 'proj', true);
+        // Perpendicular drop line
+        const [pPx,pPy]=toC(P[0],P[1]), [pAx,pAy]=toC(A[0],A[1]);
+        ctx.strokeStyle='rgba(251,191,36,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(pAx,pAy); ctx.lineTo(pPx,pPy); ctx.stroke();
+        ctx.setLineDash([]);
+        // Right angle marker
+        const dx=P[0]-A[0], dy=P[1]-A[1], dl=Math.sqrt(dx*dx+dy*dy)||1;
+        const nx=dx/dl*0.3, ny=dy/dl*0.3;
+        const bx=B[0]/mag(B)*0.3, by=B[1]/mag(B)*0.3;
+        const [r1x,r1y]=toC(P[0]+nx,P[1]+ny);
+        const [r2x,r2y]=toC(P[0]+nx-bx,P[1]+ny-by);
+        const [r3x,r3y]=toC(P[0]-bx,P[1]-by);
+        ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=1; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(r1x,r1y); ctx.lineTo(r2x,r2y); ctx.lineTo(r3x,r3y); ctx.stroke();
+
+        document.getElementById('info-proj').innerHTML =
+          `proj<sub>B</sub>A = (${P[0].toFixed(2)}, ${P[1].toFixed(2)})<br>scalar = ${scalar.toFixed(2)}`;
+      }
+    }
+
+    // Dot product angle arc
+    if(showDot){
+      const angleA = Math.atan2(A[1],A[0]), angleB = Math.atan2(B[1],B[0]);
+      ctx.strokeStyle='rgba(251,191,36,0.3)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(...toC(0,0), 30, -angleA, -angleB, angleA>angleB);
+      ctx.stroke();
+    }
+
+    // Draw vectors A and B
+    drawArrow([0,0], A, '#6366f1', 3, 'A');
+    drawArrow([0,0], B, '#22d3ee', 3, 'B');
+
+    updateInfo();
+  }
+
+  function updateInfo(){
+    const mA=mag(A), mB=mag(B);
+    document.getElementById('info-a').innerHTML=`A = (${A[0].toFixed(1)}, ${A[1].toFixed(1)})<br>|A| = ${mA.toFixed(2)}`;
+    document.getElementById('info-b').innerHTML=`B = (${B[0].toFixed(1)}, ${B[1].toFixed(1)})<br>|B| = ${mB.toFixed(2)}`;
+
+    if(showSum){
+      const S=[A[0]+B[0],A[1]+B[1]];
+      document.getElementById('info-sum').innerHTML=`A + B = (${S[0].toFixed(1)}, ${S[1].toFixed(1)})<br>|A+B| = ${mag(S).toFixed(2)}`;
+    }
+    if(showDot){
+      const d=dot(A,B);
+      const angle = Math.acos(Math.max(-1,Math.min(1,d/(mA*mB||1))))*180/Math.PI;
+      document.getElementById('dot-val').innerHTML=`A &middot; B = <span style="color:${d>0.1?'var(--green)':d<-0.1?'var(--red)':'var(--yellow)'}">${d.toFixed(2)}</span>`;
+      document.getElementById('dot-angle').textContent=`Angle: ${angle.toFixed(1)}\u00B0`;
+    }
+
+    // Overlay
+    const d=dot(A,B);
+    const angle=Math.acos(Math.max(-1,Math.min(1,d/(mA*mB||1))))*180/Math.PI;
+    document.getElementById('overlay').innerHTML=
+      `A = (${A[0].toFixed(1)}, ${A[1].toFixed(1)}) &nbsp; B = (${B[0].toFixed(1)}, ${B[1].toFixed(1)}) &nbsp; A&middot;B = <span class="value">${d.toFixed(2)}</span> &nbsp; angle = <span class="value">${angle.toFixed(1)}&deg;</span>`;
+  }
+
+  // Dragging
+  canvas.addEventListener('pointerdown', e=>{
+    const r=canvas.getBoundingClientRect();
+    const [mx,my] = [e.clientX-r.left, e.clientY-r.top];
+    const [aX,aY]=toC(A[0],A[1]), [bX,bY]=toC(B[0],B[1]);
+    if(Math.hypot(mx-aX,my-aY)<20) dragging='a';
+    else if(Math.hypot(mx-bX,my-bY)<20) dragging='b';
+    else dragging=null;
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const r=canvas.getBoundingClientRect();
+    const [x,y]=toD(e.clientX-r.left, e.clientY-r.top);
+    const cx=Math.max(-4.5,Math.min(4.5,x)), cy=Math.max(-4.5,Math.min(4.5,y));
+    if(dragging==='a'){A=[cx,cy];}else{B=[cx,cy];}
+    draw();
+  });
+  canvas.addEventListener('pointerup', ()=>{ dragging=null; });
+  canvas.addEventListener('pointerleave', ()=>{ dragging=null; });
+
+  // Toggles
+  document.getElementById('tog-sum').addEventListener('click',function(){
+    showSum=!showSum; this.classList.toggle('active');
+    document.getElementById('sec-sum').style.display=showSum?'':'none'; draw();
+  });
+  document.getElementById('tog-dot').addEventListener('click',function(){
+    showDot=!showDot; this.classList.toggle('active');
+    document.getElementById('sec-dot').style.display=showDot?'':'none'; draw();
+  });
+  document.getElementById('tog-proj').addEventListener('click',function(){
+    showProj=!showProj; this.classList.toggle('active');
+    document.getElementById('sec-proj').style.display=showProj?'':'none'; draw();
+  });
+
+  // Presets
+  document.querySelectorAll('[data-preset]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const p=btn.dataset.preset;
+      if(p==='same'){A=[3,1];B=[2,0.67];}
+      else if(p==='perp'){A=[2,1];B=[-1,2];}
+      else if(p==='opposite'){A=[2,1];B=[-2,-1];}
+      else if(p==='unit'){A=[1,0];B=[Math.cos(Math.PI/3),Math.sin(Math.PI/3)];}
+      draw();
+    });
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slopes &amp; Derivatives - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Slopes &amp; Derivatives</h1>
+      <span class="topic-desc">Drag along the curve to see the tangent line &mdash; its slope IS the derivative</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        x = <span class="value" id="ov-x">0.00</span> &nbsp;
+        slope = <span class="value" id="ov-slope">0.00</span> &nbsp;
+        <span id="ov-desc">Flat &mdash; not changing</span>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">The derivative = "how fast is it changing right now?"</div>
+        <div class="guide-text">
+          Imagine driving on a hilly road. Your <strong>speedometer</strong> doesn't show where you are &mdash; it shows how fast you're <em>moving</em> at this instant. The derivative is the speedometer for any function. It tells you the <strong>slope at exactly one point</strong>.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Function</h3>
+        <div class="btn-group" style="flex-wrap:wrap">
+          <button class="btn btn-secondary active" data-fn="para">y = x&sup2;</button>
+          <button class="btn btn-secondary" data-fn="cubic">y = x&sup3;/3</button>
+          <button class="btn btn-secondary" data-fn="sine">y = sin(x)</button>
+        </div>
+        <div class="btn-group" style="flex-wrap:wrap;margin-top:6px">
+          <button class="btn btn-secondary" data-fn="hill">Hill</button>
+          <button class="btn btn-secondary" data-fn="valley">Valley</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Position (x)</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Drag along the curve</span>
+            <span class="slider-value" id="x-val">0.00</span>
+          </div>
+          <input type="range" id="x-slider" min="-4" max="4" step="0.02" value="0">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Display</h3>
+        <div class="toggle-chips">
+          <div class="chip active" id="tog-tangent">Tangent Line</div>
+          <div class="chip active" id="tog-deriv">Derivative Curve</div>
+          <div class="chip" id="tog-secant">Secant Line</div>
+        </div>
+        <div class="slider-group" id="secant-group" style="display:none;margin-top:8px">
+          <div class="slider-label">
+            <span>Secant &Delta;x</span>
+            <span class="slider-value" id="dx-val">1.00</span>
+          </div>
+          <input type="range" id="dx-slider" min="0.05" max="2" step="0.05" value="1">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Slope-o-Meter</h3>
+        <div style="position:relative;height:80px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <canvas id="meter" style="width:100%;height:100%;display:block;"></canvas>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Intuition Builder</h3>
+        <div class="info-box" id="intuition">
+          At x = 0, the parabola is at its lowest point. The tangent line is perfectly <strong>flat</strong> (slope = 0). This means the function is not changing at this instant &mdash; it's a minimum!
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Try This!</h3>
+        <div class="info-box">
+          <strong>1.</strong> On <code>y = x&sup2;</code>, find where the slope is exactly 0. What's special about that point?<br>
+          <strong>2.</strong> Turn on "Secant Line" and shrink &Delta;x toward 0. Watch the secant become the tangent &mdash; <em>that's the limit definition of a derivative!</em><br>
+          <strong>3.</strong> On "Hill", find where slope = 0. That's the peak &mdash; gradient descent stops here!
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Connection to AI</h3>
+        <div class="info-box">
+          <a href="gradient-descent.html">Gradient descent</a> is literally "follow the slope downhill." When training a neural network, we compute the derivative of the loss function, and step in the direction where the slope goes <em>down</em>. The derivative is the engine that makes all AI learning possible.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Key Vocabulary</h3>
+        <div class="learn-more" style="margin:0">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Tangent vs Secant
+          </button>
+          <div class="learn-more-content">
+            A <strong>secant line</strong> connects two points on a curve &mdash; it gives the <em>average</em> slope between them. A <strong>tangent line</strong> touches the curve at exactly one point &mdash; it gives the <em>instantaneous</em> slope. The derivative is what you get when you shrink the secant until the two points merge into one.
+          </div>
+        </div>
+        <div class="learn-more">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Minimum, Maximum, Saddle
+          </button>
+          <div class="learn-more-content">
+            Where slope = 0, something interesting happens: it could be a <strong>minimum</strong> (valley bottom), a <strong>maximum</strong> (hill top), or a <strong>saddle point</strong> (flat but not a peak or valley). Gradient descent looks for minima but can get tricked by saddle points &mdash; try the <a href="gradient-descent.html">3D visualization</a> to see this!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const meterEl = document.getElementById('meter');
+  const mCtx = meterEl.getContext('2d');
+  let W, H;
+
+  const fns = {
+    para:  { fn: x=>x*x,          deriv: x=>2*x,                    label:'x\u00B2',   color:'#6366f1' },
+    cubic: { fn: x=>x*x*x/3,      deriv: x=>x*x,                    label:'x\u00B3/3', color:'#22d3ee' },
+    sine:  { fn: x=>Math.sin(x),   deriv: x=>Math.cos(x),            label:'sin(x)',    color:'#f472b6' },
+    hill:  { fn: x=>3*Math.exp(-x*x/2), deriv: x=>-3*x*Math.exp(-x*x/2), label:'hill', color:'#34d399' },
+    valley:{ fn: x=>-2*Math.exp(-x*x)+3, deriv: x=>4*x*Math.exp(-x*x),  label:'valley',color:'#fb923c' },
+  };
+
+  let current = 'para', xVal = 0, dx = 1;
+  let showTangent = true, showDeriv = true, showSecant = false;
+  const xR = [-4.5,4.5], yR = [-4,5];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+
+    const mr=meterEl.parentElement.getBoundingClientRect();
+    meterEl.width=mr.width*devicePixelRatio; meterEl.height=mr.height*devicePixelRatio;
+    mCtx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+
+  function drawCurve(fn, color, lw, dashed){
+    ctx.strokeStyle=color; ctx.lineWidth=lw;
+    if(dashed) ctx.setLineDash([6,4]); else ctx.setLineDash([]);
+    ctx.beginPath(); let s=false;
+    for(let px=0;px<W;px++){
+      const x=xR[0]+(px/W)*(xR[1]-xR[0]);
+      const y=fn(x);
+      const [cx,cy]=toC(x,y);
+      if(cy<-100||cy>H+100){s=false;continue;}
+      if(!s){ctx.moveTo(cx,cy);s=true;}else ctx.lineTo(cx,cy);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function draw(){
+    const f=fns[current];
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=Math.ceil(xR[0]);x<=xR[1];x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=Math.ceil(yR[0]);y<=yR[1];y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
+    for(let x=-4;x<=4;x++){if(!x)continue;const[px]=toC(x,0);ctx.fillText(x,px,oy+14);}
+
+    // Main curve
+    drawCurve(f.fn, f.color, 3, false);
+
+    // Derivative curve
+    if(showDeriv) drawCurve(f.deriv, '#fbbf24', 2, true);
+
+    const yVal = f.fn(xVal);
+    const slope = f.deriv(xVal);
+    const [px,py] = toC(xVal, yVal);
+
+    // Secant line
+    if(showSecant){
+      const x2=xVal+dx, y2=f.fn(x2);
+      const secSlope=(y2-yVal)/dx;
+      const [px2,py2]=toC(x2,y2);
+      // Draw secant extended
+      ctx.strokeStyle='rgba(251,146,60,0.5)'; ctx.lineWidth=2;
+      const ext=6;
+      const [sx1,sy1]=toC(xVal-ext, yVal-secSlope*ext);
+      const [sx2,sy2]=toC(xVal+ext, yVal+secSlope*ext);
+      ctx.beginPath(); ctx.moveTo(sx1,sy1); ctx.lineTo(sx2,sy2); ctx.stroke();
+      // Second point
+      ctx.fillStyle='#fb923c'; ctx.beginPath(); ctx.arc(px2,py2,5,0,Math.PI*2); ctx.fill();
+      // Delta x bracket
+      ctx.strokeStyle='rgba(251,146,60,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px2,py); ctx.lineTo(px2,py2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(251,146,60,0.6)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
+      ctx.fillText('\u0394x='+dx.toFixed(2),(px+px2)/2,py+16);
+    }
+
+    // Tangent line
+    if(showTangent){
+      ctx.strokeStyle='rgba(248,113,113,0.8)'; ctx.lineWidth=2.5;
+      const ext=3;
+      const [tx1,ty1]=toC(xVal-ext, yVal-slope*ext);
+      const [tx2,ty2]=toC(xVal+ext, yVal+slope*ext);
+      ctx.beginPath(); ctx.moveTo(tx1,ty1); ctx.lineTo(tx2,ty2); ctx.stroke();
+    }
+
+    // Point on curve
+    ctx.shadowColor=f.color; ctx.shadowBlur=14;
+    ctx.fillStyle=f.color; ctx.beginPath(); ctx.arc(px,py,8,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px,py,3.5,0,Math.PI*2); ctx.fill();
+
+    // Derivative point on derivative curve (if showing)
+    if(showDeriv){
+      const [dpx,dpy]=toC(xVal, slope);
+      ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(dpx,dpy,5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(dpx,dpy,2,0,Math.PI*2); ctx.fill();
+    }
+
+    // Legend
+    ctx.font='11px JetBrains Mono';
+    const labels = [{t:'f(x) = '+f.label, c:f.color}];
+    if(showDeriv) labels.push({t:"f'(x) derivative", c:'#fbbf24'});
+    if(showTangent) labels.push({t:'tangent line', c:'#f87171'});
+    if(showSecant) labels.push({t:'secant line', c:'#fb923c'});
+    labels.forEach((l,i)=>{
+      const ly=16+i*18;
+      ctx.fillStyle=l.c; ctx.beginPath(); ctx.roundRect(12,ly-6,10,10,2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.textAlign='left'; ctx.fillText(l.t,28,ly+3);
+    });
+
+    // Meter
+    drawMeter(slope);
+
+    // Overlay
+    document.getElementById('ov-x').textContent=xVal.toFixed(2);
+    document.getElementById('ov-slope').textContent=slope.toFixed(3);
+    const desc = Math.abs(slope)<0.05?'Flat \u2014 not changing':
+                 slope>0?(slope>2?'Steep uphill!':'Going up'):
+                 (slope<-2?'Steep downhill!':'Going down');
+    document.getElementById('ov-desc').textContent=desc;
+
+    // Intuition
+    updateIntuition(slope, yVal, xVal);
+  }
+
+  function drawMeter(slope){
+    const mw=meterEl.parentElement.getBoundingClientRect().width;
+    const mh=meterEl.parentElement.getBoundingClientRect().height;
+    mCtx.clearRect(0,0,mw,mh); mCtx.fillStyle='#12121f'; mCtx.fillRect(0,0,mw,mh);
+
+    // Bar: center=0, left=negative, right=positive
+    const cx=mw/2, barH=24, barY=(mh-barH)/2;
+    mCtx.fillStyle='rgba(255,255,255,0.05)';
+    mCtx.beginPath(); mCtx.roundRect(12,barY,mw-24,barH,6); mCtx.fill();
+
+    // Center line
+    mCtx.strokeStyle='rgba(255,255,255,0.2)'; mCtx.lineWidth=1;
+    mCtx.beginPath(); mCtx.moveTo(cx,barY-4); mCtx.lineTo(cx,barY+barH+4); mCtx.stroke();
+
+    // Fill bar
+    const maxSlope=5;
+    const t=Math.max(-1,Math.min(1,slope/maxSlope));
+    const barW=(mw-24)/2*Math.abs(t);
+    const color=t>=0?'#f87171':'#22d3ee';
+    mCtx.fillStyle=color; mCtx.globalAlpha=0.7;
+    if(t>=0) mCtx.fillRect(cx,barY,barW,barH);
+    else mCtx.fillRect(cx-barW,barY,barW,barH);
+    mCtx.globalAlpha=1;
+
+    // Labels
+    mCtx.fillStyle='rgba(255,255,255,0.3)'; mCtx.font='9px JetBrains Mono'; mCtx.textAlign='center';
+    mCtx.fillText('\u2212slope',mw*0.2, barY+barH+16);
+    mCtx.fillText('0',cx, barY+barH+16);
+    mCtx.fillText('+slope',mw*0.8, barY+barH+16);
+
+    // Slope value
+    mCtx.fillStyle=color; mCtx.font='bold 13px JetBrains Mono';
+    mCtx.fillText(slope.toFixed(2), cx, barY-6);
+  }
+
+  function updateIntuition(slope, y, x){
+    const el=document.getElementById('intuition');
+    let msg='';
+    if(Math.abs(slope)<0.08){
+      msg=`At x = ${x.toFixed(1)}, the slope is nearly <strong>zero</strong>. The function is flat here \u2014 this could be a minimum, maximum, or saddle point. In AI, gradient descent would stop here because there's no slope to follow.`;
+    } else if(slope>2){
+      msg=`The slope is <strong>${slope.toFixed(1)}</strong> \u2014 steeply uphill! The function is increasing rapidly. In gradient descent, we'd take a big step in the <em>opposite</em> direction (downhill).`;
+    } else if(slope>0){
+      msg=`Slope is <strong>+${slope.toFixed(2)}</strong> \u2014 gently going up. The function is increasing. A gradient descent optimizer would step to the left (toward lower values).`;
+    } else if(slope>-2){
+      msg=`Slope is <strong>${slope.toFixed(2)}</strong> \u2014 gently going down. The function is decreasing. A gradient descent optimizer would step to the right (continuing downhill).`;
+    } else {
+      msg=`The slope is <strong>${slope.toFixed(1)}</strong> \u2014 steeply downhill! The function is dropping fast. Gradient descent would take a big step in this direction.`;
+    }
+    el.innerHTML = msg;
+  }
+
+  // Controls
+  const slider=document.getElementById('x-slider');
+  slider.addEventListener('input',()=>{ xVal=parseFloat(slider.value); document.getElementById('x-val').textContent=xVal.toFixed(2); draw(); });
+
+  document.querySelectorAll('[data-fn]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-fn]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      current=btn.dataset.fn; draw();
+    });
+  });
+
+  document.getElementById('tog-tangent').addEventListener('click',function(){ showTangent=!showTangent; this.classList.toggle('active'); draw(); });
+  document.getElementById('tog-deriv').addEventListener('click',function(){ showDeriv=!showDeriv; this.classList.toggle('active'); draw(); });
+  document.getElementById('tog-secant').addEventListener('click',function(){
+    showSecant=!showSecant; this.classList.toggle('active');
+    document.getElementById('secant-group').style.display=showSecant?'':'none'; draw();
+  });
+  document.getElementById('dx-slider').addEventListener('input',e=>{
+    dx=parseFloat(e.target.value); document.getElementById('dx-val').textContent=dx.toFixed(2); draw();
+  });
+
+  canvas.addEventListener('mousemove',e=>{
+    const r=canvas.getBoundingClientRect();
+    const x=xR[0]+((e.clientX-r.left)/W)*(xR[1]-xR[0]);
+    xVal=Math.max(-4,Math.min(4,x)); slider.value=xVal;
+    document.getElementById('x-val').textContent=xVal.toFixed(2); draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>
