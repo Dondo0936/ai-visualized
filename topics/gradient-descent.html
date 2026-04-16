@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gradient Descent - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    #minimap { position:absolute; top:16px; right:16px; width:140px; height:140px;
+      border-radius:10px; border:1px solid var(--border); background:#12121f;
+      z-index:10; box-shadow:0 2px 12px rgba(0,0,0,0.5); cursor:crosshair; }
+    #minimap-label { position:absolute; top:160px; right:16px; z-index:10;
+      font:600 0.65rem var(--font-mono); color:var(--text-muted);
+      text-transform:uppercase; letter-spacing:0.06em; }
+    .preset-btn { width:100%; text-align:left; justify-content:flex-start; gap:10px; }
+    .preset-btn .preset-desc { font-weight:400; color:var(--text-muted); font-size:0.72rem; }
+    #loss-chart { width:100%; height:110px; border-radius:var(--radius);
+      border:1px solid var(--border); background:var(--bg-card); display:block; }
+    .compare-legend { display:flex; gap:14px; font-size:0.75rem; margin-top:6px; }
+    .compare-legend span { display:flex; align-items:center; gap:5px; }
+    .compare-legend .dot { width:8px; height:8px; border-radius:50%; }
+    .narration-box { background:var(--bg-card); border:1px solid var(--border);
+      border-radius:var(--radius); padding:14px; font-size:0.82rem;
+      color:var(--text-secondary); line-height:1.65; min-height:52px;
+      transition:background 0.3s; }
+    .narration-box.warn { border-color:rgba(251,191,36,0.3); background:rgba(251,191,36,0.04); }
+    .narration-box.error { border-color:rgba(248,113,113,0.3); background:rgba(248,113,113,0.04); }
+    .narration-box.success { border-color:rgba(52,211,153,0.3); background:rgba(52,211,153,0.04); }
+  </style>
+</head>
+<body>
+
+  <div class="topic-page has-guide">
+
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Gradient Descent</h1>
+      <span class="topic-desc">Click the surface to start, compare optimizers, see what goes wrong</span>
+    </div>
+
+    <!-- 3D Canvas + Minimap -->
+    <div class="canvas-area" id="canvas-area">
+      <canvas id="minimap" width="140" height="140"></canvas>
+      <span id="minimap-label">Top-down view</span>
+      <div class="canvas-overlay" id="overlay">Drag to rotate &middot; Scroll to zoom &middot; Click surface to start</div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+
+      <!-- Guide -->
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" id="guide-dismiss">&times;</button>
+        <div class="guide-step-counter" id="guide-counter">Step 1 of 3</div>
+        <div class="guide-title" id="guide-title"></div>
+        <div class="guide-text" id="guide-text"></div>
+        <div class="guide-nav">
+          <button class="btn btn-secondary" id="guide-prev" disabled>Prev</button>
+          <button class="btn btn-primary" id="guide-next">Next</button>
+        </div>
+      </div>
+
+      <!-- Mode -->
+      <div class="control-section">
+        <h3>Mode</h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" data-mode="auto">Auto</button>
+          <button class="btn btn-secondary" data-mode="step">Step-by-Step</button>
+          <button class="btn btn-secondary" data-mode="compare">Compare</button>
+        </div>
+      </div>
+
+      <!-- Optimizer: single -->
+      <div class="control-section" id="sec-single-opt">
+        <h3>Optimizer</h3>
+        <div class="btn-group" id="opt-btns">
+          <button class="btn btn-secondary active" data-opt="sgd">SGD</button>
+          <button class="btn btn-secondary" data-opt="momentum">Momentum</button>
+          <button class="btn btn-secondary" data-opt="adam">Adam</button>
+        </div>
+      </div>
+
+      <!-- Optimizer: compare -->
+      <div class="control-section" id="sec-compare-opt" style="display:none">
+        <h3>Optimizer A <span style="color:#f87171">(Red)</span></h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" data-opta="sgd">SGD</button>
+          <button class="btn btn-secondary" data-opta="momentum">Mom.</button>
+          <button class="btn btn-secondary" data-opta="adam">Adam</button>
+        </div>
+        <h3 style="margin-top:10px">Optimizer B <span style="color:#22d3ee">(Cyan)</span></h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary" data-optb="sgd">SGD</button>
+          <button class="btn btn-secondary" data-optb="momentum">Mom.</button>
+          <button class="btn btn-secondary active" data-optb="adam">Adam</button>
+        </div>
+      </div>
+
+      <!-- Step controls -->
+      <div class="control-section" id="sec-step" style="display:none">
+        <button class="btn btn-primary" id="btn-step" style="width:100%">Take One Step</button>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;text-align:center">
+          Click the surface first, then step through one iteration at a time
+        </div>
+      </div>
+
+      <!-- Parameters -->
+      <div class="control-section">
+        <h3>Parameters</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Learning Rate (&alpha;)</span>
+            <span class="slider-value" id="lr-value">0.050</span>
+          </div>
+          <input type="range" id="lr-slider" min="0.001" max="0.5" step="0.001" value="0.05">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Momentum (&beta;)</span>
+            <span class="slider-value" id="momentum-value">0.90</span>
+          </div>
+          <input type="range" id="momentum-slider" min="0" max="0.99" step="0.01" value="0.90">
+        </div>
+        <div class="slider-group" id="speed-group">
+          <div class="slider-label">
+            <span>Speed</span>
+            <span class="slider-value" id="speed-value">5</span>
+          </div>
+          <input type="range" id="speed-slider" min="1" max="20" step="1" value="5">
+        </div>
+      </div>
+
+      <!-- Surface -->
+      <div class="control-section">
+        <h3>Surface</h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" data-surface="bowl">Bowl</button>
+          <button class="btn btn-secondary" data-surface="saddle">Saddle</button>
+          <button class="btn btn-secondary" data-surface="rastrigin">Bumpy</button>
+        </div>
+      </div>
+
+      <!-- Failure Presets -->
+      <div class="control-section">
+        <h3>Try These Experiments</h3>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-secondary preset-btn" data-preset="lr_high">
+            LR Too High <span class="preset-desc">&mdash; watch it diverge</span>
+          </button>
+          <button class="btn btn-secondary preset-btn" data-preset="local_min">
+            Local Minimum Trap <span class="preset-desc">&mdash; stuck in a dip</span>
+          </button>
+          <button class="btn btn-secondary preset-btn" data-preset="saddle_sgd">
+            Saddle Point <span class="preset-desc">&mdash; SGD stalls</span>
+          </button>
+          <button class="btn btn-secondary preset-btn" data-preset="saddle_adam">
+            Adam Escapes <span class="preset-desc">&mdash; same start, Adam wins</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Narration -->
+      <div class="control-section">
+        <h3>What's Happening</h3>
+        <div class="narration-box" id="narration">
+          Click on the 3D surface to place a starting point. The optimizer will try to find the lowest valley from wherever you click.
+        </div>
+      </div>
+
+      <!-- Loss Chart -->
+      <div class="control-section">
+        <h3>Loss Over Time</h3>
+        <canvas id="loss-chart"></canvas>
+        <div class="compare-legend" id="chart-legend" style="display:none">
+          <span><span class="dot" style="background:#f87171"></span> Optimizer A</span>
+          <span><span class="dot" style="background:#22d3ee"></span> Optimizer B</span>
+        </div>
+      </div>
+
+      <!-- View -->
+      <div class="control-section">
+        <h3>View</h3>
+        <div class="view-toggle">
+          <button class="active" data-view="3d">3D</button>
+          <button data-view="top">Top-Down</button>
+        </div>
+        <div class="toggle-chips" style="margin-top:8px">
+          <div class="chip active" id="toggle-wireframe">Wireframe</div>
+          <div class="chip active" id="toggle-contours">Contours</div>
+          <div class="chip active" id="toggle-arrows">Step Arrows</div>
+        </div>
+      </div>
+
+      <!-- Reset -->
+      <div class="control-section">
+        <button class="btn btn-primary" id="btn-reset" style="width:100%">Reset Path</button>
+      </div>
+
+      <!-- Key Concepts -->
+      <div class="control-section">
+        <h3>Key Concepts</h3>
+        <div class="learn-more" style="margin:0">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            What is a loss surface?
+          </button>
+          <div class="learn-more-content">
+            The <strong>loss function</strong> measures how wrong a model's predictions are. Each point on this surface represents a set of model parameters (weights). Height = error. Training a neural network = finding the lowest point. Real networks have millions of dimensions &mdash; we show 2 so you can visualize it.
+          </div>
+        </div>
+        <div class="learn-more">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            What is the gradient?
+          </button>
+          <div class="learn-more-content">
+            The <strong>gradient</strong> is a vector pointing in the steepest uphill direction. Its magnitude tells you how steep the slope is. Gradient descent steps in the <em>opposite</em> direction (downhill). When the gradient is near zero, you're at a flat spot &mdash; hopefully a minimum, but maybe a saddle point.
+          </div>
+        </div>
+        <div class="learn-more">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Why different optimizers?
+          </button>
+          <div class="learn-more-content">
+            <strong>SGD</strong> follows the raw gradient &mdash; simple but slow in curved valleys. <strong>Momentum</strong> adds inertia (like a heavy ball), building speed in consistent directions. <strong>Adam</strong> adapts the step size per-parameter and tracks both direction and magnitude. Most modern AI (GPT, DALL-E) uses Adam or AdamW.
+          </div>
+        </div>
+        <div class="learn-more">
+          <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+            <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            How is this used in real AI?
+          </button>
+          <div class="learn-more-content">
+            Every neural network is trained with gradient descent. The model starts with random weights (a random point on the loss surface) and iteratively adjusts them to reduce error. Modern LLMs use AdamW with learning rate warmup + cosine decay, training for days across thousands of GPUs.
+          </div>
+        </div>
+      </div>
+
+    </div><!-- control-panel -->
+  </div><!-- topic-page -->
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// =============================================
+// Config
+// =============================================
+const DOMAIN = { min: -3, max: 3 };
+const GRID = 120;
+const SCALE = { xz: 1, y: 0.35 };
+
+// =============================================
+// State
+// =============================================
+let mode = 'auto'; // auto | step | compare
+let surface = 'bowl';
+let optA = 'sgd', optB = 'adam';
+let lr = 0.05, beta = 0.9, speed = 5;
+let showWireframe = true, showContours = true, showArrows = true;
+
+// Run A (always active)
+let posA = null, pathA = [], velA = [0,0], mA = [0,0], vA_ = [0,0], tA = 0;
+let runA = false, lossHistA = [];
+// Run B (compare mode only)
+let posB = null, pathB = [], velB = [0,0], mB = [0,0], vB_ = [0,0], tB = 0;
+let runB = false, lossHistB = [];
+
+// =============================================
+// Surface definitions
+// =============================================
+const surfaces = {
+  bowl: {
+    fn: (x,y) => 0.5*x*x + 2*y*y + 0.8*x*y - 0.5*x,
+    grad: (x,y) => [x + 0.8*y - 0.5, 4*y + 0.8*x],
+  },
+  saddle: {
+    fn: (x,y) => x*x - y*y + 0.3*x,
+    grad: (x,y) => [2*x + 0.3, -2*y],
+  },
+  rastrigin: {
+    fn: (x,y) => 0.5*(x*x+y*y) + 2*(Math.cos(2*Math.PI*x)+Math.cos(2*Math.PI*y)),
+    grad: (x,y) => [x - 4*Math.PI*Math.sin(2*Math.PI*x), y - 4*Math.PI*Math.sin(2*Math.PI*y)],
+  },
+};
+
+// =============================================
+// Optimizer step function
+// =============================================
+function optimStep(pos, vel, m, v, t, opt) {
+  const g = surfaces[surface].grad(pos[0], pos[1]);
+  let newT = t;
+  if (opt === 'sgd') {
+    pos[0] -= lr * g[0]; pos[1] -= lr * g[1];
+  } else if (opt === 'momentum') {
+    vel[0] = beta*vel[0] + lr*g[0]; vel[1] = beta*vel[1] + lr*g[1];
+    pos[0] -= vel[0]; pos[1] -= vel[1];
+  } else {
+    newT = t + 1;
+    const b1=0.9, b2=0.999, eps=1e-8;
+    m[0]=b1*m[0]+(1-b1)*g[0]; m[1]=b1*m[1]+(1-b1)*g[1];
+    v[0]=b2*v[0]+(1-b2)*g[0]*g[0]; v[1]=b2*v[1]+(1-b2)*g[1]*g[1];
+    const mh0=m[0]/(1-b1**newT), mh1=m[1]/(1-b1**newT);
+    const vh0=v[0]/(1-b2**newT), vh1=v[1]/(1-b2**newT);
+    pos[0] -= lr*mh0/(Math.sqrt(vh0)+eps);
+    pos[1] -= lr*mh1/(Math.sqrt(vh1)+eps);
+  }
+  pos[0]=Math.max(DOMAIN.min,Math.min(DOMAIN.max,pos[0]));
+  pos[1]=Math.max(DOMAIN.min,Math.min(DOMAIN.max,pos[1]));
+  return newT;
+}
+
+function gradNorm(x,y) {
+  const g = surfaces[surface].grad(x,y);
+  return Math.sqrt(g[0]*g[0]+g[1]*g[1]);
+}
+
+// =============================================
+// Colormap (viridis-ish)
+// =============================================
+function heightColor(t) {
+  t = Math.max(0, Math.min(1, t));
+  let r,g,b;
+  if(t<.25){const s=t/.25; r=.06+s*.08;g=.04+s*.18;b=.31+s*.24;}
+  else if(t<.5){const s=(t-.25)/.25; r=.14-s*.06;g=.22+s*.3;b=.55-s*.12;}
+  else if(t<.75){const s=(t-.5)/.25; r=.08+s*.5;g=.52+s*.22;b=.43-s*.22;}
+  else{const s=(t-.75)/.25; r=.58+s*.42;g=.74+s*.2;b=.21-s*.1;}
+  return new THREE.Color(r,g,b);
+}
+function heightColorCSS(t) {
+  const c = heightColor(t);
+  return `rgb(${Math.floor(c.r*255)},${Math.floor(c.g*255)},${Math.floor(c.b*255)})`;
+}
+
+// =============================================
+// Three.js setup
+// =============================================
+const container = document.getElementById('canvas-area');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x08080f);
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x08080f, 0.06);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(4.5, 3.5, 4.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0,0,0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2;
+controls.maxDistance = 15;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.update();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dLight = new THREE.DirectionalLight(0xffffff, 1); dLight.position.set(5,8,5); scene.add(dLight);
+const dLight2 = new THREE.DirectionalLight(0x8888ff, 0.3); dLight2.position.set(-5,3,-5); scene.add(dLight2);
+
+// Ground plane
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(8,8).rotateX(-Math.PI/2),
+  new THREE.MeshBasicMaterial({color:0x08080f, transparent:true, opacity:0.95})
+);
+scene.add(ground);
+
+// =============================================
+// Surface mesh
+// =============================================
+let surfMesh, wireMesh, contLines;
+let hMin=0, hMax=1;
+
+function buildSurface() {
+  [surfMesh, wireMesh, contLines].forEach(o => { if(o){scene.remove(o);o.geometry.dispose();} });
+  const fn = surfaces[surface].fn;
+  const geo = new THREE.PlaneGeometry(DOMAIN.max-DOMAIN.min, DOMAIN.max-DOMAIN.min, GRID, GRID);
+  const pos = geo.attributes.position;
+  const colors = new THREE.Float32BufferAttribute(pos.count*3, 3);
+  geo.setAttribute('color', colors);
+
+  const heights = new Float32Array(pos.count);
+  let mn=Infinity, mx=-Infinity;
+  for(let i=0;i<pos.count;i++){
+    const h = fn(pos.getX(i), pos.getY(i));
+    heights[i]=h; if(h<mn)mn=h; if(h>mx)mx=h;
+  }
+  hMin=mn; hMax=mx;
+
+  for(let i=0;i<pos.count;i++){
+    const px=pos.getX(i), pz=pos.getY(i), h=heights[i];
+    const t=(h-hMin)/(hMax-hMin||1);
+    pos.setXYZ(i, px*SCALE.xz, h*SCALE.y, pz*SCALE.xz);
+    const c=heightColor(t);
+    colors.setXYZ(i, c.r, c.g, c.b);
+  }
+  geo.computeVertexNormals();
+
+  surfMesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    vertexColors:true, side:THREE.DoubleSide, shininess:40, transparent:true, opacity:0.92
+  }));
+  scene.add(surfMesh);
+
+  wireMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color:0xffffff, wireframe:true, transparent:true, opacity:0.04
+  }));
+  wireMesh.visible = showWireframe;
+  scene.add(wireMesh);
+
+  buildContours(fn);
+  ground.position.y = hMin*SCALE.y - 0.16;
+  computeMinimapImage();
+}
+
+function buildContours(fn) {
+  const levels=16, res=60, step=(DOMAIN.max-DOMAIN.min)/res;
+  const hStep=(hMax-hMin)/levels, pts=[];
+  for(let lv=1;lv<levels;lv++){
+    const th=hMin+hStep*lv;
+    for(let i=0;i<res;i++) for(let j=0;j<res;j++){
+      const x0=DOMAIN.min+i*step, z0=DOMAIN.min+j*step, x1=x0+step, z1=z0+step;
+      const v00=fn(x0,z0),v10=fn(x1,z0),v01=fn(x0,z1),v11=fn(x1,z1);
+      const lerp=(a,b,va,vb)=>a+(th-va)/(vb-va)*(b-a);
+      const edges=[];
+      if((v00>th)!==(v10>th)) edges.push([lerp(x0,x1,v00,v10),z0]);
+      if((v10>th)!==(v11>th)) edges.push([x1,lerp(z0,z1,v10,v11)]);
+      if((v01>th)!==(v11>th)) edges.push([lerp(x0,x1,v01,v11),z1]);
+      if((v00>th)!==(v01>th)) edges.push([x0,lerp(z0,z1,v00,v01)]);
+      if(edges.length>=2){
+        const gy=hMin*SCALE.y-0.15;
+        pts.push(new THREE.Vector3(edges[0][0]*SCALE.xz,gy,edges[0][1]*SCALE.xz),
+                 new THREE.Vector3(edges[1][0]*SCALE.xz,gy,edges[1][1]*SCALE.xz));
+      }
+    }
+  }
+  contLines = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.12})
+  );
+  contLines.visible = showContours;
+  scene.add(contLines);
+}
+
+// =============================================
+// Path visualization (A = red, B = cyan)
+// =============================================
+let lineA, lineB;
+const ballA = makeBall(0xf87171); scene.add(ballA);
+const ballB = makeBall(0x22d3ee); scene.add(ballB); ballB.visible = false;
+const arrowGroupA = new THREE.Group(); scene.add(arrowGroupA);
+const arrowGroupB = new THREE.Group(); scene.add(arrowGroupB);
+
+function makeBall(color) {
+  const b = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06,16,16),
+    new THREE.MeshBasicMaterial({color})
+  );
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.07,0.12,24),
+    new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.4, side:THREE.DoubleSide})
+  );
+  ring.rotation.x = -Math.PI/2;
+  b.add(ring);
+  b.visible = false;
+  b.userData.ring = ring;
+  return b;
+}
+
+function updatePathLine(path, color, oldLine) {
+  if(oldLine){scene.remove(oldLine);oldLine.geometry.dispose();}
+  if(path.length<2) return null;
+  const fn=surfaces[surface].fn;
+  const pts=path.map(p=>new THREE.Vector3(p[0]*SCALE.xz, fn(p[0],p[1])*SCALE.y+0.02, p[1]*SCALE.xz));
+  const geo=new THREE.BufferGeometry().setFromPoints(pts);
+  const cols=new Float32Array(pts.length*3);
+  const c=new THREE.Color(color);
+  for(let i=0;i<pts.length;i++){
+    const t=i/(pts.length-1);
+    cols[i*3]=c.r*(0.3+0.7*t); cols[i*3+1]=c.g*(0.3+0.7*t); cols[i*3+2]=c.b*(0.3+0.7*t);
+  }
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+  const line=new THREE.Line(geo, new THREE.LineBasicMaterial({vertexColors:true}));
+  scene.add(line);
+  return line;
+}
+
+function updateBall(ball, pos) {
+  if(!pos){ball.visible=false;return;}
+  const h=surfaces[surface].fn(pos[0],pos[1]);
+  ball.position.set(pos[0]*SCALE.xz, h*SCALE.y+0.05, pos[1]*SCALE.xz);
+  ball.visible=true;
+}
+
+function updateArrows(group, pos, color) {
+  while(group.children.length) group.remove(group.children[0]);
+  if(!pos||!showArrows){group.visible=false;return;}
+  const fn=surfaces[surface].fn, g=surfaces[surface].grad(pos[0],pos[1]);
+  const gn=Math.sqrt(g[0]*g[0]+g[1]*g[1]);
+  if(gn<0.001){group.visible=false;return;}
+  const h=fn(pos[0],pos[1]);
+  const origin=new THREE.Vector3(pos[0]*SCALE.xz, h*SCALE.y+0.08, pos[1]*SCALE.xz);
+
+  // Step arrow (green) = actual step direction & magnitude scaled by lr
+  const stepLen=Math.min(0.9, gn*lr*2.5);
+  const stepDir=new THREE.Vector3(-g[0], 0, -g[1]).normalize();
+  group.add(new THREE.ArrowHelper(stepDir, origin, stepLen, 0x34d399, 0.06, 0.04));
+
+  // Gradient arrow (faint red) = raw gradient direction (uphill)
+  const gradLen=Math.min(0.7, gn*0.12);
+  const gradDir=new THREE.Vector3(g[0], 0, g[1]).normalize();
+  group.add(new THREE.ArrowHelper(gradDir, origin, gradLen, 0xf8717180, 0.05, 0.035));
+
+  group.visible=true;
+}
+
+function syncVisuals() {
+  lineA = updatePathLine(pathA, 0xf87171, lineA);
+  updateBall(ballA, posA);
+  updateArrows(arrowGroupA, posA, 0x34d399);
+
+  if(mode==='compare'){
+    lineB = updatePathLine(pathB, 0x22d3ee, lineB);
+    updateBall(ballB, posB);
+    updateArrows(arrowGroupB, posB, 0x22d3ee);
+  } else {
+    if(lineB){scene.remove(lineB);lineB=null;}
+    ballB.visible=false;
+    arrowGroupB.visible=false;
+  }
+}
+
+// =============================================
+// Raycaster (click to start)
+// =============================================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let ptrDown = null;
+
+renderer.domElement.addEventListener('pointerdown', e => { ptrDown={x:e.clientX,y:e.clientY}; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if(!ptrDown) return;
+  if(Math.hypot(e.clientX-ptrDown.x, e.clientY-ptrDown.y)>5) return; // was drag
+  const r=renderer.domElement.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1;
+  mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  if(!surfMesh) return;
+  const hits=raycaster.intersectObject(surfMesh);
+  if(hits.length){
+    const p=hits[0].point;
+    const x=Math.max(DOMAIN.min,Math.min(DOMAIN.max,p.x/SCALE.xz));
+    const y=Math.max(DOMAIN.min,Math.min(DOMAIN.max,p.z/SCALE.xz));
+    startFrom(x,y);
+  }
+  ptrDown=null;
+});
+
+// Also allow clicking the minimap
+document.getElementById('minimap').addEventListener('click', e => {
+  const r=e.target.getBoundingClientRect();
+  const mx=(e.clientX-r.left)/r.width, my=(e.clientY-r.top)/r.height;
+  const x=DOMAIN.min+mx*(DOMAIN.max-DOMAIN.min);
+  const y=DOMAIN.min+my*(DOMAIN.max-DOMAIN.min);
+  startFrom(x,y);
+});
+
+function startFrom(x,y) {
+  posA=[x,y]; pathA=[[x,y]]; velA=[0,0]; mA=[0,0]; vA_=[0,0]; tA=0;
+  lossHistA=[surfaces[surface].fn(x,y)];
+  runA = mode !== 'step';
+
+  if(mode==='compare'){
+    posB=[x,y]; pathB=[[x,y]]; velB=[0,0]; mB=[0,0]; vB_=[0,0]; tB=0;
+    lossHistB=[surfaces[surface].fn(x,y)];
+    runB = true;
+  }
+  syncVisuals();
+  updateNarration();
+}
+
+function fullReset() {
+  posA=null; pathA=[]; runA=false; lossHistA=[];
+  posB=null; pathB=[]; runB=false; lossHistB=[];
+  velA=[0,0];mA=[0,0];vA_=[0,0];tA=0;
+  velB=[0,0];mB=[0,0];vB_=[0,0];tB=0;
+  ballA.visible=false; ballB.visible=false;
+  arrowGroupA.visible=false; arrowGroupB.visible=false;
+  if(lineA){scene.remove(lineA);lineA=null;}
+  if(lineB){scene.remove(lineB);lineB=null;}
+  updateNarration();
+  drawLossChart();
+  drawMinimap();
+}
+
+// =============================================
+// Narration engine
+// =============================================
+const narEl = document.getElementById('narration');
+
+function updateNarration() {
+  if(!posA) {
+    narEl.className='narration-box';
+    narEl.textContent='Click on the 3D surface (or the minimap) to place a starting point.';
+    return;
+  }
+
+  const fn=surfaces[surface].fn;
+  const step=pathA.length-1;
+  const loss=fn(posA[0],posA[1]);
+  const gn=gradNorm(posA[0],posA[1]);
+  let cls='narration-box', msg='';
+
+  if(step===0){
+    msg=`Starting at (${posA[0].toFixed(1)}, ${posA[1].toFixed(1)}) with loss = ${loss.toFixed(2)}. This simulates initializing a model with random weights.`;
+  } else {
+    const prevLoss = lossHistA.length>1 ? lossHistA[lossHistA.length-2] : loss;
+    const delta = prevLoss - loss;
+
+    // Diverging
+    if(delta < -0.5 && step > 2) {
+      cls='narration-box error';
+      msg=`Loss INCREASED to ${loss.toFixed(2)}! The learning rate (${lr}) is too high \u2014 we overshot the minimum. Try reducing \u03b1.`;
+    }
+    // Converged
+    else if(gn < 0.01 && !runA) {
+      const isLocal = surface==='rastrigin' && loss > hMin + 0.5;
+      if(isLocal){
+        cls='narration-box warn';
+        msg=`Stuck in a local minimum (loss=${loss.toFixed(3)}). The global minimum is lower. Try Momentum or Adam, or increase the learning rate to escape.`;
+      } else {
+        cls='narration-box success';
+        msg=`Converged! Found the minimum at loss = ${loss.toFixed(4)} in ${step} steps. The gradient is near zero (${gn.toFixed(5)}).`;
+      }
+    }
+    // Oscillating
+    else if(pathA.length>6 && detectOscillation(pathA)) {
+      cls='narration-box warn';
+      msg=`Oscillating! The ball is bouncing between valley walls. ${optA==='sgd'?'Try Momentum to dampen it, or reduce the learning rate.':'Try reducing the learning rate.'}`;
+    }
+    // Steep
+    else if(gn > 3) {
+      msg=`Steep slope (\u2207f = ${gn.toFixed(1)}). Taking a large step. Loss: ${prevLoss.toFixed(3)} \u2192 ${loss.toFixed(3)}.`;
+    }
+    // Normal progress
+    else if(gn > 0.1) {
+      msg=`Step ${step}: Loss ${prevLoss.toFixed(3)} \u2192 ${loss.toFixed(3)} (\u2193${delta.toFixed(3)}). Gradient: ${gn.toFixed(2)}.`;
+    }
+    // Almost there
+    else {
+      msg=`Getting close... Loss = ${loss.toFixed(4)}, gradient is small (${gn.toFixed(3)}). Almost at the minimum!`;
+    }
+
+    // Compare mode addition
+    if(mode==='compare' && posB) {
+      const lB=fn(posB[0],posB[1]);
+      const nameA=optA.toUpperCase(), nameB=optB.toUpperCase();
+      msg += ` \u2014 ${nameA}: ${loss.toFixed(3)} vs ${nameB}: ${lB.toFixed(3)}.`;
+      if(Math.abs(loss-lB)>0.1) {
+        msg += loss<lB ? ` ${nameA} is ahead!` : ` ${nameB} is winning!`;
+      }
+    }
+  }
+  narEl.className = cls;
+  narEl.textContent = msg;
+}
+
+function detectOscillation(path) {
+  if(path.length<6) return false;
+  const recent=path.slice(-6);
+  let changes=0;
+  for(let i=2;i<recent.length;i++){
+    const dx1=recent[i-1][0]-recent[i-2][0], dx2=recent[i][0]-recent[i-1][0];
+    if(dx1*dx2<0) changes++;
+  }
+  return changes>=3;
+}
+
+// =============================================
+// Loss chart (2D canvas)
+// =============================================
+const chartEl = document.getElementById('loss-chart');
+const cCtx = chartEl.getContext('2d');
+const CW=320, CH=110;
+chartEl.width=CW; chartEl.height=CH;
+
+function drawLossChart() {
+  cCtx.clearRect(0,0,CW,CH);
+  cCtx.fillStyle='#12121f'; cCtx.fillRect(0,0,CW,CH);
+
+  // Axes
+  cCtx.strokeStyle='rgba(255,255,255,0.08)'; cCtx.lineWidth=1;
+  cCtx.beginPath(); cCtx.moveTo(28,5); cCtx.lineTo(28,CH-16); cCtx.lineTo(CW-8,CH-16); cCtx.stroke();
+  cCtx.fillStyle='rgba(255,255,255,0.25)'; cCtx.font='9px JetBrains Mono,monospace';
+  cCtx.fillText('Loss',2,12); cCtx.fillText('Step',CW-32,CH-3);
+
+  function drawLine(hist, color) {
+    if(hist.length<2) return;
+    let mn=Infinity,mx=-Infinity;
+    for(const v of hist){if(v<mn)mn=v;if(v>mx)mx=v;}
+    const range=mx-mn||1;
+
+    cCtx.strokeStyle=color; cCtx.lineWidth=1.5; cCtx.beginPath();
+    for(let i=0;i<hist.length;i++){
+      const x=28+(i/(hist.length-1))*(CW-40);
+      const y=CH-18-((hist[i]-mn)/range)*(CH-28);
+      i===0?cCtx.moveTo(x,y):cCtx.lineTo(x,y);
+    }
+    cCtx.stroke();
+
+    // Current value dot
+    const lastX=CW-12, lastY=CH-18-((hist[hist.length-1]-mn)/range)*(CH-28);
+    cCtx.fillStyle=color; cCtx.beginPath(); cCtx.arc(lastX,lastY,3,0,Math.PI*2); cCtx.fill();
+
+    // Y-axis labels
+    cCtx.fillStyle='rgba(255,255,255,0.2)'; cCtx.font='8px JetBrains Mono';
+    cCtx.textAlign='right';
+    cCtx.fillText(mx.toFixed(1), 25, 14);
+    cCtx.fillText(mn.toFixed(1), 25, CH-18);
+    cCtx.textAlign='left';
+  }
+
+  drawLine(lossHistA, '#f87171');
+  if(mode==='compare') drawLine(lossHistB, '#22d3ee');
+}
+
+// =============================================
+// Minimap (2D canvas)
+// =============================================
+const miniEl = document.getElementById('minimap');
+const mCtx = miniEl.getContext('2d');
+const MS = 140;
+let minimapImg = null;
+
+function computeMinimapImage() {
+  const img = mCtx.createImageData(MS, MS);
+  const fn = surfaces[surface].fn;
+  let mn=Infinity, mx=-Infinity;
+  const h = new Float32Array(MS*MS);
+  for(let j=0;j<MS;j++) for(let i=0;i<MS;i++){
+    const v=fn(DOMAIN.min+(i/MS)*(DOMAIN.max-DOMAIN.min), DOMAIN.min+(j/MS)*(DOMAIN.max-DOMAIN.min));
+    h[j*MS+i]=v; if(v<mn)mn=v; if(v>mx)mx=v;
+  }
+  for(let j=0;j<MS;j++) for(let i=0;i<MS;i++){
+    const t=(h[j*MS+i]-mn)/(mx-mn||1);
+    const c=heightColor(t);
+    const idx=(j*MS+i)*4;
+    img.data[idx]=Math.floor(c.r*255); img.data[idx+1]=Math.floor(c.g*255);
+    img.data[idx+2]=Math.floor(c.b*255); img.data[idx+3]=200;
+  }
+  minimapImg = img;
+}
+
+function drawMinimap() {
+  if(minimapImg) mCtx.putImageData(minimapImg, 0, 0);
+
+  function drawPath(path, color) {
+    if(path.length<2) return;
+    mCtx.strokeStyle=color; mCtx.lineWidth=2; mCtx.beginPath();
+    path.forEach((p,i) => {
+      const mx=((p[0]-DOMAIN.min)/(DOMAIN.max-DOMAIN.min))*MS;
+      const my=((p[1]-DOMAIN.min)/(DOMAIN.max-DOMAIN.min))*MS;
+      i===0?mCtx.moveTo(mx,my):mCtx.lineTo(mx,my);
+    });
+    mCtx.stroke();
+    const last=path[path.length-1];
+    const lx=((last[0]-DOMAIN.min)/(DOMAIN.max-DOMAIN.min))*MS;
+    const ly=((last[1]-DOMAIN.min)/(DOMAIN.max-DOMAIN.min))*MS;
+    mCtx.fillStyle='#fff'; mCtx.beginPath(); mCtx.arc(lx,ly,4,0,Math.PI*2); mCtx.fill();
+    mCtx.fillStyle=color; mCtx.beginPath(); mCtx.arc(lx,ly,3,0,Math.PI*2); mCtx.fill();
+  }
+
+  drawPath(pathA, '#f87171');
+  if(mode==='compare') drawPath(pathB, '#22d3ee');
+}
+
+// =============================================
+// Presets (failure demonstrations)
+// =============================================
+const presets = {
+  lr_high:    { surface:'bowl', opt:'sgd', lr:0.5, start:[2,1] },
+  local_min:  { surface:'rastrigin', opt:'sgd', lr:0.02, start:[1.0,1.0] },
+  saddle_sgd: { surface:'saddle', opt:'sgd', lr:0.02, start:[0.05,0.05] },
+  saddle_adam: { surface:'saddle', opt:'adam', lr:0.1, start:[0.05,0.05] },
+};
+
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = presets[btn.dataset.preset];
+    // Switch to single/auto mode
+    setMode('auto');
+    document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-mode="auto"]').classList.add('active');
+
+    // Set surface
+    if(surface !== p.surface){
+      surface = p.surface;
+      document.querySelectorAll('[data-surface]').forEach(b=>b.classList.remove('active'));
+      document.querySelector(`[data-surface="${p.surface}"]`).classList.add('active');
+      buildSurface();
+    }
+    // Set optimizer
+    optA = p.opt;
+    document.querySelectorAll('[data-opt]').forEach(b=>b.classList.remove('active'));
+    document.querySelector(`[data-opt="${p.opt}"]`).classList.add('active');
+    // Set LR
+    lr = p.lr;
+    document.getElementById('lr-slider').value = lr;
+    document.getElementById('lr-value').textContent = lr.toFixed(3);
+    // Start
+    startFrom(p.start[0], p.start[1]);
+  });
+});
+
+// =============================================
+// UI event handlers
+// =============================================
+
+// Mode
+function setMode(m) {
+  mode = m;
+  document.getElementById('sec-single-opt').style.display = m==='compare'?'none':'';
+  document.getElementById('sec-compare-opt').style.display = m==='compare'?'':'none';
+  document.getElementById('sec-step').style.display = m==='step'?'':'none';
+  document.getElementById('speed-group').style.display = m==='step'?'none':'';
+  document.getElementById('chart-legend').style.display = m==='compare'?'':'none';
+  ballB.visible = false;
+  if(lineB){scene.remove(lineB);lineB=null;}
+  fullReset();
+}
+document.querySelectorAll('[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    setMode(btn.dataset.mode);
+  });
+});
+
+// Single optimizer
+document.querySelectorAll('[data-opt]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-opt]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    optA = btn.dataset.opt;
+    velA=[0,0];mA=[0,0];vA_=[0,0];tA=0;
+  });
+});
+
+// Compare optimizers
+document.querySelectorAll('[data-opta]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-opta]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    optA = btn.dataset.opta;
+  });
+});
+document.querySelectorAll('[data-optb]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-optb]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    optB = btn.dataset.optb;
+  });
+});
+
+// Step button
+document.getElementById('btn-step').addEventListener('click', () => {
+  if(!posA) return;
+  tA = optimStep(posA, velA, mA, vA_, tA, optA);
+  pathA.push([posA[0],posA[1]]);
+  lossHistA.push(surfaces[surface].fn(posA[0],posA[1]));
+  if(gradNorm(posA[0],posA[1])<0.001) runA=false;
+  syncVisuals(); updateNarration(); drawLossChart(); drawMinimap();
+});
+
+// Sliders
+document.getElementById('lr-slider').addEventListener('input', e => {
+  lr=parseFloat(e.target.value); document.getElementById('lr-value').textContent=lr.toFixed(3);
+});
+document.getElementById('momentum-slider').addEventListener('input', e => {
+  beta=parseFloat(e.target.value); document.getElementById('momentum-value').textContent=beta.toFixed(2);
+});
+document.getElementById('speed-slider').addEventListener('input', e => {
+  speed=parseInt(e.target.value); document.getElementById('speed-value').textContent=speed;
+});
+
+// Surface
+document.querySelectorAll('[data-surface]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-surface]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    surface = btn.dataset.surface;
+    buildSurface();
+    fullReset();
+  });
+});
+
+// View
+document.querySelectorAll('[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-view]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(btn.dataset.view==='3d'){
+      camera.position.set(4.5,3.5,4.5);
+      controls.maxPolarAngle=Math.PI*0.48;
+    } else {
+      camera.position.set(0,7,0.01);
+      controls.maxPolarAngle=0.01;
+    }
+    controls.target.set(0,0,0); controls.update();
+  });
+});
+
+// Toggles
+document.getElementById('toggle-wireframe').addEventListener('click', function(){
+  showWireframe=!showWireframe; this.classList.toggle('active');
+  if(wireMesh) wireMesh.visible=showWireframe;
+});
+document.getElementById('toggle-contours').addEventListener('click', function(){
+  showContours=!showContours; this.classList.toggle('active');
+  if(contLines) contLines.visible=showContours;
+});
+document.getElementById('toggle-arrows').addEventListener('click', function(){
+  showArrows=!showArrows; this.classList.toggle('active');
+  syncVisuals();
+});
+
+// Reset
+document.getElementById('btn-reset').addEventListener('click', fullReset);
+
+// =============================================
+// Guided tour (3 steps)
+// =============================================
+const guideSteps = [
+  { title:'What You\'re Seeing',
+    text:'This 3D surface is a <strong>loss landscape</strong>. Each point represents a possible set of model parameters. Height = prediction error. The deep valley = best parameters. Your goal: reach the lowest point.' },
+  { title:'How to Interact',
+    text:'<strong>Drag</strong> to rotate the view. <strong>Scroll</strong> to zoom. <strong>Click</strong> anywhere on the surface (or the minimap) to place a starting point and watch the optimizer roll downhill.' },
+  { title:'Experiment!',
+    text:'Try the <strong>preset experiments</strong> below to see what goes wrong (divergence, local minima, saddle points). Use <strong>Compare mode</strong> to run two optimizers side-by-side. Use <strong>Step mode</strong> to go one iteration at a time.' },
+];
+let gStep = 0;
+const gEl=document.getElementById('guide'), gTitle=document.getElementById('guide-title'),
+      gText=document.getElementById('guide-text'), gCnt=document.getElementById('guide-counter'),
+      gPrev=document.getElementById('guide-prev'), gNext=document.getElementById('guide-next');
+
+function showGuide(){
+  const s=guideSteps[gStep];
+  gCnt.textContent=`Step ${gStep+1} of ${guideSteps.length}`;
+  gTitle.textContent=s.title; gText.innerHTML=s.text;
+  gPrev.disabled=gStep===0; gNext.textContent=gStep===guideSteps.length-1?'Got it!':'Next';
+}
+gPrev.addEventListener('click',()=>{if(gStep>0){gStep--;showGuide();}});
+gNext.addEventListener('click',()=>{if(gStep<guideSteps.length-1){gStep++;showGuide();}else gEl.style.display='none';});
+document.getElementById('guide-dismiss').addEventListener('click',()=>gEl.style.display='none');
+showGuide();
+
+// =============================================
+// Resize
+// =============================================
+function onResize(){
+  const r=container.getBoundingClientRect();
+  renderer.setSize(r.width, r.height);
+  camera.aspect=r.width/r.height;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+
+// =============================================
+// Animation loop
+// =============================================
+let frame=0;
+function animate(){
+  requestAnimationFrame(animate);
+
+  // Run optimization
+  if(mode==='auto' || mode==='compare'){
+    if(runA && posA){
+      for(let i=0;i<speed;i++){
+        tA=optimStep(posA,velA,mA,vA_,tA,optA);
+        pathA.push([posA[0],posA[1]]);
+        lossHistA.push(surfaces[surface].fn(posA[0],posA[1]));
+        if(gradNorm(posA[0],posA[1])<0.0005||pathA.length>3000){runA=false;break;}
+      }
+    }
+    if(mode==='compare' && runB && posB){
+      for(let i=0;i<speed;i++){
+        tB=optimStep(posB,velB,mB,vB_,tB,optB);
+        pathB.push([posB[0],posB[1]]);
+        lossHistB.push(surfaces[surface].fn(posB[0],posB[1]));
+        if(gradNorm(posB[0],posB[1])<0.0005||pathB.length>3000){runB=false;break;}
+      }
+    }
+    if(posA) { syncVisuals(); updateNarration(); drawLossChart(); drawMinimap(); }
+  }
+
+  // Pulse effect
+  frame++;
+  [ballA,ballB].forEach(b=>{
+    if(!b.visible) return;
+    const s=1+0.15*Math.sin(frame*0.06);
+    b.userData.ring.scale.setScalar(s);
+    b.userData.ring.material.opacity=0.2+0.15*Math.sin(frame*0.06);
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// =============================================
+// Init
+// =============================================
+onResize();
+buildSurface();
+drawMinimap();
+drawLossChart();
+animate();
+</script>
+</body>
+</html>

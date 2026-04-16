@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Perceptron - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="topic-page">
+
+    <!-- Header -->
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>The Perceptron</h1>
+      <span class="topic-desc">Click to place data points, then train or manually adjust the decision boundary</span>
+    </div>
+
+    <!-- Canvas Area -->
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        Left-click to add <span class="value">blue</span> points &mdash; Right-click for <span class="value" style="color:#f87171">red</span> points
+      </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+
+      <div class="control-section">
+        <h3>Data Points</h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" id="class-0" style="border-color: #6366f1;">
+            <span style="color:#6366f1;">&#9679;</span> Class 0
+          </button>
+          <button class="btn btn-secondary" id="class-1" style="border-color: transparent;">
+            <span style="color:#f87171;">&#9679;</span> Class 1
+          </button>
+        </div>
+        <div class="btn-group" style="margin-top: 8px;">
+          <button class="btn btn-secondary" id="btn-preset-linear">Linear Data</button>
+          <button class="btn btn-secondary" id="btn-preset-cluster">Clusters</button>
+        </div>
+        <button class="btn btn-secondary" id="btn-clear" style="width:100%; margin-top: 6px;">Clear All Points</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Weights</h3>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>w1 (x-axis)</span>
+            <span class="slider-value" id="w1-value">0.50</span>
+          </div>
+          <input type="range" id="w1-slider" min="-3" max="3" step="0.01" value="0.5">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>w2 (y-axis)</span>
+            <span class="slider-value" id="w2-value">-0.30</span>
+          </div>
+          <input type="range" id="w2-slider" min="-3" max="3" step="0.01" value="-0.3">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>bias (b)</span>
+            <span class="slider-value" id="b-value">0.00</span>
+          </div>
+          <input type="range" id="b-slider" min="-3" max="3" step="0.01" value="0">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Training</h3>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Learning Rate</span>
+            <span class="slider-value" id="lr-value">0.10</span>
+          </div>
+          <input type="range" id="lr-slider" min="0.01" max="1.0" step="0.01" value="0.10">
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-train-step">Step</button>
+          <button class="btn btn-primary" id="btn-train-run">Train</button>
+          <button class="btn btn-secondary" id="btn-train-stop" style="display:none">Stop</button>
+        </div>
+
+        <div class="info-box" id="train-info" style="margin-top: 8px; font-family: var(--font-mono); font-size: 0.78rem;">
+          Epoch: <span class="value" id="epoch-count">0</span><br>
+          Accuracy: <span class="value" id="accuracy">-</span><br>
+          Errors: <span class="value" id="error-count">-</span>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Neuron Diagram</h3>
+        <canvas id="neuron-canvas" width="280" height="160" style="width:100%; border-radius: var(--radius); background: var(--bg-card); border: 1px solid var(--border);"></canvas>
+      </div>
+
+      <div class="control-section">
+        <h3>How It Works</h3>
+        <div class="info-box">
+          A <strong>perceptron</strong> is the simplest neural unit. It computes a weighted sum of inputs plus a bias, then applies a step function:<br><br>
+          <code>output = step(w1*x + w2*y + b)</code><br><br>
+          The <strong>decision boundary</strong> is the line where <code>w1*x + w2*y + b = 0</code>. Points on one side are class 0, the other side class 1.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Formula</h3>
+        <div class="formula">
+          y = step(w &middot; x + b)
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const neuronCanvas = document.getElementById('neuron-canvas');
+  const nCtx = neuronCanvas.getContext('2d');
+
+  let W, H, dpr;
+
+  // State
+  let points = []; // {x, y, label: 0|1}
+  let w1 = 0.5, w2 = -0.3, b = 0;
+  let lr = 0.1;
+  let activeClass = 0;
+  let training = false;
+  let epoch = 0;
+
+  // Domain [-4, 4]
+  const domain = { xMin: -4, xMax: 4, yMin: -4, yMax: 4 };
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = rect.width;
+    H = rect.height;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawFrame();
+  }
+
+  function toCanvas(x, y) {
+    const px = ((x - domain.xMin) / (domain.xMax - domain.xMin)) * W;
+    const py = H - ((y - domain.yMin) / (domain.yMax - domain.yMin)) * H;
+    return [px, py];
+  }
+
+  function toDomain(px, py) {
+    const x = domain.xMin + (px / W) * (domain.xMax - domain.xMin);
+    const y = domain.yMin + ((H - py) / H) * (domain.yMax - domain.yMin);
+    return [x, y];
+  }
+
+  function predict(x, y) {
+    return w1 * x + w2 * y + b;
+  }
+
+  function drawDecisionRegions() {
+    const res = 6;
+    const cols = Math.ceil(W / res);
+    const rows = Math.ceil(H / res);
+
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        const [x, y] = toDomain(i * res + res/2, j * res + res/2);
+        const val = predict(x, y);
+        if (val >= 0) {
+          ctx.fillStyle = 'rgba(248, 113, 113, 0.07)';
+        } else {
+          ctx.fillStyle = 'rgba(99, 102, 241, 0.07)';
+        }
+        ctx.fillRect(i * res, j * res, res, res);
+      }
+    }
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+
+    for (let x = Math.ceil(domain.xMin); x <= domain.xMax; x++) {
+      const [px] = toCanvas(x, 0);
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, H);
+      ctx.stroke();
+    }
+
+    for (let y = Math.ceil(domain.yMin); y <= domain.yMax; y++) {
+      const [, py] = toCanvas(0, y);
+      ctx.beginPath();
+      ctx.moveTo(0, py);
+      ctx.lineTo(W, py);
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1.5;
+    const [ox, oy] = toCanvas(0, 0);
+    ctx.beginPath();
+    ctx.moveTo(0, oy); ctx.lineTo(W, oy);
+    ctx.moveTo(ox, 0); ctx.lineTo(ox, H);
+    ctx.stroke();
+
+    // Labels
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.textAlign = 'center';
+    for (let x = Math.ceil(domain.xMin); x <= domain.xMax; x++) {
+      if (x === 0) continue;
+      const [px] = toCanvas(x, 0);
+      ctx.fillText(x.toString(), px, oy + 14);
+    }
+    ctx.textAlign = 'right';
+    for (let y = Math.ceil(domain.yMin); y <= domain.yMax; y++) {
+      if (y === 0) continue;
+      const [, py] = toCanvas(0, y);
+      ctx.fillText(y.toString(), ox - 6, py + 4);
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('x₁', W - 20, oy - 8);
+    ctx.fillText('x₂', ox + 8, 16);
+  }
+
+  function drawDecisionBoundary() {
+    // Line: w1*x + w2*y + b = 0 => y = -(w1*x + b) / w2
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(251, 191, 36, 0.4)';
+    ctx.shadowBlur = 8;
+
+    if (Math.abs(w2) > 0.001) {
+      const x0 = domain.xMin;
+      const x1 = domain.xMax;
+      const y0 = -(w1 * x0 + b) / w2;
+      const y1 = -(w1 * x1 + b) / w2;
+      const [px0, py0] = toCanvas(x0, y0);
+      const [px1, py1] = toCanvas(x1, y1);
+
+      ctx.beginPath();
+      ctx.moveTo(px0, py0);
+      ctx.lineTo(px1, py1);
+      ctx.stroke();
+    } else if (Math.abs(w1) > 0.001) {
+      // Vertical line: x = -b / w1
+      const x = -b / w1;
+      const [px] = toCanvas(x, 0);
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, H);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+
+    // Normal vector from origin
+    const norm = Math.sqrt(w1*w1 + w2*w2);
+    if (norm > 0.01) {
+      const scale = 0.8;
+      const nx = w1 / norm * scale;
+      const ny = w2 / norm * scale;
+      const [ox, oy] = toCanvas(0, 0);
+      const [ex, ey] = toCanvas(nx, ny);
+
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Arrowhead
+      const angle = Math.atan2(oy - ey, ox - ex);
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + 8 * Math.cos(angle + 0.4), ey + 8 * Math.sin(angle + 0.4));
+      ctx.lineTo(ex + 8 * Math.cos(angle - 0.4), ey + 8 * Math.sin(angle - 0.4));
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawPoints() {
+    points.forEach(p => {
+      const [px, py] = toCanvas(p.x, p.y);
+      const predicted = predict(p.x, p.y) >= 0 ? 1 : 0;
+      const correct = predicted === p.label;
+
+      // Outer ring for misclassified
+      if (!correct) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 10, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Point
+      ctx.fillStyle = p.label === 0 ? '#6366f1' : '#f87171';
+      ctx.shadowColor = p.label === 0 ? 'rgba(99,102,241,0.5)' : 'rgba(248,113,113,0.5)';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // White center
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.arc(px, py, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawFrame() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#08080f';
+    ctx.fillRect(0, 0, W, H);
+
+    drawDecisionRegions();
+    drawGrid();
+    drawDecisionBoundary();
+    drawPoints();
+    drawNeuronDiagram();
+  }
+
+  function drawNeuronDiagram() {
+    const c = nCtx;
+    const cw = neuronCanvas.width;
+    const ch = neuronCanvas.height;
+    c.clearRect(0, 0, cw, ch);
+    c.fillStyle = '#12121f';
+    c.fillRect(0, 0, cw, ch);
+
+    const inputs = [
+      { label: 'x₁', y: 40, weight: w1 },
+      { label: 'x₂', y: 80, weight: w2 },
+      { label: '1', y: 120, weight: b }
+    ];
+
+    const nodeX = 60, sumX = 170, outX = 240;
+    const sumY = 80;
+
+    inputs.forEach(inp => {
+      // Connection line
+      const intensity = Math.min(1, Math.abs(inp.weight) / 2);
+      const color = inp.weight >= 0 ? `rgba(52,211,153,${0.3 + intensity * 0.7})` : `rgba(248,113,113,${0.3 + intensity * 0.7})`;
+      c.strokeStyle = color;
+      c.lineWidth = 1 + intensity * 2;
+      c.beginPath();
+      c.moveTo(nodeX + 14, inp.y);
+      c.lineTo(sumX - 16, sumY);
+      c.stroke();
+
+      // Weight label
+      c.font = '10px JetBrains Mono, monospace';
+      c.fillStyle = color;
+      const mx = (nodeX + 14 + sumX - 16) / 2;
+      const my = (inp.y + sumY) / 2 - 6;
+      c.textAlign = 'center';
+      c.fillText(inp.weight.toFixed(2), mx, my);
+
+      // Input node
+      c.fillStyle = '#1e1e35';
+      c.strokeStyle = '#3d3d6b';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.arc(nodeX, inp.y, 14, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+
+      c.fillStyle = '#e8eaf0';
+      c.font = '11px Inter, sans-serif';
+      c.textAlign = 'center';
+      c.fillText(inp.label, nodeX, inp.y + 4);
+    });
+
+    // Sum node
+    c.fillStyle = '#1e1e35';
+    c.strokeStyle = '#fbbf24';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.arc(sumX, sumY, 16, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+
+    c.fillStyle = '#fbbf24';
+    c.font = '13px Inter, sans-serif';
+    c.textAlign = 'center';
+    c.fillText('Σ', sumX, sumY + 5);
+
+    // Arrow to output
+    c.strokeStyle = '#fbbf24';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(sumX + 16, sumY);
+    c.lineTo(outX - 16, sumY);
+    c.stroke();
+
+    // Step label
+    c.fillStyle = 'rgba(255,255,255,0.4)';
+    c.font = '9px JetBrains Mono, monospace';
+    c.fillText('step()', (sumX + outX) / 2, sumY - 8);
+
+    // Output node
+    c.fillStyle = '#1e1e35';
+    c.strokeStyle = '#22d3ee';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.arc(outX, sumY, 14, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+
+    c.fillStyle = '#22d3ee';
+    c.font = '11px Inter, sans-serif';
+    c.fillText('ŷ', outX, sumY + 4);
+  }
+
+  function computeAccuracy() {
+    if (points.length === 0) return { acc: '-', errors: '-' };
+    let correct = 0;
+    points.forEach(p => {
+      const pred = predict(p.x, p.y) >= 0 ? 1 : 0;
+      if (pred === p.label) correct++;
+    });
+    const errors = points.length - correct;
+    return {
+      acc: (correct / points.length * 100).toFixed(1) + '%',
+      errors: errors.toString()
+    };
+  }
+
+  function updateInfo() {
+    document.getElementById('epoch-count').textContent = epoch;
+    const { acc, errors } = computeAccuracy();
+    document.getElementById('accuracy').textContent = acc;
+    document.getElementById('error-count').textContent = errors;
+  }
+
+  // Perceptron learning rule: single pass
+  function trainStep() {
+    if (points.length === 0) return;
+
+    let anyUpdate = false;
+    // Shuffle points for stochastic update
+    const shuffled = [...points].sort(() => Math.random() - 0.5);
+
+    for (const p of shuffled) {
+      const pred = predict(p.x, p.y) >= 0 ? 1 : 0;
+      const error = p.label - pred;
+
+      if (error !== 0) {
+        w1 += lr * error * p.x;
+        w2 += lr * error * p.y;
+        b += lr * error;
+        anyUpdate = true;
+      }
+    }
+
+    // Clamp weights for slider range
+    w1 = Math.max(-3, Math.min(3, w1));
+    w2 = Math.max(-3, Math.min(3, w2));
+    b = Math.max(-3, Math.min(3, b));
+
+    // Update sliders
+    document.getElementById('w1-slider').value = w1;
+    document.getElementById('w2-slider').value = w2;
+    document.getElementById('b-slider').value = b;
+    document.getElementById('w1-value').textContent = w1.toFixed(2);
+    document.getElementById('w2-value').textContent = w2.toFixed(2);
+    document.getElementById('b-value').textContent = b.toFixed(2);
+
+    epoch++;
+    updateInfo();
+    drawFrame();
+
+    return anyUpdate;
+  }
+
+  // Click to add points
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const [x, y] = toDomain(e.clientX - rect.left, e.clientY - rect.top);
+    points.push({ x, y, label: activeClass });
+    updateInfo();
+    drawFrame();
+  });
+
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const [x, y] = toDomain(e.clientX - rect.left, e.clientY - rect.top);
+    points.push({ x, y, label: 1 });
+    updateInfo();
+    drawFrame();
+  });
+
+  // Class toggle
+  document.getElementById('class-0').addEventListener('click', () => {
+    activeClass = 0;
+    document.getElementById('class-0').classList.add('active');
+    document.getElementById('class-0').style.borderColor = '#6366f1';
+    document.getElementById('class-1').classList.remove('active');
+    document.getElementById('class-1').style.borderColor = 'transparent';
+    overlay.innerHTML = 'Left-click to add <span class="value">blue</span> points &mdash; Right-click for <span class="value" style="color:#f87171">red</span> points';
+  });
+
+  document.getElementById('class-1').addEventListener('click', () => {
+    activeClass = 1;
+    document.getElementById('class-1').classList.add('active');
+    document.getElementById('class-1').style.borderColor = '#f87171';
+    document.getElementById('class-0').classList.remove('active');
+    document.getElementById('class-0').style.borderColor = 'transparent';
+    overlay.innerHTML = 'Left-click to add <span class="value" style="color:#f87171">red</span> points &mdash; Right-click for <span class="value">blue</span> points';
+  });
+
+  // Weight sliders
+  document.getElementById('w1-slider').addEventListener('input', (e) => {
+    w1 = parseFloat(e.target.value);
+    document.getElementById('w1-value').textContent = w1.toFixed(2);
+    updateInfo();
+    drawFrame();
+  });
+
+  document.getElementById('w2-slider').addEventListener('input', (e) => {
+    w2 = parseFloat(e.target.value);
+    document.getElementById('w2-value').textContent = w2.toFixed(2);
+    updateInfo();
+    drawFrame();
+  });
+
+  document.getElementById('b-slider').addEventListener('input', (e) => {
+    b = parseFloat(e.target.value);
+    document.getElementById('b-value').textContent = b.toFixed(2);
+    updateInfo();
+    drawFrame();
+  });
+
+  document.getElementById('lr-slider').addEventListener('input', (e) => {
+    lr = parseFloat(e.target.value);
+    document.getElementById('lr-value').textContent = lr.toFixed(2);
+  });
+
+  // Train buttons
+  document.getElementById('btn-train-step').addEventListener('click', trainStep);
+
+  let trainInterval = null;
+  document.getElementById('btn-train-run').addEventListener('click', () => {
+    if (training) return;
+    training = true;
+    document.getElementById('btn-train-run').style.display = 'none';
+    document.getElementById('btn-train-stop').style.display = '';
+
+    trainInterval = setInterval(() => {
+      const updated = trainStep();
+      if (!updated) {
+        // Converged
+        stopTraining();
+      }
+    }, 100);
+  });
+
+  document.getElementById('btn-train-stop').addEventListener('click', stopTraining);
+
+  function stopTraining() {
+    training = false;
+    clearInterval(trainInterval);
+    document.getElementById('btn-train-run').style.display = '';
+    document.getElementById('btn-train-stop').style.display = 'none';
+  }
+
+  // Presets
+  document.getElementById('btn-preset-linear').addEventListener('click', () => {
+    points = [];
+    // Linearly separable data
+    for (let i = 0; i < 15; i++) {
+      points.push({ x: -1 - Math.random() * 2, y: Math.random() * 4 - 2, label: 0 });
+      points.push({ x: 1 + Math.random() * 2, y: Math.random() * 4 - 2, label: 1 });
+    }
+    epoch = 0;
+    updateInfo();
+    drawFrame();
+  });
+
+  document.getElementById('btn-preset-cluster').addEventListener('click', () => {
+    points = [];
+    // Two clusters
+    for (let i = 0; i < 20; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * 1.2;
+      points.push({ x: -1.5 + r * Math.cos(a), y: 1.5 + r * Math.sin(a), label: 0 });
+    }
+    for (let i = 0; i < 20; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * 1.2;
+      points.push({ x: 1.5 + r * Math.cos(a), y: -1.5 + r * Math.sin(a), label: 1 });
+    }
+    epoch = 0;
+    updateInfo();
+    drawFrame();
+  });
+
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    points = [];
+    epoch = 0;
+    stopTraining();
+    updateInfo();
+    drawFrame();
+  });
+
+  // Init
+  resize();
+  updateInfo();
+  window.addEventListener('resize', resize);
+})();
+</script>
+
+</body>
+</html>
