@@ -947,9 +947,21 @@ function updateHessian(pos) {
   const l1 = tr/2 + Math.sqrt(disc);
   const l2 = tr/2 - Math.sqrt(disc);
   const eig = (lam) => {
-    /* solve (H - lam I) v = 0 */
-    const vx = b, vy = lam - a;
-    const n = Math.sqrt(vx*vx + vy*vy) || 1e-8;
+    /* Solve (H - lam*I) v = 0.
+       Row 1 gives v = [b, lam - a].  Row 2 gives v = [d - lam, -c].
+       Either can be zero (e.g. diagonal H when lam = a). Pick the row
+       with larger norm so we always get a valid eigenvector. */
+    let vx1 = b,         vy1 = lam - a;
+    let vx2 = d - lam,   vy2 = -c;
+    const n1 = Math.sqrt(vx1*vx1 + vy1*vy1);
+    const n2 = Math.sqrt(vx2*vx2 + vy2*vy2);
+    let vx, vy, n;
+    if (n1 >= n2) { vx = vx1; vy = vy1; n = n1; }
+    else          { vx = vx2; vy = vy2; n = n2; }
+    if (n < 1e-10) {
+      /* Fully degenerate (matrix == lam*I). Return canonical basis. */
+      return [1, 0];
+    }
     return [vx/n, vy/n];
   };
   const v1 = eig(l1), v2 = eig(l2);
