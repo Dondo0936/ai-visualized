@@ -3,356 +3,1264 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Neural Network Playground - AI Visualized</title>
+  <title>Neural network playground — AI Visualized</title>
+  <meta name="description" content="Train a real neural network in the browser. Six datasets, seven activations, four optimizers, live decision boundary, live weights.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* Page-local styles, layered on the shared design system. */
+    .nnp-main {
+      position:relative; width:100%; height:100%;
+      display:grid;
+      grid-template-columns: 2fr 1.2fr;
+      grid-template-rows: 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .nnp-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .nnp-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+    }
+    .nnp-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+    }
+    .nnp-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .nnp-panel-body {
+      flex:1;
+      position:relative;
+      overflow:hidden;
+    }
+    .nnp-panel-body canvas {
+      display:block;
+      width:100%; height:100%;
+    }
+
+    /* Decision boundary canvas fills the whole panel */
+    #db-canvas { cursor: crosshair; }
+
+    /* Network diagram canvas */
+    #net-canvas { background: var(--bg-sunken); }
+
+    /* Stats strip */
+    .nnp-stats {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--s-3);
+    }
+    .nnp-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .nnp-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .nnp-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+    }
+    .nnp-stat .value .unit {
+      font-size: 0.8rem; color: var(--fg-muted); margin-left: 2px;
+    }
+    .nnp-stat.accent .value { color: var(--teal-300); }
+    .nnp-stat .spark { height: 24px; margin-top: var(--s-1); }
+
+    /* Charts panel below decision boundary */
+    .nnp-charts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .nnp-charts > div { position: relative; height: 120px; }
+    .nnp-charts > div + div { border-left: 1px solid var(--border-subtle); }
+    .nnp-charts canvas { display:block; width:100%; height:100%; }
+    .nnp-charts .chart-label {
+      position:absolute; top:6px; left:10px; z-index:2;
+      font-family:var(--font-mono); font-size:var(--fs-micro);
+      text-transform:uppercase; letter-spacing:var(--tracking-label);
+      color:var(--fg-muted);
+      pointer-events:none;
+    }
+    .nnp-charts .chart-value {
+      position:absolute; top:6px; right:10px; z-index:2;
+      font-family:var(--font-mono); font-size:0.72rem; font-weight:500;
+      color: var(--teal-300);
+      pointer-events:none;
+    }
+
+    /* Architecture editor: stack of "layer pills" */
+    .arch-row {
+      display:flex; gap: var(--s-2); flex-wrap: wrap; align-items:center;
+      padding: var(--s-2);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+    }
+    .arch-pill {
+      display: inline-flex; align-items: center; gap: var(--s-2);
+      padding: var(--s-1) var(--s-3);
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: var(--fs-small);
+    }
+    .arch-pill.io { background: var(--accent-soft); color: var(--teal-300); border-color: var(--accent-ring); }
+    .arch-pill button {
+      background: none; border: none; color: var(--fg-muted);
+      cursor: pointer; font-family: var(--font-mono);
+      font-size: 0.9rem; line-height:1; padding: 0 4px;
+    }
+    .arch-pill button:hover { color: var(--fg-primary); }
+    .arch-add {
+      background: transparent;
+      border: 1px dashed var(--border-default);
+      border-radius: var(--r-sm);
+      padding: var(--s-1) var(--s-3);
+      font-family: var(--font-mono);
+      font-size: var(--fs-small);
+      color: var(--fg-muted);
+      cursor: pointer;
+    }
+    .arch-add:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+
+    /* Dataset tiles */
+    .dataset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+    .ds-tile {
+      position:relative;
+      aspect-ratio: 1;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-sunken);
+      cursor: pointer;
+      overflow: hidden;
+      display:flex; align-items:center; justify-content:center;
+      transition: border-color var(--dur-fast) var(--ease-standard);
+    }
+    .ds-tile:hover { border-color: var(--border-strong); }
+    .ds-tile.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .ds-tile canvas { width:100%; height:100%; display:block; }
+    .ds-tile .ds-name {
+      position:absolute; left:4px; bottom:4px;
+      font-family:var(--font-mono); font-size:9px;
+      text-transform:uppercase; letter-spacing: var(--tracking-label);
+      color: var(--fg-primary);
+      background: rgba(10,10,11,0.72);
+      padding: 1px 4px; border-radius: 3px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .nnp-main { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Neural Network Playground</h1>
-      <span class="topic-desc">Pick a dataset, design a network, click Train &mdash; watch it learn</span>
-    </div>
 
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">Click Train to start</div>
-    </div>
+<div class="topic-page has-guide">
 
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">Watch a neural network learn live</div>
-        <div class="guide-text">
-          This is a real neural network running in your browser. Pick a <strong>dataset</strong>, adjust the <strong>architecture</strong>, and click Train. You'll see the decision boundary evolve as the network discovers the pattern. Everything you've learned &mdash; <a href="perceptron.html">perceptrons</a>, <a href="activation-functions.html">activations</a>, <a href="gradient-descent.html">gradient descent</a>, <a href="backpropagation.html">backprop</a> &mdash; comes together here.
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Neural network playground</h1>
+    <span class="topic-desc">Train a real network in your browser. Seven activations, four optimizers, six datasets.</span>
+  </div>
+
+  <!-- =====================================================
+       CANVAS AREA = Main workspace (DB + net + charts + stats)
+       ===================================================== -->
+  <div class="canvas-area" style="padding:0">
+    <div class="nnp-main">
+
+      <!-- Decision boundary -->
+      <div class="nnp-panel" style="grid-row:1 / span 1;">
+        <div class="nnp-panel-head">
+          <h4>Decision boundary</h4>
+          <span class="meta">click to add points</span>
+        </div>
+        <div class="nnp-panel-body">
+          <canvas id="db-canvas"></canvas>
+        </div>
+        <div class="nnp-charts">
+          <div>
+            <span class="chart-label">Loss</span>
+            <span class="chart-value" id="chart-loss-val">&mdash;</span>
+            <canvas id="chart-loss"></canvas>
+          </div>
+          <div>
+            <span class="chart-label">Accuracy</span>
+            <span class="chart-value" id="chart-acc-val">&mdash;</span>
+            <canvas id="chart-acc"></canvas>
+          </div>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Dataset</h3>
-        <div class="btn-group" style="flex-wrap:wrap">
-          <button class="btn btn-secondary active" data-ds="xor">XOR</button>
-          <button class="btn btn-secondary" data-ds="circle">Circle</button>
+      <!-- Network diagram -->
+      <div class="nnp-panel" style="grid-row:1;">
+        <div class="nnp-panel-head">
+          <h4>Network &middot; weights</h4>
+          <span class="meta" id="net-meta">&mdash;</span>
         </div>
-        <div class="btn-group" style="flex-wrap:wrap;margin-top:6px">
-          <button class="btn btn-secondary" data-ds="spiral">Spiral</button>
-          <button class="btn btn-secondary" data-ds="linear">Linear</button>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Architecture</h3>
-        <div class="slider-group">
-          <div class="slider-label"><span>Hidden Layers</span><span class="slider-value" id="nl-val">2</span></div>
-          <input type="range" id="nl-slider" min="1" max="4" step="1" value="2">
-        </div>
-        <div class="slider-group">
-          <div class="slider-label"><span>Neurons/layer</span><span class="slider-value" id="nn-val">6</span></div>
-          <input type="range" id="nn-slider" min="2" max="12" step="1" value="6">
-        </div>
-        <div class="btn-group" style="margin-top:6px">
-          <button class="btn btn-secondary active" data-act="tanh">tanh</button>
-          <button class="btn btn-secondary" data-act="relu">ReLU</button>
-          <button class="btn btn-secondary" data-act="sigmoid">sigmoid</button>
+        <div class="nnp-panel-body">
+          <canvas id="net-canvas"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Learning Rate</h3>
-        <div class="slider-group">
-          <div class="slider-label"><span>&alpha;</span><span class="slider-value" id="lr-val">0.10</span></div>
-          <input type="range" id="lr-slider" min="0.01" max="1" step="0.01" value="0.1">
+      <!-- Bottom stats strip -->
+      <div class="nnp-stats">
+        <div class="nnp-stat">
+          <div class="label">Epoch</div>
+          <div class="value" id="stat-epoch">0</div>
+        </div>
+        <div class="nnp-stat accent">
+          <div class="label">Train loss</div>
+          <div class="value" id="stat-loss">&mdash;</div>
+        </div>
+        <div class="nnp-stat">
+          <div class="label">Test accuracy</div>
+          <div class="value" id="stat-acc">&mdash;<span class="unit">%</span></div>
+        </div>
+        <div class="nnp-stat">
+          <div class="label">Parameters</div>
+          <div class="value" id="stat-params">&mdash;</div>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Training</h3>
-        <div class="btn-group">
-          <button class="btn btn-primary" id="btn-train" style="flex:1">Train</button>
-          <button class="btn btn-secondary" id="btn-reset" style="flex:1">Reset</button>
-        </div>
-        <div class="info-box" id="stats" style="margin-top:8px;font-family:var(--font-mono);font-size:0.8rem;">
-          Epoch: <span class="value" id="epoch">0</span><br>
-          Loss: <span class="value" id="loss">-</span><br>
-          Accuracy: <span class="value" id="acc">-</span>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>What To Try</h3>
-        <div class="info-box">
-          <strong>1.</strong> Start with XOR + 1 hidden layer. It works!<br>
-          <strong>2.</strong> Try "Spiral" with 1 layer &mdash; it fails. Add more layers/neurons.<br>
-          <strong>3.</strong> Set LR = 0.9 and watch training diverge.<br>
-          <strong>4.</strong> Compare ReLU vs Sigmoid &mdash; which learns faster?
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>This Is Real ML</h3>
-        <div class="info-box">
-          What you see here is a full forward pass + backprop running 20&times; per second in your browser. Same algorithm as PyTorch, TensorFlow, and every LLM. The only difference is scale &mdash; real networks have billions more parameters and train on huge GPU clusters.
-        </div>
-      </div>
     </div>
   </div>
 
+  <!-- =====================================================
+       CONTROL PANEL
+       ===================================================== -->
+  <div class="control-panel">
+
+    <div class="guide-banner" id="guide">
+      <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+      <div class="guide-step-counter">The big idea</div>
+      <div class="guide-title">A network is stacked linear layers + non-linearities.</div>
+      <div class="guide-text">
+        Each hidden neuron computes <code>activation(W &middot; x + b)</code>. Stack them and the network can learn any decision boundary. Press <strong>Train</strong> and watch the boundary bend to fit the data.
+      </div>
+    </div>
+
+    <!-- Dataset -->
+    <div class="control-section">
+      <h3>Dataset</h3>
+      <div class="dataset-grid" id="dataset-grid">
+        <!-- filled by JS with thumbnail previews -->
+      </div>
+      <div class="slider-group" style="margin-top: var(--s-3);">
+        <div class="slider-label"><span>Noise</span><span class="slider-value" id="noise-val">0.00</span></div>
+        <input type="range" id="noise-slider" min="0" max="0.5" step="0.01" value="0">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>Train / test split</span><span class="slider-value" id="split-val">70 / 30</span></div>
+        <input type="range" id="split-slider" min="0.3" max="0.9" step="0.05" value="0.7">
+      </div>
+    </div>
+
+    <!-- Architecture editor -->
+    <div class="control-section">
+      <h3>Architecture</h3>
+      <div class="arch-row" id="arch-row"></div>
+      <div class="info-box">
+        Click <strong>+</strong> to add a hidden layer, <strong>&times;</strong> to remove. Each layer's pill shows <code>width &times; activation</code>. Input is always 2 features (x, y); output is always a single probability.
+      </div>
+    </div>
+
+    <!-- Activation picker -->
+    <div class="control-section">
+      <h3>Hidden activation</h3>
+      <div class="toggle-chips" id="act-chips">
+        <div class="chip active" data-act="tanh">tanh</div>
+        <div class="chip" data-act="relu">ReLU</div>
+        <div class="chip" data-act="leakyRelu">LReLU</div>
+        <div class="chip" data-act="sigmoid">sigmoid</div>
+        <div class="chip" data-act="elu">ELU</div>
+        <div class="chip" data-act="swish">swish</div>
+        <div class="chip" data-act="gelu">GELU</div>
+      </div>
+    </div>
+
+    <!-- Optimizer -->
+    <div class="control-section">
+      <h3>Optimizer</h3>
+      <div class="btn-group">
+        <button class="btn btn-secondary active" data-opt="sgd">SGD</button>
+        <button class="btn btn-secondary" data-opt="momentum">Momentum</button>
+        <button class="btn btn-secondary" data-opt="rmsprop">RMSProp</button>
+        <button class="btn btn-secondary" data-opt="adam">Adam</button>
+      </div>
+      <div class="slider-group" style="margin-top: var(--s-3);">
+        <div class="slider-label"><span>Learning rate &alpha;</span><span class="slider-value" id="lr-val">0.10</span></div>
+        <input type="range" id="lr-slider" min="0.001" max="1" step="0.001" value="0.1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>Batch size</span><span class="slider-value" id="bs-val">16</span></div>
+        <input type="range" id="bs-slider" min="1" max="64" step="1" value="16">
+      </div>
+    </div>
+
+    <!-- Regularization -->
+    <div class="control-section">
+      <h3>Regularization</h3>
+      <div class="slider-group">
+        <div class="slider-label"><span>L2 (weight decay)</span><span class="slider-value" id="l2-val">0.000</span></div>
+        <input type="range" id="l2-slider" min="0" max="0.1" step="0.001" value="0">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>Dropout</span><span class="slider-value" id="dp-val">0.00</span></div>
+        <input type="range" id="dp-slider" min="0" max="0.5" step="0.01" value="0">
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="control-section">
+      <h3>Control</h3>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-train">Train</button>
+        <button class="btn btn-secondary" id="btn-step">Step</button>
+        <button class="btn btn-secondary" id="btn-reset">Reset</button>
+      </div>
+      <div class="slider-group" style="margin-top: var(--s-3);">
+        <div class="slider-label"><span>Epochs per frame</span><span class="slider-value" id="eps-val">4</span></div>
+        <input type="range" id="eps-slider" min="1" max="20" step="1" value="4">
+      </div>
+    </div>
+
+    <!-- Display -->
+    <div class="control-section">
+      <h3>Display</h3>
+      <div class="toggle-chips">
+        <div class="chip active" id="tog-boundary">Boundary</div>
+        <div class="chip active" id="tog-points">Training points</div>
+        <div class="chip" id="tog-test">Test points</div>
+        <div class="chip active" id="tog-weights">Weights</div>
+        <div class="chip" id="tog-activations">Activations</div>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="control-section">
+      <h3>Try these</h3>
+      <div style="display:flex;flex-direction:column;gap:var(--s-2)">
+        <button class="btn btn-secondary" data-preset="xor_small">XOR with 1 hidden layer</button>
+        <button class="btn btn-secondary" data-preset="spiral_deep">Spiral, 3-layer deep</button>
+        <button class="btn btn-secondary" data-preset="lr_too_high">&alpha; too high &mdash; diverges</button>
+        <button class="btn btn-secondary" data-preset="overfit">Over-fitting with noise</button>
+        <button class="btn btn-secondary" data-preset="dying_relu">Dying ReLU (bad init)</button>
+      </div>
+    </div>
+
+    <!-- Formula -->
+    <div class="control-section">
+      <h3>Formula</h3>
+      <div class="formula">
+        y = &sigma;(W<sub>L</sub> &middot; &hellip; &middot; &phi;(W<sub>1</sub>x + b<sub>1</sub>) &hellip; + b<sub>L</sub>)
+      </div>
+    </div>
+
+    <!-- Key concepts -->
+    <div class="control-section">
+      <h3>Key concepts</h3>
+
+      <div class="learn-more" style="margin:0">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Why stack layers?
+        </button>
+        <div class="learn-more-content">
+          A single neuron can only draw a <strong>line</strong> (linear separator). Stack enough non-linear layers and you can draw any shape. The universal approximation theorem says <em>any</em> continuous function can be represented by a network with one hidden layer and enough neurons &mdash; but depth buys expressiveness more efficiently than width.
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          What you're watching
+        </button>
+        <div class="learn-more-content">
+          The coloured region is the network's current <strong>decision surface</strong>. Darker = more confident. As training proceeds the surface bends to fit the data. Weight thickness in the network diagram shows magnitude; teal = positive, red = negative. Neurons that go dim are contributing little (potentially dead).
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Overfitting, in one sentence
+        </button>
+        <div class="learn-more-content">
+          A flexible network with too little data or too many parameters will <em>memorise</em> the training points, including the noise, and fail to generalise. Increase L2, add dropout, shrink the network, or get more data. The gap between train loss and test accuracy is the clearest signal.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========================================================
+     MAIN SCRIPT
+     ======================================================== -->
 <script>
-(function(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  let W, H;
+(function() {
+'use strict';
 
-  const XR=[-4,4], YR=[-4,4];
-  let numLayers=2, neuronsPerLayer=6, activation='tanh', lr=0.1;
-  let data = [];
-  let weights = [], biases = []; // per layer
-  let training = false, epoch = 0;
+/* =============================================================
+   Activation functions & derivatives
+   ============================================================= */
+const acts = {
+  tanh:      { f: x => Math.tanh(x),                  df: x => 1 - Math.tanh(x)**2 },
+  relu:      { f: x => Math.max(0, x),                df: x => x > 0 ? 1 : 0 },
+  leakyRelu: { f: x => x > 0 ? x : 0.1*x,              df: x => x > 0 ? 1 : 0.1 },
+  sigmoid:   { f: x => 1/(1+Math.exp(-x)),            df: x => { const s=1/(1+Math.exp(-x)); return s*(1-s); } },
+  elu:       { f: x => x >= 0 ? x : Math.exp(x)-1,    df: x => x >= 0 ? 1 : Math.exp(x) },
+  swish:     { f: x => { const s=1/(1+Math.exp(-x)); return x*s; },
+               df: x => { const s=1/(1+Math.exp(-x)); return s + x*s*(1-s); } },
+  gelu:      { f: x => 0.5*x*(1+Math.tanh(Math.sqrt(2/Math.PI)*(x + 0.044715*x*x*x))),
+               df: x => {
+                 const c = Math.sqrt(2/Math.PI);
+                 const u = c*(x + 0.044715*x*x*x);
+                 const t = Math.tanh(u);
+                 return 0.5*(1+t) + 0.5*x*(1-t*t)*c*(1 + 3*0.044715*x*x);
+               }},
+};
+const sigmoid = acts.sigmoid.f;
 
-  // Activations
-  const acts = {
-    tanh: { fn: x=>Math.tanh(x), deriv: x=>1-Math.tanh(x)**2 },
-    relu: { fn: x=>Math.max(0,x), deriv: x=>x>0?1:0 },
-    sigmoid: { fn: x=>1/(1+Math.exp(-x)), deriv: x=>{const s=1/(1+Math.exp(-x));return s*(1-s);} },
-  };
+/* =============================================================
+   Global state
+   ============================================================= */
+let architecture = [2, 6, 4, 1];   // input / hidden* / output
+let activationName = 'tanh';
+let optimizer = 'sgd';
+let lr = 0.1, batchSize = 16;
+let l2 = 0, dropout = 0;
+let noise = 0, split = 0.7;
+let epochsPerFrame = 4;
+let training = false, stopRequested = false;
+let epoch = 0;
 
-  function randn(){ return (Math.random()-0.5)*2; }
+let datasetName = 'xor';
+let rawData = [];       // all points
+let trainData = [];     // subset
+let testData = [];      // subset
 
-  function initNetwork(){
-    weights = []; biases = [];
-    const layers = [2];
-    for(let i=0;i<numLayers;i++) layers.push(neuronsPerLayer);
-    layers.push(1);
-    for(let l=0;l<layers.length-1;l++){
-      const layerW = [];
-      const layerB = [];
-      const scale = Math.sqrt(2/layers[l]);
-      for(let j=0;j<layers[l+1];j++){
-        const row = [];
-        for(let i=0;i<layers[l];i++) row.push(randn()*scale);
-        layerW.push(row);
-        layerB.push(randn()*0.1);
-      }
-      weights.push(layerW);
-      biases.push(layerB);
+/* Model state:  per-layer W, b + optimizer moments */
+let W = [], b = [];
+let mW = [], mb = [], vW = [], vb = [];     // 1st & 2nd moments (Adam/RMSProp/Momentum)
+let tStep = 0;
+
+let lossHist = [], accHist = [];
+let showBoundary = true, showPoints = true, showTest = false, showWeights = true, showActivations = false;
+
+/* Tracked for per-neuron activation display */
+let lastForwardActs = null;
+
+/* =============================================================
+   Dataset generators
+   ============================================================= */
+function genDataset(name, n, noiseLvl) {
+  const pts = [];
+  const J = () => (Math.random()*2 - 1) * noiseLvl;
+  if (name === 'xor') {
+    for (let i=0; i<n; i++) {
+      const x = (Math.random()-0.5)*6, y = (Math.random()-0.5)*6;
+      pts.push({ x: x + J(), y: y + J(), cls: (x*y > 0) ? 1 : 0 });
+    }
+  } else if (name === 'circle') {
+    for (let i=0; i<n; i++) {
+      const x = (Math.random()-0.5)*6, y = (Math.random()-0.5)*6;
+      pts.push({ x: x + J(), y: y + J(), cls: Math.hypot(x,y) < 2 ? 1 : 0 });
+    }
+  } else if (name === 'spiral') {
+    for (let i=0; i<n; i++) {
+      const t = i/n * 4 * Math.PI;
+      const r = t * 0.35;
+      const cls = i % 2;
+      const a = t + (cls ? Math.PI : 0);
+      pts.push({ x: r*Math.cos(a) + J()*0.5, y: r*Math.sin(a) + J()*0.5, cls });
+    }
+  } else if (name === 'linear') {
+    for (let i=0; i<n; i++) {
+      const x = (Math.random()-0.5)*6, y = (Math.random()-0.5)*6;
+      pts.push({ x: x + J(), y: y + J(), cls: (0.7*x + y > 0) ? 1 : 0 });
+    }
+  } else if (name === 'rings') {
+    for (let i=0; i<n; i++) {
+      const r = Math.random() < 0.5 ? 0.9 + Math.random()*0.6 : 2.2 + Math.random()*0.6;
+      const a = Math.random()*2*Math.PI;
+      const cls = r < 1.8 ? 1 : 0;
+      pts.push({ x: r*Math.cos(a) + J(), y: r*Math.sin(a) + J(), cls });
+    }
+  } else if (name === 'moons') {
+    for (let i=0; i<n; i++) {
+      const cls = i % 2;
+      const a = Math.random()*Math.PI;
+      const rx = cls ? 1 : -1;
+      const ry = cls ? -0.5 : 0.5;
+      pts.push({ x: rx*Math.cos(a) + J(), y: ry + Math.sin(a) + J(), cls });
     }
   }
+  return pts;
+}
 
-  function forward(x1, x2){
-    let a = [x1, x2];
-    const activations = [a];
-    const zs = [];
-    for(let l=0;l<weights.length;l++){
-      const z = [], newA = [];
-      for(let j=0;j<weights[l].length;j++){
-        let s = biases[l][j];
-        for(let i=0;i<a.length;i++) s += weights[l][j][i]*a[i];
-        z.push(s);
-        if(l===weights.length-1) newA.push(acts.sigmoid.fn(s)); // output layer: sigmoid
-        else newA.push(acts[activation].fn(s));
-      }
-      zs.push(z); activations.push(newA); a = newA;
-    }
-    return { y: a[0], activations, zs };
+function reseedData() {
+  rawData = genDataset(datasetName, 140, noise);
+  /* Shuffle + split */
+  for (let i = rawData.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [rawData[i], rawData[j]] = [rawData[j], rawData[i]];
   }
-
-  function train(){
-    // One epoch = all data points
-    let totalLoss = 0;
-    for(const p of data){
-      const {y, activations, zs} = forward(p.x, p.y);
-      const target = p.cls;
-      const loss = -(target*Math.log(Math.max(y,1e-9)) + (1-target)*Math.log(Math.max(1-y,1e-9)));
-      totalLoss += loss;
-
-      // Backprop
-      // Output layer delta (sigmoid + BCE): delta = y - target
-      const deltas = [];
-      deltas[weights.length-1] = [y - target];
-
-      for(let l=weights.length-2; l>=0; l--){
-        const layerDelta = [];
-        const nextW = weights[l+1];
-        const nextD = deltas[l+1];
-        for(let j=0;j<zs[l].length;j++){
-          let s = 0;
-          for(let k=0;k<nextD.length;k++) s += nextW[k][j]*nextD[k];
-          layerDelta.push(s * acts[activation].deriv(zs[l][j]));
-        }
-        deltas[l] = layerDelta;
-      }
-
-      // Update weights
-      for(let l=0;l<weights.length;l++){
-        for(let j=0;j<weights[l].length;j++){
-          biases[l][j] -= lr * deltas[l][j];
-          for(let i=0;i<weights[l][j].length;i++){
-            weights[l][j][i] -= lr * deltas[l][j] * activations[l][i];
-          }
-        }
-      }
-    }
-    epoch++;
-    return totalLoss / data.length;
-  }
-
-  function datasets(name){
-    const out = [];
-    if(name==='xor'){
-      for(let i=0;i<40;i++){
-        const x = (Math.random()-0.5)*5;
-        const y = (Math.random()-0.5)*5;
-        const cls = (x*y > 0) ? 1 : 0;
-        out.push({x,y,cls});
-      }
-    } else if(name==='circle'){
-      for(let i=0;i<40;i++){
-        const x = (Math.random()-0.5)*6;
-        const y = (Math.random()-0.5)*6;
-        const r = Math.hypot(x,y);
-        const cls = r < 1.8 ? 1 : 0;
-        out.push({x,y,cls});
-      }
-    } else if(name==='spiral'){
-      for(let i=0;i<60;i++){
-        const t = i/60 * Math.PI * 3.5;
-        const r = t * 0.5;
-        const cls = i % 2 === 0 ? 0 : 1;
-        const angle = t + (cls ? Math.PI : 0);
-        const jx = (Math.random()-0.5)*0.4;
-        const jy = (Math.random()-0.5)*0.4;
-        out.push({x: r*Math.cos(angle)+jx, y: r*Math.sin(angle)+jy, cls});
-      }
-    } else { // linear
-      for(let i=0;i<30;i++){
-        const x = (Math.random()-0.5)*6;
-        const y = (Math.random()-0.5)*6;
-        const cls = (x+y > 0) ? 1 : 0;
-        out.push({x,y,cls});
-      }
-    }
-    return out;
-  }
-
-  function resize(){
-    const r=canvas.parentElement.getBoundingClientRect();
-    W=r.width; H=r.height;
-    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-    canvas.style.width=W+'px'; canvas.style.height=H+'px';
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    draw();
-  }
-
-  function toC(x,y){return [(x-XR[0])/(XR[1]-XR[0])*W, H-(y-YR[0])/(YR[1]-YR[0])*H];}
-  function toD(px,py){return [XR[0]+(px/W)*(XR[1]-XR[0]), YR[0]+((H-py)/H)*(YR[1]-YR[0])];}
-
-  function draw(){
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
-
-    // Decision surface
-    const step = 12;
-    let correct=0;
-    for(let py=0;py<H;py+=step){
-      for(let px=0;px<W;px+=step){
-        const [dx,dy]=toD(px+step/2,py+step/2);
-        const {y} = forward(dx, dy);
-        const color = y > 0.5 ? `rgba(34,211,238,${Math.min(1,(y-0.5)*1.4)*0.35})` : `rgba(248,113,113,${Math.min(1,(0.5-y)*1.4)*0.35})`;
-        ctx.fillStyle = color;
-        ctx.fillRect(px,py,step,step);
-      }
-    }
-
-    // Axes
-    ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1.2;
-    const [ox,oy]=toC(0,0);
-    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
-
-    // Data points
-    for(const p of data){
-      const [px,py]=toC(p.x,p.y);
-      const {y} = forward(p.x, p.y);
-      const predicted = y > 0.5 ? 1 : 0;
-      if(predicted === p.cls) correct++;
-
-      ctx.fillStyle = p.cls === 1 ? '#22d3ee' : '#f87171';
-      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 6;
-      ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.fill();
-      ctx.shadowBlur=0;
-      ctx.fillStyle='rgba(255,255,255,0.6)';
-      ctx.beginPath(); ctx.arc(px,py,2,0,Math.PI*2); ctx.fill();
-    }
-
-    // Stats
-    const acc = (correct/data.length*100).toFixed(1);
-    document.getElementById('acc').textContent = acc+'%';
-    document.getElementById('epoch').textContent = epoch;
-    document.getElementById('overlay').innerHTML =
-      `Epoch <span class="value">${epoch}</span> &middot; Accuracy <span class="value">${acc}%</span> &middot; ${training?'training...':'idle'}`;
-  }
-
-  function trainLoop(){
-    if(!training) return;
-    for(let i=0;i<4;i++) {
-      const loss = train();
-      document.getElementById('loss').textContent = loss.toFixed(4);
-    }
-    draw();
-    requestAnimationFrame(trainLoop);
-  }
-
-  document.getElementById('btn-train').addEventListener('click',()=>{
-    training = !training;
-    document.getElementById('btn-train').textContent = training ? 'Stop' : 'Train';
-    if(training) trainLoop();
-  });
-  document.getElementById('btn-reset').addEventListener('click',()=>{
-    training = false;
-    document.getElementById('btn-train').textContent = 'Train';
-    epoch = 0;
-    initNetwork();
-    draw();
-  });
-
-  document.querySelectorAll('[data-ds]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('[data-ds]').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      data = datasets(b.dataset.ds);
-      training=false; document.getElementById('btn-train').textContent='Train';
-      epoch=0; initNetwork(); draw();
-    });
-  });
-  document.querySelectorAll('[data-act]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('[data-act]').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      activation = b.dataset.act;
-      epoch=0; initNetwork(); draw();
-    });
-  });
-
-  document.getElementById('nl-slider').addEventListener('input',e=>{
-    numLayers=parseInt(e.target.value); document.getElementById('nl-val').textContent=numLayers;
-    epoch=0; initNetwork(); draw();
-  });
-  document.getElementById('nn-slider').addEventListener('input',e=>{
-    neuronsPerLayer=parseInt(e.target.value); document.getElementById('nn-val').textContent=neuronsPerLayer;
-    epoch=0; initNetwork(); draw();
-  });
-  document.getElementById('lr-slider').addEventListener('input',e=>{
-    lr=parseFloat(e.target.value); document.getElementById('lr-val').textContent=lr.toFixed(2);
-  });
-
-  data = datasets('xor');
+  const cut = Math.floor(rawData.length * split);
+  trainData = rawData.slice(0, cut);
+  testData = rawData.slice(cut);
+  epoch = 0; lossHist = []; accHist = [];
   initNetwork();
-  resize(); window.addEventListener('resize',resize);
+}
+
+/* =============================================================
+   Network init (He init for ReLU-like, Xavier for others)
+   ============================================================= */
+function initNetwork() {
+  W = []; b = []; mW = []; mb = []; vW = []; vb = [];
+  tStep = 0;
+  const fanOutMul = (activationName === 'relu' || activationName === 'leakyRelu' || activationName === 'elu') ? 2 : 1;
+  for (let l = 0; l < architecture.length - 1; l++) {
+    const fin = architecture[l], fout = architecture[l+1];
+    const scale = Math.sqrt(fanOutMul / fin);
+    const Wl = [], bl = [];
+    for (let j = 0; j < fout; j++) {
+      const row = [];
+      for (let i = 0; i < fin; i++) row.push(randn() * scale);
+      Wl.push(row);
+      bl.push(0);
+    }
+    W.push(Wl); b.push(bl);
+    /* Moment buffers */
+    mW.push(Wl.map(r => r.map(() => 0))); mb.push(bl.map(() => 0));
+    vW.push(Wl.map(r => r.map(() => 0))); vb.push(bl.map(() => 0));
+  }
+}
+
+let rnSpare = null;
+function randn() {
+  if (rnSpare !== null) { const s = rnSpare; rnSpare = null; return s; }
+  let u=0, v=0;
+  while (u===0) u = Math.random();
+  while (v===0) v = Math.random();
+  const m = Math.sqrt(-2*Math.log(u));
+  rnSpare = m * Math.sin(2*Math.PI*v);
+  return m * Math.cos(2*Math.PI*v);
+}
+
+/* =============================================================
+   Forward pass
+   ============================================================= */
+function forward(x, y, returnAll) {
+  let a = [x, y];
+  const allA = returnAll ? [a.slice()] : null;
+  const allZ = returnAll ? [] : null;
+  for (let l = 0; l < W.length; l++) {
+    const fout = W[l].length;
+    const z = new Array(fout), newA = new Array(fout);
+    const act = (l === W.length-1) ? acts.sigmoid : acts[activationName];
+    for (let j = 0; j < fout; j++) {
+      let s = b[l][j];
+      for (let i = 0; i < W[l][j].length; i++) s += W[l][j][i] * a[i];
+      /* Dropout on hidden (not output) */
+      if (dropout > 0 && training && l < W.length-1) {
+        if (Math.random() < dropout) { z[j] = 0; newA[j] = 0; continue; }
+        /* Inverted dropout: scale up */
+        s = s / (1 - dropout);
+      }
+      z[j] = s;
+      newA[j] = act.f(s);
+    }
+    if (returnAll) { allZ.push(z); allA.push(newA); }
+    a = newA;
+  }
+  if (returnAll) return { y: a[0], allA, allZ };
+  return a[0];
+}
+
+/* =============================================================
+   Backprop on a single example
+   ============================================================= */
+function backward(sample) {
+  const { y: yHat, allA, allZ } = forward(sample.x, sample.y, true);
+  const target = sample.cls;
+  /* Binary cross-entropy loss with sigmoid output: dL/dz = yHat - target */
+  const grads = { W: [], b: [] };
+  /* Allocate grads */
+  for (let l = 0; l < W.length; l++) {
+    grads.W.push(W[l].map(r => r.map(() => 0)));
+    grads.b.push(b[l].map(() => 0));
+  }
+  /* Backward pass */
+  let delta = [yHat - target];   // dL/dz for last layer
+  for (let l = W.length-1; l >= 0; l--) {
+    const act = (l === W.length-1) ? acts.sigmoid : acts[activationName];
+    const prevA = allA[l];   // activations feeding this layer
+    for (let j = 0; j < W[l].length; j++) {
+      grads.b[l][j] = delta[j];
+      for (let i = 0; i < W[l][j].length; i++) grads.W[l][j][i] = delta[j] * prevA[i];
+    }
+    if (l > 0) {
+      const newDelta = new Array(architecture[l]).fill(0);
+      for (let i = 0; i < architecture[l]; i++) {
+        let s = 0;
+        for (let j = 0; j < W[l].length; j++) s += W[l][j][i] * delta[j];
+        const prevAct = acts[activationName];
+        newDelta[i] = s * prevAct.df(allZ[l-1][i]);
+      }
+      delta = newDelta;
+    }
+  }
+  const loss = -(target*Math.log(Math.max(yHat, 1e-9)) + (1-target)*Math.log(Math.max(1-yHat, 1e-9)));
+  return { grads, loss };
+}
+
+/* =============================================================
+   Optimizer application (per mini-batch)
+   ============================================================= */
+function applyOptimizer(sumGradsW, sumGradsB, count) {
+  tStep++;
+  const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+  for (let l = 0; l < W.length; l++) {
+    for (let j = 0; j < W[l].length; j++) {
+      for (let i = 0; i < W[l][j].length; i++) {
+        let g = sumGradsW[l][j][i] / count + l2 * W[l][j][i];
+        let step = 0;
+        if (optimizer === 'sgd') step = lr * g;
+        else if (optimizer === 'momentum') {
+          mW[l][j][i] = 0.9*mW[l][j][i] + lr * g;
+          step = mW[l][j][i];
+        }
+        else if (optimizer === 'rmsprop') {
+          vW[l][j][i] = 0.9*vW[l][j][i] + 0.1*g*g;
+          step = lr * g / (Math.sqrt(vW[l][j][i]) + eps);
+        }
+        else {
+          mW[l][j][i] = b1*mW[l][j][i] + (1-b1)*g;
+          vW[l][j][i] = b2*vW[l][j][i] + (1-b2)*g*g;
+          const mh = mW[l][j][i]/(1-Math.pow(b1, tStep));
+          const vh = vW[l][j][i]/(1-Math.pow(b2, tStep));
+          step = lr * mh / (Math.sqrt(vh) + eps);
+        }
+        W[l][j][i] -= step;
+      }
+      /* Bias */
+      const gb = sumGradsB[l][j] / count;
+      let stepB = 0;
+      if (optimizer === 'sgd') stepB = lr * gb;
+      else if (optimizer === 'momentum') { mb[l][j] = 0.9*mb[l][j] + lr * gb; stepB = mb[l][j]; }
+      else if (optimizer === 'rmsprop') { vb[l][j] = 0.9*vb[l][j] + 0.1*gb*gb; stepB = lr * gb / (Math.sqrt(vb[l][j]) + eps); }
+      else {
+        mb[l][j] = b1*mb[l][j] + (1-b1)*gb;
+        vb[l][j] = b2*vb[l][j] + (1-b2)*gb*gb;
+        const mh = mb[l][j]/(1-Math.pow(b1, tStep));
+        const vh = vb[l][j]/(1-Math.pow(b2, tStep));
+        stepB = lr * mh / (Math.sqrt(vh) + eps);
+      }
+      b[l][j] -= stepB;
+    }
+  }
+}
+
+/* =============================================================
+   One training epoch: mini-batch over shuffled train set
+   ============================================================= */
+function trainOneEpoch() {
+  const idxs = trainData.map((_,i) => i);
+  for (let i = idxs.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
+  }
+  let totalLoss = 0;
+  for (let start = 0; start < idxs.length; start += batchSize) {
+    const end = Math.min(start + batchSize, idxs.length);
+    const sumGradsW = W.map(layer => layer.map(r => r.map(() => 0)));
+    const sumGradsB = b.map(layer => layer.map(() => 0));
+    let count = 0;
+    for (let k = start; k < end; k++) {
+      const { grads, loss } = backward(trainData[idxs[k]]);
+      totalLoss += loss;
+      count++;
+      for (let l = 0; l < W.length; l++) {
+        for (let j = 0; j < W[l].length; j++) {
+          sumGradsB[l][j] += grads.b[l][j];
+          for (let i = 0; i < W[l][j].length; i++) sumGradsW[l][j][i] += grads.W[l][j][i];
+        }
+      }
+    }
+    applyOptimizer(sumGradsW, sumGradsB, count);
+  }
+  epoch++;
+  lossHist.push(totalLoss / trainData.length);
+  accHist.push(testAccuracy());
+  if (lossHist.length > 300) { lossHist.shift(); accHist.shift(); }
+}
+
+function testAccuracy() {
+  const data = testData.length ? testData : trainData;
+  if (!data.length) return 0;
+  let correct = 0;
+  for (const p of data) {
+    const y = forward(p.x, p.y, false);
+    if ((y > 0.5 ? 1 : 0) === p.cls) correct++;
+  }
+  return correct / data.length;
+}
+
+function paramCount() {
+  let c = 0;
+  for (let l = 0; l < W.length; l++) {
+    for (let j = 0; j < W[l].length; j++) c += W[l][j].length + 1;
+  }
+  return c;
+}
+
+/* =============================================================
+   Rendering helpers
+   ============================================================= */
+function readTokenColor(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+const pal = {};
+function reloadPalette() {
+  pal.teal400 = readTokenColor('--teal-400');
+  pal.teal300 = readTokenColor('--teal-300');
+  pal.teal500 = readTokenColor('--teal-500');
+  pal.ink850  = readTokenColor('--ink-850');
+  pal.ink700  = readTokenColor('--ink-700');
+  pal.ink500  = readTokenColor('--ink-500');
+  pal.ink300  = readTokenColor('--ink-300');
+  pal.bgSunken= readTokenColor('--bg-sunken') || '#060607';
+  pal.heat    = readTokenColor('--heat-400');
+  pal.danger  = readTokenColor('--danger');
+  pal.success = readTokenColor('--success');
+  pal.fgPrim  = readTokenColor('--fg-primary');
+}
+
+const XR = [-4, 4], YR = [-4, 4];
+function toC(canvas, x, y) {
+  const W = canvas.width / devicePixelRatio;
+  const H = canvas.height / devicePixelRatio;
+  return [ (x - XR[0]) / (XR[1]-XR[0]) * W, H - (y - YR[0]) / (YR[1]-YR[0]) * H ];
+}
+function toD(canvas, px, py) {
+  const W = canvas.width / devicePixelRatio;
+  const H = canvas.height / devicePixelRatio;
+  return [ XR[0] + px/W*(XR[1]-XR[0]), YR[0] + (H - py)/H*(YR[1]-YR[0]) ];
+}
+
+function fitCanvas(canvas) {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width * devicePixelRatio;
+  canvas.height = r.height * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+
+/* =============================================================
+   Decision-boundary rendering
+   ============================================================= */
+const dbCanvas = document.getElementById('db-canvas');
+const dbCtx = dbCanvas.getContext('2d');
+
+function renderDB() {
+  const W = dbCanvas.width / devicePixelRatio;
+  const H = dbCanvas.height / devicePixelRatio;
+  dbCtx.clearRect(0,0,W,H);
+  dbCtx.fillStyle = pal.bgSunken || '#060607';
+  dbCtx.fillRect(0,0,W,H);
+
+  /* Boundary: sample a coarse grid, lerp-fill per cell */
+  if (showBoundary) {
+    const step = 10;
+    for (let py = 0; py < H; py += step) {
+      for (let px = 0; px < W; px += step) {
+        const [x, y] = toD(dbCanvas, px + step/2, py + step/2);
+        const v = forward(x, y, false);    /* 0..1 */
+        const intensity = Math.abs(v - 0.5) * 2;    /* 0..1 confidence */
+        const color = v > 0.5
+          ? `rgba(32, 184, 174, ${intensity * 0.45})`
+          : `rgba(242, 92, 84, ${intensity * 0.35})`;
+        dbCtx.fillStyle = color;
+        dbCtx.fillRect(px, py, step, step);
+      }
+    }
+  }
+
+  /* Grid */
+  dbCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+  dbCtx.lineWidth = 1;
+  for (let x = -3; x <= 3; x++) {
+    const [px] = toC(dbCanvas, x, 0);
+    dbCtx.beginPath(); dbCtx.moveTo(px, 0); dbCtx.lineTo(px, H); dbCtx.stroke();
+  }
+  for (let y = -3; y <= 3; y++) {
+    const [,py] = toC(dbCanvas, 0, y);
+    dbCtx.beginPath(); dbCtx.moveTo(0, py); dbCtx.lineTo(W, py); dbCtx.stroke();
+  }
+
+  /* Axes */
+  dbCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+  const [ox, oy] = toC(dbCanvas, 0, 0);
+  dbCtx.beginPath(); dbCtx.moveTo(0, oy); dbCtx.lineTo(W, oy); dbCtx.stroke();
+  dbCtx.beginPath(); dbCtx.moveTo(ox, 0); dbCtx.lineTo(ox, H); dbCtx.stroke();
+
+  /* Points */
+  if (showPoints) drawPoints(trainData, 1.0);
+  if (showTest)   drawPoints(testData,  0.55);
+
+  function drawPoints(data, alpha) {
+    for (const p of data) {
+      const [px, py] = toC(dbCanvas, p.x, p.y);
+      const fill = p.cls === 1 ? pal.teal400 : pal.danger;
+      dbCtx.fillStyle = hex2rgba(fill, alpha);
+      dbCtx.beginPath(); dbCtx.arc(px, py, 5, 0, Math.PI*2); dbCtx.fill();
+      dbCtx.fillStyle = 'rgba(255,255,255,0.85)';
+      dbCtx.beginPath(); dbCtx.arc(px, py, 1.5, 0, Math.PI*2); dbCtx.fill();
+    }
+  }
+}
+
+function hex2rgba(hex, a) {
+  if (hex.startsWith('#')) hex = hex.slice(1);
+  if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
+  const r = parseInt(hex.slice(0,2), 16);
+  const g = parseInt(hex.slice(2,4), 16);
+  const b = parseInt(hex.slice(4,6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* =============================================================
+   Network-diagram rendering
+   ============================================================= */
+const netCanvas = document.getElementById('net-canvas');
+const netCtx = netCanvas.getContext('2d');
+
+function renderNet() {
+  const W = netCanvas.width / devicePixelRatio;
+  const H = netCanvas.height / devicePixelRatio;
+  netCtx.clearRect(0,0,W,H);
+  netCtx.fillStyle = pal.bgSunken || '#060607';
+  netCtx.fillRect(0,0,W,H);
+
+  const L = architecture.length;
+  const padX = 30, padY = 24;
+  const xs = architecture.map((_, i) => padX + (W - 2*padX) * (i / (L-1)));
+
+  /* Find max |weight| for normalization.
+     Note: local `W` above shadows the global weight matrix with canvas width,
+     so we use the sync'd alias `this_W` here. */
+  let maxAbs = 1;
+  if (this_W) {
+    for (const layer of this_W)
+      for (const r of layer)
+        for (const v of r)
+          if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+  }
+
+  /* Connections */
+  if (showWeights) {
+    for (let l = 0; l < this_W.length; l++) {
+      const n1 = architecture[l], n2 = architecture[l+1];
+      for (let i = 0; i < n1; i++) {
+        for (let j = 0; j < n2; j++) {
+          const w = this_W[l][j][i];
+          const mag = Math.min(1, Math.abs(w)/maxAbs);
+          const color = w >= 0
+            ? `rgba(32, 184, 174, ${0.12 + mag*0.75})`
+            : `rgba(242, 92, 84, ${0.12 + mag*0.7})`;
+          netCtx.strokeStyle = color;
+          netCtx.lineWidth = 0.6 + mag * 2.6;
+          netCtx.beginPath();
+          const y1 = padY + (H - 2*padY) * ((i + 0.5) / n1);
+          const y2 = padY + (H - 2*padY) * ((j + 0.5) / n2);
+          netCtx.moveTo(xs[l] + 10, y1);
+          netCtx.lineTo(xs[l+1] - 10, y2);
+          netCtx.stroke();
+        }
+      }
+    }
+  }
+
+  /* Nodes */
+  for (let l = 0; l < L; l++) {
+    const n = architecture[l];
+    for (let i = 0; i < n; i++) {
+      const y = padY + (H - 2*padY) * ((i + 0.5) / n);
+      const act = showActivations && lastForwardActs ? (lastForwardActs[l] ? lastForwardActs[l][i] : 0) : 0;
+      netCtx.fillStyle = act > 0
+        ? hex2rgba(pal.teal400, Math.min(1, 0.4 + act*0.6))
+        : (l === 0 ? pal.ink700 : pal.ink850);
+      netCtx.strokeStyle = l === L-1 ? pal.teal300 : 'rgba(255,255,255,0.15)';
+      netCtx.lineWidth = 1.2;
+      netCtx.beginPath(); netCtx.arc(xs[l], y, 9, 0, Math.PI*2);
+      netCtx.fill(); netCtx.stroke();
+    }
+  }
+
+  /* Layer labels */
+  netCtx.font = `10px ${'JetBrains Mono, monospace'}`;
+  netCtx.fillStyle = pal.ink500;
+  netCtx.textAlign = 'center';
+  for (let l = 0; l < L; l++) {
+    const label = l === 0 ? 'in' : l === L-1 ? 'out' : `h${l}`;
+    netCtx.fillText(label, xs[l], H - 8);
+    netCtx.fillText(`${architecture[l]}`, xs[l], 14);
+  }
+  netCtx.textAlign = 'left';
+}
+/* Alias matches variable naming in renderNet: we named global `W` above
+   but the script also uses `W` for canvas width in functions. To avoid
+   accidental shadowing bugs, rebind: */
+let this_W, this_b;
+function syncThis() { this_W = W; this_b = b; }
+
+/* =============================================================
+   Line-chart helper for Loss / Accuracy
+   ============================================================= */
+function drawSparkline(canvas, series, color) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width / devicePixelRatio;
+  const H = canvas.height / devicePixelRatio;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = pal.bgSunken || '#060607';
+  ctx.fillRect(0,0,W,H);
+
+  /* Grid */
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.beginPath();
+  for (let y = 24; y < H-6; y += 24) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+
+  if (!series || series.length < 2) return;
+  let mn = Infinity, mx = -Infinity;
+  for (const v of series) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const range = mx - mn || 1;
+  const padT = 26, padB = 10;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  for (let i = 0; i < series.length; i++) {
+    const x = (i/(series.length-1)) * W;
+    const y = padT + (1 - (series[i]-mn)/range) * (H - padT - padB);
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  /* end-dot */
+  const last = series[series.length-1];
+  const lx = W - 6;
+  const ly = padT + (1 - (last-mn)/range) * (H - padT - padB);
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI*2); ctx.fill();
+}
+
+/* =============================================================
+   Architecture editor UI
+   ============================================================= */
+const archRow = document.getElementById('arch-row');
+function rebuildArchRow() {
+  archRow.innerHTML = '';
+  for (let i = 0; i < architecture.length; i++) {
+    const pill = document.createElement('div');
+    const isIO = (i === 0 || i === architecture.length - 1);
+    pill.className = 'arch-pill' + (isIO ? ' io' : '');
+    pill.innerHTML = `<span>${isIO ? (i===0?'in':'out') : 'h'+i}: ${architecture[i]}</span>`;
+    if (!isIO) {
+      pill.innerHTML += `<button title="minus neuron" data-op="dec">&minus;</button>`;
+      pill.innerHTML += `<button title="plus neuron" data-op="inc">+</button>`;
+      pill.innerHTML += `<button title="remove layer" data-op="rm">&times;</button>`;
+      pill.querySelectorAll('button').forEach(bt => bt.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const op = bt.dataset.op;
+        if (op === 'dec' && architecture[i] > 1) architecture[i]--;
+        else if (op === 'inc' && architecture[i] < 12) architecture[i]++;
+        else if (op === 'rm') architecture.splice(i, 1);
+        rebuildArchRow(); reseedData();
+      }));
+    }
+    archRow.appendChild(pill);
+    if (i < architecture.length - 1) {
+      const add = document.createElement('button');
+      add.className = 'arch-add';
+      add.textContent = '+';
+      add.title = 'add a hidden layer here';
+      add.addEventListener('click', () => {
+        if (architecture.length < 6) architecture.splice(i+1, 0, 4);
+        rebuildArchRow(); reseedData();
+      });
+      archRow.appendChild(add);
+    }
+  }
+}
+
+/* =============================================================
+   Dataset tile thumbnails
+   ============================================================= */
+const dsNames = ['xor', 'circle', 'spiral', 'rings', 'moons', 'linear'];
+const dsGrid = document.getElementById('dataset-grid');
+function buildDatasetTiles() {
+  dsGrid.innerHTML = '';
+  for (const name of dsNames) {
+    const tile = document.createElement('div');
+    tile.className = 'ds-tile' + (name === datasetName ? ' active' : '');
+    tile.dataset.ds = name;
+    tile.innerHTML = `<canvas></canvas><div class="ds-name">${name}</div>`;
+    tile.addEventListener('click', () => {
+      datasetName = name;
+      dsGrid.querySelectorAll('.ds-tile').forEach(t => t.classList.toggle('active', t.dataset.ds === name));
+      reseedData();
+    });
+    dsGrid.appendChild(tile);
+  }
+  /* Render previews */
+  dsGrid.querySelectorAll('.ds-tile').forEach(tile => {
+    const c = tile.querySelector('canvas');
+    const r = c.getBoundingClientRect();
+    c.width = Math.max(40, r.width) * devicePixelRatio;
+    c.height = Math.max(40, r.height) * devicePixelRatio;
+    const cx = c.getContext('2d');
+    cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    const W = c.width/devicePixelRatio, H = c.height/devicePixelRatio;
+    cx.fillStyle = pal.bgSunken || '#060607'; cx.fillRect(0,0,W,H);
+    const pts = genDataset(tile.dataset.ds, 60, 0);
+    for (const p of pts) {
+      const px = (p.x - XR[0]) / (XR[1]-XR[0]) * W;
+      const py = H - (p.y - YR[0]) / (YR[1]-YR[0]) * H;
+      cx.fillStyle = p.cls === 1 ? pal.teal400 : pal.danger;
+      cx.beginPath(); cx.arc(px, py, 2, 0, Math.PI*2); cx.fill();
+    }
+  });
+}
+
+/* =============================================================
+   Stats update
+   ============================================================= */
+function updateStats() {
+  document.getElementById('stat-epoch').textContent = epoch;
+  const loss = lossHist.length ? lossHist[lossHist.length-1] : 0;
+  const acc = accHist.length ? accHist[accHist.length-1] : 0;
+  document.getElementById('stat-loss').textContent = loss.toFixed(3);
+  document.getElementById('stat-acc').innerHTML = `${(acc*100).toFixed(1)}<span class="unit">%</span>`;
+  document.getElementById('stat-params').textContent = paramCount();
+  document.getElementById('chart-loss-val').textContent = loss.toFixed(3);
+  document.getElementById('chart-acc-val').textContent = `${(acc*100).toFixed(1)}%`;
+  document.getElementById('net-meta').textContent = `${paramCount()} params · ${architecture.join(' · ')}`;
+}
+
+/* =============================================================
+   Training loop
+   ============================================================= */
+function trainLoop() {
+  if (!training) return;
+  for (let i = 0; i < epochsPerFrame; i++) trainOneEpoch();
+  syncThis();
+  renderDB(); renderNet();
+  drawSparkline(document.getElementById('chart-loss'), lossHist, pal.teal400);
+  drawSparkline(document.getElementById('chart-acc'), accHist, pal.heat);
+  updateStats();
+  requestAnimationFrame(trainLoop);
+}
+
+/* =============================================================
+   UI wiring
+   ============================================================= */
+document.querySelectorAll('[data-act]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-act]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); activationName = btn.dataset.act;
+    initNetwork(); syncThis(); renderDB(); renderNet(); updateStats();
+  });
+});
+document.querySelectorAll('[data-opt]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-opt]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); optimizer = btn.dataset.opt;
+    /* Reset optimizer moments but keep weights */
+    mW = W.map(l => l.map(r => r.map(() => 0)));
+    mb = b.map(l => l.map(() => 0));
+    vW = W.map(l => l.map(r => r.map(() => 0)));
+    vb = b.map(l => l.map(() => 0));
+    tStep = 0;
+  });
+});
+
+document.getElementById('lr-slider').addEventListener('input', e => {
+  lr = parseFloat(e.target.value); document.getElementById('lr-val').textContent = lr.toFixed(3);
+});
+document.getElementById('bs-slider').addEventListener('input', e => {
+  batchSize = parseInt(e.target.value); document.getElementById('bs-val').textContent = batchSize;
+});
+document.getElementById('l2-slider').addEventListener('input', e => {
+  l2 = parseFloat(e.target.value); document.getElementById('l2-val').textContent = l2.toFixed(3);
+});
+document.getElementById('dp-slider').addEventListener('input', e => {
+  dropout = parseFloat(e.target.value); document.getElementById('dp-val').textContent = dropout.toFixed(2);
+});
+document.getElementById('noise-slider').addEventListener('input', e => {
+  noise = parseFloat(e.target.value); document.getElementById('noise-val').textContent = noise.toFixed(2);
+  reseedData(); renderDB();
+});
+document.getElementById('split-slider').addEventListener('input', e => {
+  split = parseFloat(e.target.value);
+  document.getElementById('split-val').textContent = `${Math.round(split*100)} / ${Math.round((1-split)*100)}`;
+  reseedData(); renderDB();
+});
+document.getElementById('eps-slider').addEventListener('input', e => {
+  epochsPerFrame = parseInt(e.target.value); document.getElementById('eps-val').textContent = epochsPerFrame;
+});
+
+document.getElementById('tog-boundary').addEventListener('click', function() { showBoundary = !showBoundary; this.classList.toggle('active'); renderDB(); });
+document.getElementById('tog-points').addEventListener('click', function()   { showPoints = !showPoints; this.classList.toggle('active'); renderDB(); });
+document.getElementById('tog-test').addEventListener('click', function()     { showTest = !showTest; this.classList.toggle('active'); renderDB(); });
+document.getElementById('tog-weights').addEventListener('click', function()  { showWeights = !showWeights; this.classList.toggle('active'); renderNet(); });
+document.getElementById('tog-activations').addEventListener('click', function() { showActivations = !showActivations; this.classList.toggle('active'); renderNet(); });
+
+const btnTrain = document.getElementById('btn-train');
+btnTrain.addEventListener('click', () => {
+  training = !training;
+  btnTrain.textContent = training ? 'Stop' : 'Train';
+  btnTrain.classList.toggle('active', training);
+  if (training) { syncThis(); trainLoop(); }
+});
+document.getElementById('btn-step').addEventListener('click', () => {
+  trainOneEpoch();
+  syncThis(); renderDB(); renderNet(); updateStats();
+  drawSparkline(document.getElementById('chart-loss'), lossHist, pal.teal400);
+  drawSparkline(document.getElementById('chart-acc'), accHist, pal.heat);
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  training = false; btnTrain.textContent = 'Train'; btnTrain.classList.remove('active');
+  reseedData(); syncThis(); renderDB(); renderNet(); updateStats();
+  drawSparkline(document.getElementById('chart-loss'), lossHist, pal.teal400);
+  drawSparkline(document.getElementById('chart-acc'), accHist, pal.heat);
+});
+
+/* Click to add point */
+dbCanvas.addEventListener('click', e => {
+  const r = dbCanvas.getBoundingClientRect();
+  const [x, y] = toD(dbCanvas, e.clientX - r.left, e.clientY - r.top);
+  if (x < XR[0] || x > XR[1] || y < YR[0] || y > YR[1]) return;
+  const cls = e.shiftKey ? 0 : 1;
+  trainData.push({ x, y, cls });
+  renderDB();
+});
+
+/* =============================================================
+   Presets
+   ============================================================= */
+const presets = {
+  xor_small: () => {
+    datasetName = 'xor'; architecture = [2, 4, 1]; activationName = 'tanh';
+    optimizer = 'adam'; lr = 0.1; batchSize = 16; l2 = 0; dropout = 0; noise = 0;
+  },
+  spiral_deep: () => {
+    datasetName = 'spiral'; architecture = [2, 8, 8, 8, 1]; activationName = 'relu';
+    optimizer = 'adam'; lr = 0.05; batchSize = 16; l2 = 0; dropout = 0; noise = 0;
+  },
+  lr_too_high: () => {
+    datasetName = 'xor'; architecture = [2, 6, 1]; activationName = 'tanh';
+    optimizer = 'sgd'; lr = 0.9; batchSize = 16; l2 = 0; dropout = 0; noise = 0;
+  },
+  overfit: () => {
+    datasetName = 'moons'; architecture = [2, 12, 12, 1]; activationName = 'relu';
+    optimizer = 'adam'; lr = 0.05; batchSize = 8; l2 = 0; dropout = 0; noise = 0.2;
+  },
+  dying_relu: () => {
+    datasetName = 'spiral'; architecture = [2, 6, 6, 1]; activationName = 'relu';
+    optimizer = 'sgd'; lr = 0.5; batchSize = 16; l2 = 0; dropout = 0; noise = 0;
+  },
+};
+document.querySelectorAll('[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    training = false; btnTrain.textContent = 'Train'; btnTrain.classList.remove('active');
+    presets[btn.dataset.preset]();
+    /* Update UI to reflect */
+    document.getElementById('lr-slider').value = lr;
+    document.getElementById('lr-val').textContent = lr.toFixed(3);
+    document.getElementById('bs-slider').value = batchSize;
+    document.getElementById('bs-val').textContent = batchSize;
+    document.getElementById('l2-slider').value = l2;
+    document.getElementById('l2-val').textContent = l2.toFixed(3);
+    document.getElementById('dp-slider').value = dropout;
+    document.getElementById('dp-val').textContent = dropout.toFixed(2);
+    document.getElementById('noise-slider').value = noise;
+    document.getElementById('noise-val').textContent = noise.toFixed(2);
+    document.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('active', b.dataset.act === activationName));
+    document.querySelectorAll('[data-opt]').forEach(b => b.classList.toggle('active', b.dataset.opt === optimizer));
+    dsGrid.querySelectorAll('.ds-tile').forEach(t => t.classList.toggle('active', t.dataset.ds === datasetName));
+    rebuildArchRow();
+    reseedData(); syncThis(); renderDB(); renderNet(); updateStats();
+  });
+});
+
+/* =============================================================
+   Init & resize
+   ============================================================= */
+function fit() {
+  fitCanvas(dbCanvas);
+  fitCanvas(netCanvas);
+  fitCanvas(document.getElementById('chart-loss'));
+  fitCanvas(document.getElementById('chart-acc'));
+}
+window.addEventListener('resize', () => { fit(); renderDB(); renderNet(); });
+
+function init() {
+  reloadPalette();
+  fit();
+  buildDatasetTiles();
+  rebuildArchRow();
+  reseedData();
+  syncThis();
+  renderDB(); renderNet(); updateStats();
+  drawSparkline(document.getElementById('chart-loss'), lossHist, pal.teal400);
+  drawSparkline(document.getElementById('chart-acc'), accHist, pal.heat);
+}
+
+/* Defer init to next tick so CSS vars are parsed */
+requestAnimationFrame(init);
+
 })();
 </script>
+
 </body>
 </html>
