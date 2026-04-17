@@ -500,18 +500,20 @@ const GRID     = 128;                  // surface tessellation
 const SCALE    = { xz: 1, y: 0.35 };   // scene scaling
 
 /* Color keys (hex strings + three Colors for convenience) */
+/* Aligned with Perplexity × Firecrawl palette: monochrome ink + single teal accent,
+   heat only on sub-brand signals. Other colors reserved for status / trail contrast. */
 const PAL = {
-  bg:       0x08080f,
-  accent:   0x6366f1,
-  accent2:  0x818cf8,
-  cyan:     0x22d3ee,
-  green:    0x34d399,
-  yellow:   0xfbbf24,
-  orange:   0xfb923c,
-  red:      0xf87171,
+  bg:       0x0A0A0B,
+  accent:   0x20B8AE, /* teal-400 */
+  accent2:  0x5FD2CB, /* teal-300 */
+  cyan:     0x5FD2CB,
+  green:    0x3DD68C,
+  yellow:   0xF5B547,
+  orange:   0xFF7A29, /* heat-400 (Firecrawl sub-accent) */
+  red:      0xF25C54,
   pink:     0xf472b6,
   purple:   0xa78bfa,
-  white:    0xffffff,
+  white:    0xF5F5F7,
 };
 
 /* =============================================================
