@@ -141,16 +141,11 @@
   const xR = [-6,6], yR = [-6,6];
 
   const datasets = {
-    linear:   [[−3,−2.5],[−2,−1.8],[−1,−0.5],[0,0.3],[1,1.2],[2,1.9],[3,3.1],[4,3.8]],
-    noisy:    [[−3,−1.8],[−2,−2.5],[−1,0.2],[0,−0.5],[0.5,1.5],[1,0.8],[2,2.5],[2.5,1.2],[3,3.5],[4,2.8]],
-    steep:    [[−2,−4.5],[−1,−2.8],[0,−0.2],[0.5,0.8],[1,2.1],[1.5,3.2],[2,4.5]],
-    negative: [[−3,3.2],[−2,2.5],[−1,1.8],[0,0.5],[1,−0.2],[2,−1.5],[3,−2.8],[4,−3.5]],
+    linear:   [[-3,-2.5],[-2,-1.8],[-1,-0.5],[0,0.3],[1,1.2],[2,1.9],[3,3.1],[4,3.8]],
+    noisy:    [[-3,-1.8],[-2,-2.5],[-1,0.2],[0,-0.5],[0.5,1.5],[1,0.8],[2,2.5],[2.5,1.2],[3,3.5],[4,2.8]],
+    steep:    [[-2,-4.5],[-1,-2.8],[0,-0.2],[0.5,0.8],[1,2.1],[1.5,3.2],[2,4.5]],
+    negative: [[-3,3.2],[-2,2.5],[-1,1.8],[0,0.5],[1,-0.2],[2,-1.5],[3,-2.8],[4,-3.5]],
   };
-  // Fix unicode minus
-  datasets.linear = [[-3,-2.5],[-2,-1.8],[-1,-0.5],[0,0.3],[1,1.2],[2,1.9],[3,3.1],[4,3.8]];
-  datasets.noisy = [[-3,-1.8],[-2,-2.5],[-1,0.2],[0,-0.5],[0.5,1.5],[1,0.8],[2,2.5],[2.5,1.2],[3,3.5],[4,2.8]];
-  datasets.steep = [[-2,-4.5],[-1,-2.8],[0,-0.2],[0.5,0.8],[1,2.1],[1.5,3.2],[2,4.5]];
-  datasets.negative = [[-3,3.2],[-2,2.5],[-1,1.8],[0,0.5],[1,-0.2],[2,-1.5],[3,-2.8],[4,-3.5]];
 
   points = [...datasets.linear];
 
@@ -256,13 +251,13 @@
     ctx.strokeStyle='#fbbf24'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.roundRect(W-180,12,168,32,8); ctx.stroke();
     ctx.fillStyle='#fbbf24'; ctx.font='bold 13px JetBrains Mono'; ctx.textAlign='right';
-    const sign = b>=0?'+':'';
-    ctx.fillText(`y = ${m.toFixed(2)}x ${sign} ${b.toFixed(2)}`, W-20, 34);
+    const bStr = b>=0 ? `+ ${b.toFixed(2)}` : `- ${(-b).toFixed(2)}`;
+    ctx.fillText(`y = ${m.toFixed(2)}x ${bStr}`, W-20, 34);
     ctx.textAlign='left';
 
     // Update overlay
     const mse = computeMSE();
-    document.getElementById('ov-eq').textContent = `${m.toFixed(2)}x ${sign} ${b.toFixed(2)}`;
+    document.getElementById('ov-eq').textContent = `${m.toFixed(2)}x ${bStr}`;
     document.getElementById('ov-err').textContent = mse.toFixed(3);
     document.getElementById('mse-val').textContent = mse.toFixed(3);
   }
