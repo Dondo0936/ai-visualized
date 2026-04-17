@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Positional Encoding - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Positional Encoding</h1>
+      <span class="topic-desc">How transformers know where each word is &mdash; sinusoidal patterns at different frequencies</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        Hover rows to see individual frequency patterns
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Why transformers need positions</div>
+        <div class="guide-text">
+          Unlike older models, transformers process all words <strong>in parallel</strong>. Fast! But they lose track of word order. "Dog bites man" and "Man bites dog" would look identical. Positional encoding adds a unique "signature" to each position so the model knows which word came first.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Sequence Length</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Positions</span>
+            <span class="slider-value" id="seq-val">64</span>
+          </div>
+          <input type="range" id="seq-slider" min="8" max="128" step="4" value="64">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Embedding Dimensions</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>d_model</span>
+            <span class="slider-value" id="dim-val">64</span>
+          </div>
+          <input type="range" id="dim-slider" min="16" max="128" step="4" value="64">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Why Sine &amp; Cosine?</h3>
+        <div class="info-box">
+          The original Transformer paper uses sinusoids at <strong>different frequencies</strong>. Each dimension oscillates at a different rate: dim 0 oscillates fast, dim 64 oscillates slowly. Every position gets a unique pattern, and the model can learn relative distances (like "4 positions apart") using simple linear combinations.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Formula</h3>
+        <div class="formula" style="font-size:0.78rem">
+          PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>)<br>
+          PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Hovered Dimension</h3>
+        <div class="info-box" id="dim-info" style="font-family:var(--font-mono);font-size:0.82rem">
+          Hover a row on the heatmap to inspect.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Modern Variants</h3>
+        <div class="info-box">
+          The original sinusoidal PE is being replaced by <strong>RoPE</strong> (Rotary Position Embeddings) in models like LLaMA and GPT-NeoX. RoPE rotates query/key vectors in 2D planes. The intuition is the same: give each position a distinct pattern that encodes relative distance naturally.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  let seq = 64, dim = 64, hoverDim = -1;
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function pe(pos, i, d){
+    const denom = Math.pow(10000, 2*Math.floor(i/2)/d);
+    return i % 2 === 0 ? Math.sin(pos/denom) : Math.cos(pos/denom);
+  }
+
+  function heatColor(v){
+    // v in [-1, 1], red for negative, white for 0, blue for positive
+    const t = (v + 1) / 2; // [0, 1]
+    if(t < 0.5){
+      const s = t / 0.5;
+      return `rgb(${Math.floor(248 - s*150)}, ${Math.floor(113 - s*50)}, ${Math.floor(113 + s*50)})`;
+    } else {
+      const s = (t-0.5)/0.5;
+      return `rgb(${Math.floor(98 - s*60)}, ${Math.floor(64 + s*130)}, ${Math.floor(163 + s*70)})`;
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    const margin = 40;
+    const headerH = 50;
+    const sideBarW = hoverDim >= 0 ? 180 : 0;
+    const availW = W - margin*2 - sideBarW;
+    const availH = H - headerH - margin*2;
+    const cellW = availW / seq;
+    const cellH = availH / dim;
+    const matX = margin, matY = headerH + margin/2;
+
+    // Title
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText(`Positional Encoding Matrix: ${dim} dims \u00D7 ${seq} positions`, W/2, 28);
+
+    // Axis labels
+    ctx.textAlign='center'; ctx.font='10px JetBrains Mono'; ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.fillText('pos \u2192 (token position in sequence)', matX + availW/2, matY + availH + 24);
+    ctx.save(); ctx.translate(matX-20, matY + availH/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText('dim \u2193', 0, 0); ctx.restore();
+
+    // Draw cells
+    for(let d=0; d<dim; d++){
+      const highlight = d === hoverDim;
+      for(let p=0; p<seq; p++){
+        const v = pe(p, d, dim);
+        ctx.fillStyle = heatColor(v);
+        if(hoverDim >= 0 && !highlight) ctx.globalAlpha = 0.3;
+        ctx.fillRect(matX + p*cellW, matY + d*cellH, cellW+0.5, cellH+0.5);
+        ctx.globalAlpha = 1;
+      }
+      if(highlight){
+        ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2;
+        ctx.strokeRect(matX, matY + d*cellH, availW, cellH);
+      }
+    }
+
+    // Border
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
+    ctx.strokeRect(matX, matY, availW, availH);
+
+    // Side bar: show hovered row as line chart
+    if(hoverDim >= 0){
+      const sx = matX + availW + 20;
+      const sw = sideBarW - 20;
+      const sh = availH;
+      ctx.fillStyle='rgba(14,14,26,0.8)';
+      ctx.fillRect(sx, matY, sw, sh);
+      ctx.strokeStyle='rgba(251,191,36,0.5)'; ctx.lineWidth=1;
+      ctx.strokeRect(sx, matY, sw, sh);
+
+      ctx.fillStyle='#fbbf24'; ctx.font='bold 11px JetBrains Mono'; ctx.textAlign='left';
+      ctx.fillText(`dim ${hoverDim}`, sx+8, matY+16);
+      const freq = Math.pow(10000, 2*Math.floor(hoverDim/2)/dim);
+      ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px JetBrains Mono';
+      ctx.fillText(hoverDim%2===0?'sin':'cos', sx+8, matY+30);
+      ctx.fillText(`period ${(2*Math.PI*freq).toFixed(1)}`, sx+8, matY+42);
+
+      // Line chart
+      const chartY = matY + 60, chartH = sh - 80;
+      ctx.strokeStyle='rgba(255,255,255,0.1)';
+      ctx.beginPath(); ctx.moveTo(sx+8, chartY+chartH/2); ctx.lineTo(sx+sw-8, chartY+chartH/2); ctx.stroke();
+
+      ctx.strokeStyle='#fbbf24'; ctx.lineWidth=1.5; ctx.beginPath();
+      for(let p=0; p<seq; p++){
+        const v = pe(p, hoverDim, dim);
+        const x = sx + 8 + (p/(seq-1))*(sw-16);
+        const y = chartY + chartH/2 - v*(chartH/2-4);
+        if(p===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
+      ctx.fillText('+1', sx+sw-4, chartY+4);
+      ctx.fillText('-1', sx+sw-4, chartY+chartH);
+
+      // Update panel
+      document.getElementById('dim-info').innerHTML =
+        `Dimension <strong style="color:var(--yellow)">${hoverDim}</strong><br>` +
+        `Function: ${hoverDim%2===0?'sin':'cos'}<br>` +
+        `Period: ${(2*Math.PI*freq).toFixed(1)} positions<br>` +
+        `<span style="color:var(--text-muted);font-size:0.75rem">Low dims = fast wiggles<br>High dims = slow waves</span>`;
+    }
+
+    canvas._layout = { matX, matY, cellW, cellH, availW, availH };
+  }
+
+  canvas.addEventListener('mousemove', e=>{
+    const L = canvas._layout; if(!L) return;
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    if(mx >= L.matX && mx < L.matX+L.availW && my >= L.matY && my < L.matY+L.availH){
+      const d = Math.floor((my - L.matY)/L.cellH);
+      if(d !== hoverDim){ hoverDim = d; draw(); }
+    }
+  });
+  canvas.addEventListener('mouseleave', ()=>{ hoverDim=-1; document.getElementById('dim-info').textContent='Hover a row on the heatmap to inspect.'; draw(); });
+
+  document.getElementById('seq-slider').addEventListener('input',e=>{
+    seq = parseInt(e.target.value); document.getElementById('seq-val').textContent=seq; draw();
+  });
+  document.getElementById('dim-slider').addEventListener('input',e=>{
+    dim = parseInt(e.target.value); document.getElementById('dim-val').textContent=dim; draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

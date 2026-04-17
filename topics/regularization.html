@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dropout & Regularization - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Dropout &amp; Regularization</h1>
+      <span class="topic-desc">Why overfitting happens, and how dropout + L2 penalties keep models honest</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        Dropout rate: <span class="value" id="ov-drop">0.50</span> &middot; Neurons active: <span class="value" id="ov-active">-</span>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Don't memorize &mdash; generalize</div>
+        <div class="guide-text">
+          A model with too many parameters can <strong>memorize the training data</strong> instead of learning patterns. It performs perfectly on data it has seen, but fails on new data. Regularization forces the model to stay simple: dropout randomly silences neurons, L2 penalizes large weights.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>View</h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" data-view="dropout">Dropout</button>
+          <button class="btn btn-secondary" data-view="fit">Over/Underfit</button>
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-dropout">
+        <h3>Dropout Rate</h3>
+        <div class="slider-group">
+          <div class="slider-label"><span>p (drop probability)</span><span class="slider-value" id="drop-val">0.50</span></div>
+          <input type="range" id="drop-slider" min="0" max="0.8" step="0.05" value="0.5">
+        </div>
+        <button class="btn btn-primary" id="btn-resample" style="width:100%;margin-top:8px">Resample Mask</button>
+        <div class="info-box" style="margin-top:8px">
+          Every training step, each neuron is <strong>randomly turned off</strong> with probability p. This prevents neurons from co-adapting. It's like a team where every day random members are absent &mdash; everyone learns to work independently.
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-fit" style="display:none">
+        <h3>Model Complexity</h3>
+        <div class="slider-group">
+          <div class="slider-label"><span>Polynomial degree</span><span class="slider-value" id="deg-val">3</span></div>
+          <input type="range" id="deg-slider" min="1" max="15" step="1" value="3">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>L2 regularization (&lambda;)</span><span class="slider-value" id="lam-val">0.00</span></div>
+          <input type="range" id="lam-slider" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="info-box" style="margin-top:6px">
+          Low degree = underfit (too simple). High degree = overfit (memorizes noise). L2 penalty shrinks weights, making the model smoother.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Why It Works</h3>
+        <div class="info-box">
+          Regularization introduces a <strong>bias toward simplicity</strong>. Without it, models will use their full capacity to fit noise. Real-world test: models with regularization have <em>higher training loss</em> but <em>lower test loss</em> &mdash; which is what we actually care about.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>In Real Training</h3>
+        <div class="info-box">
+          Modern LLMs use <strong>weight decay</strong> (equivalent to L2) and <strong>dropout</strong> (typically 0.1 in transformer layers). Other techniques: early stopping, data augmentation, label smoothing, mixup. All fight the same enemy: overfitting.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  let view = 'dropout';
+  let dropRate = 0.5;
+  let degree = 3, lambda = 0;
+  let mask = null;
+
+  // Network layout: 3 inputs, 2 hidden layers (6 each), 2 outputs
+  const layers = [3, 6, 6, 2];
+
+  function regenMask(){
+    mask = layers.map(n => {
+      return Array.from({length:n}, () => Math.random() > dropRate);
+    });
+  }
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function drawDropout(){
+    const margin = 80;
+    const nodeR = 18;
+    const xs = layers.map((_, i) => margin + (W-margin*2) * (i/(layers.length-1)));
+
+    // Count active
+    let active = 0, total = 0;
+    mask.forEach(layerMask => layerMask.forEach(m => { total++; if(m) active++; }));
+
+    // Edges
+    for(let l=0; l<layers.length-1; l++){
+      const n1 = layers[l], n2 = layers[l+1];
+      for(let i=0; i<n1; i++){
+        const y1 = H*(0.2 + 0.6*(i+0.5)/n1);
+        for(let j=0; j<n2; j++){
+          const y2 = H*(0.2 + 0.6*(j+0.5)/n2);
+          const on = (l===0 || mask[l][i]) && mask[l+1][j];
+          // First layer always on (inputs aren't dropped)
+          const fromOn = (l===0) ? true : mask[l][i];
+          const toOn = mask[l+1][j];
+          const edgeOn = fromOn && toOn;
+          ctx.strokeStyle = edgeOn ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.04)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(xs[l]+nodeR, y1); ctx.lineTo(xs[l+1]-nodeR, y2); ctx.stroke();
+        }
+      }
+    }
+
+    // Nodes
+    for(let l=0; l<layers.length; l++){
+      const n = layers[l];
+      for(let i=0; i<n; i++){
+        const y = H*(0.2 + 0.6*(i+0.5)/n);
+        const on = l===0 ? true : mask[l][i];
+        const isInput = l===0, isOutput = l===layers.length-1;
+        ctx.fillStyle = on ? (isInput?'#22d3ee':isOutput?'#34d399':'#6366f1') : 'rgba(40,40,60,0.5)';
+        ctx.strokeStyle = on ? 'rgba(255,255,255,0.3)' : 'rgba(100,100,130,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(xs[l], y, nodeR, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        if(!on && l > 0 && l < layers.length-1){
+          // X through dropped
+          ctx.strokeStyle='rgba(248,113,113,0.6)'; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(xs[l]-8, y-8); ctx.lineTo(xs[l]+8, y+8);
+          ctx.moveTo(xs[l]+8, y-8); ctx.lineTo(xs[l]-8, y+8); ctx.stroke();
+        }
+      }
+    }
+
+    // Labels
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
+    ['INPUT','HIDDEN 1','HIDDEN 2','OUTPUT'].forEach((l,i)=>ctx.fillText(l, xs[i], H*0.12));
+
+    document.getElementById('ov-drop').textContent = dropRate.toFixed(2);
+    document.getElementById('ov-active').textContent = `${active}/${total}`;
+  }
+
+  // Generate noisy training points
+  const trainData = [];
+  (function genData(){
+    for(let i=0;i<16;i++){
+      const x = -2.5 + i * 0.34;
+      const y = Math.sin(x * 1.2) + (Math.random()-0.5) * 0.6;
+      trainData.push([x, y]);
+    }
+  })();
+
+  // Polynomial ridge regression (closed form with L2)
+  function fitPoly(deg, lam){
+    const n = trainData.length;
+    // Design matrix X: n x (deg+1)
+    const X = trainData.map(([x]) => {
+      const row = []; for(let p=0;p<=deg;p++) row.push(Math.pow(x,p));
+      return row;
+    });
+    const y = trainData.map(d=>d[1]);
+
+    // (X'X + lambda*I) * w = X'y
+    const d = deg+1;
+    const XtX = Array.from({length:d},()=>new Array(d).fill(0));
+    for(let i=0;i<d;i++)for(let j=0;j<d;j++){
+      for(let k=0;k<n;k++) XtX[i][j] += X[k][i]*X[k][j];
+      if(i===j && i>0) XtX[i][j] += lam*n; // don't regularize bias
+    }
+    const Xty = new Array(d).fill(0);
+    for(let i=0;i<d;i++)for(let k=0;k<n;k++) Xty[i] += X[k][i]*y[k];
+
+    // Solve via Gaussian elimination
+    const A = XtX.map((r,i)=>[...r, Xty[i]]);
+    for(let i=0;i<d;i++){
+      // Pivot
+      let maxRow=i;
+      for(let k=i+1;k<d;k++) if(Math.abs(A[k][i])>Math.abs(A[maxRow][i])) maxRow=k;
+      [A[i],A[maxRow]]=[A[maxRow],A[i]];
+      if(Math.abs(A[i][i])<1e-12) return new Array(d).fill(0);
+      for(let k=i+1;k<d;k++){
+        const f = A[k][i]/A[i][i];
+        for(let j=i;j<=d;j++) A[k][j] -= f*A[i][j];
+      }
+    }
+    const w = new Array(d).fill(0);
+    for(let i=d-1;i>=0;i--){
+      let s = A[i][d];
+      for(let j=i+1;j<d;j++) s -= A[i][j]*w[j];
+      w[i] = s/A[i][i];
+    }
+    return w;
+  }
+
+  function drawFit(){
+    const xR = [-3, 3], yR = [-2, 2];
+    const margin = 40;
+    function toC(x,y){return [margin+(x-xR[0])/(xR[1]-xR[0])*(W-margin*2), H-margin-(y-yR[0])/(yR[1]-yR[0])*(H-margin*2)];}
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=-2;x<=2;x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,margin);ctx.lineTo(px,H-margin);ctx.stroke();}
+    for(let y=-1;y<=1;y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(margin,py);ctx.lineTo(W-margin,py);ctx.stroke();}
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(margin,oy);ctx.lineTo(W-margin,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,margin);ctx.lineTo(ox,H-margin);ctx.stroke();
+
+    // True function (faint)
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+    ctx.beginPath();
+    for(let px=margin;px<=W-margin;px+=2){
+      const x = xR[0] + (px-margin)/(W-margin*2)*(xR[1]-xR[0]);
+      const y = Math.sin(x*1.2);
+      const [cx,cy] = toC(x,y);
+      if(px===margin) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Fit
+    const weights = fitPoly(degree, lambda);
+    ctx.strokeStyle='#fbbf24'; ctx.lineWidth=3;
+    ctx.shadowColor='rgba(251,191,36,0.3)'; ctx.shadowBlur=6;
+    ctx.beginPath();
+    for(let px=margin;px<=W-margin;px+=2){
+      const x = xR[0] + (px-margin)/(W-margin*2)*(xR[1]-xR[0]);
+      let y = 0;
+      for(let p=0;p<weights.length;p++) y += weights[p]*Math.pow(x,p);
+      y = Math.max(-3, Math.min(3, y));
+      const [cx,cy] = toC(x,y);
+      if(px===margin) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+    }
+    ctx.stroke(); ctx.shadowBlur=0;
+
+    // Training points
+    for(const p of trainData){
+      const [cx,cy] = toC(p[0], p[1]);
+      ctx.fillStyle='#6366f1'; ctx.shadowColor='rgba(99,102,241,0.4)'; ctx.shadowBlur=6;
+      ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+      ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(cx,cy,2,0,Math.PI*2); ctx.fill();
+    }
+
+    // Legend
+    ctx.fillStyle='rgba(14,14,26,0.85)';
+    ctx.beginPath(); ctx.roundRect(16, 16, 180, 74, 8); ctx.fill();
+    ctx.strokeStyle='rgba(30,30,53,0.8)'; ctx.stroke();
+    ctx.font='11px JetBrains Mono'; ctx.textAlign='left';
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.setLineDash([4,3]); ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(28, 32); ctx.lineTo(48, 32); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.fillText('true function', 56, 35);
+    ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(28, 52); ctx.lineTo(48, 52); ctx.stroke();
+    ctx.fillStyle='#fbbf24'; ctx.fillText('fitted polynomial', 56, 55);
+    ctx.fillStyle='#6366f1'; ctx.beginPath(); ctx.arc(38,72,4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.fillText('training data', 56, 75);
+
+    let diagnosis;
+    if(degree <= 2) diagnosis = 'UNDERFITTING &mdash; model too simple to capture the curve';
+    else if(degree > 8 && lambda < 0.05) diagnosis = 'OVERFITTING &mdash; fits noise, wiggly between points';
+    else if(lambda > 0.3) diagnosis = 'OVER-REGULARIZED &mdash; too smooth, loses detail';
+    else diagnosis = 'Good fit &mdash; captures the pattern without chasing noise';
+
+    document.getElementById('overlay').innerHTML = `Degree ${degree}, &lambda;=${lambda.toFixed(2)} &mdash; <span class="value">${diagnosis}</span>`;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+    if(view==='dropout') drawDropout();
+    else drawFit();
+  }
+
+  document.querySelectorAll('[data-view]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-view]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); view=b.dataset.view;
+      document.getElementById('sec-dropout').style.display = view==='dropout'?'':'none';
+      document.getElementById('sec-fit').style.display = view==='fit'?'':'none';
+      draw();
+    });
+  });
+
+  document.getElementById('drop-slider').addEventListener('input',e=>{
+    dropRate=parseFloat(e.target.value);
+    document.getElementById('drop-val').textContent=dropRate.toFixed(2);
+    regenMask(); draw();
+  });
+  document.getElementById('btn-resample').addEventListener('click',()=>{regenMask();draw();});
+
+  document.getElementById('deg-slider').addEventListener('input',e=>{
+    degree=parseInt(e.target.value);document.getElementById('deg-val').textContent=degree;draw();
+  });
+  document.getElementById('lam-slider').addEventListener('input',e=>{
+    lambda=parseFloat(e.target.value);document.getElementById('lam-val').textContent=lambda.toFixed(2);draw();
+  });
+
+  regenMask();
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

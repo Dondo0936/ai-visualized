@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Probability & Softmax - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Probability &amp; Softmax</h1>
+      <span class="topic-desc">Drag the logit bars &mdash; watch softmax turn scores into probabilities</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Drag any logit bar up/down to change its score</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">From raw scores to probabilities</div>
+        <div class="guide-text">
+          Neural networks output raw numbers called <strong>logits</strong>. They can be positive, negative, anything. <strong>Softmax</strong> turns them into valid probabilities: all positive, all summing to 1. The class with the highest logit gets the highest probability.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Classes</h3>
+        <div class="slider-group">
+          <div class="slider-label"><span>Number of classes</span><span class="slider-value" id="n-val">5</span></div>
+          <input type="range" id="n-slider" min="2" max="10" step="1" value="5">
+        </div>
+        <button class="btn btn-secondary" id="btn-randomize" style="width:100%;margin-top:6px">Randomize Logits</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Temperature</h3>
+        <div class="slider-group">
+          <div class="slider-label"><span>&tau;</span><span class="slider-value" id="tau-val">1.00</span></div>
+          <input type="range" id="tau-slider" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="info-box" style="margin-top:6px;font-size:0.76rem">
+          Low &tau; = sharp (winner takes all). High &tau; = flat (even chances). See <a href="temperature.html">Softmax Temperature</a> for deep dive.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Softmax Properties</h3>
+        <div class="info-box">
+          &bull; All outputs are <strong>positive</strong> (exp always positive)<br>
+          &bull; All outputs <strong>sum to 1</strong> (valid probability distribution)<br>
+          &bull; <strong>Translation-invariant</strong> &mdash; adding 100 to every logit gives the same result<br>
+          &bull; Winner-takes-all as &tau; &rarr; 0; uniform as &tau; &rarr; &infin;
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Why exp()?</h3>
+        <div class="info-box">
+          Exp makes everything positive AND <strong>amplifies differences</strong>. A logit 2 larger becomes ~7.4&times; more likely. This encourages the model to commit to an answer. The "soft" in softmax = a smooth approximation of argmax (which would just pick one).
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Used Everywhere</h3>
+        <div class="info-box">
+          Softmax is the final layer of almost every classifier. In LLMs, it turns per-token logits into the next-word probability distribution &mdash; and then <a href="temperature.html">temperature</a> controls how "creative" the sampling is.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Formula</h3>
+        <div class="formula">
+          softmax(z)<sub>i</sub> = e<sup>z<sub>i</sub>/&tau;</sup> / &Sigma; e<sup>z<sub>j</sub>/&tau;</sup>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  let logits = [2, 1, 0.5, -1, 0];
+  let tau = 1;
+  let dragging = -1;
+
+  const classColors = ['#6366f1','#22d3ee','#34d399','#fbbf24','#f472b6','#fb923c','#a78bfa','#f87171','#60a5fa','#4ade80'];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function softmax(z, t){
+    const m = Math.max(...z);
+    const e = z.map(v => Math.exp((v-m)/t));
+    const s = e.reduce((a,b)=>a+b,0);
+    return e.map(v=>v/s);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    const n = logits.length;
+    const margin = 40;
+    const gap = 20;
+    const colW = (W - margin*2 - gap) / 2;
+    const barWidth = Math.min(60, (colW - 40) / n);
+    const barSpace = colW / n;
+
+    const topY = 70;
+    const botY = H - 80;
+    const midY = (topY + botY) / 2;
+    const maxH = (botY - topY) / 2 - 20;
+
+    // Title headers
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='12px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('LOGITS (raw scores)', margin + colW/2, 32);
+    ctx.fillText('SOFTMAX (probabilities)', margin + colW + gap + colW/2, 32);
+
+    // Left: logits bars (draggable)
+    const leftX0 = margin;
+    const zeroLineY = midY;
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(leftX0, zeroLineY); ctx.lineTo(leftX0+colW, zeroLineY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
+    ctx.fillText('0', leftX0-4, zeroLineY+3);
+
+    for(let i=0;i<n;i++){
+      const cx = leftX0 + barSpace*(i+0.5);
+      const h = (logits[i]/4) * maxH; // 4 is max scale
+      const y0 = zeroLineY;
+      const y1 = zeroLineY - h;
+
+      // Bar
+      ctx.fillStyle = classColors[i % classColors.length];
+      ctx.globalAlpha = dragging===i ? 1 : 0.85;
+      const barX = cx - barWidth/2;
+      const barY = Math.min(y0, y1);
+      const barH = Math.abs(h);
+      ctx.beginPath(); ctx.roundRect(barX, barY, barWidth, barH, 4); ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Handle at top of bar
+      ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(cx, y1, 6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = classColors[i % classColors.length];
+      ctx.beginPath(); ctx.arc(cx, y1, 4, 0, Math.PI*2); ctx.fill();
+
+      // Label
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Inter,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('class '+i, cx, botY+14);
+      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 11px JetBrains Mono';
+      ctx.fillText(logits[i].toFixed(2), cx, botY+28);
+    }
+
+    // Right: softmax probabilities
+    const rightX0 = margin + colW + gap;
+    const probs = softmax(logits, tau);
+    const baseY = botY;
+
+    for(let i=0;i<n;i++){
+      const cx = rightX0 + barSpace*(i+0.5);
+      const h = probs[i] * (botY - topY - 20);
+      const y = baseY - h;
+
+      ctx.fillStyle = classColors[i % classColors.length];
+      const barX = cx - barWidth/2;
+      ctx.beginPath(); ctx.roundRect(barX, y, barWidth, h, 4); ctx.fill();
+
+      // Percentage on bar
+      ctx.fillStyle='#fff'; ctx.font='bold 10px JetBrains Mono'; ctx.textAlign='center';
+      if(h > 20) ctx.fillText((probs[i]*100).toFixed(0)+'%', cx, y+14);
+
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Inter,sans-serif';
+      ctx.fillText('p='+probs[i].toFixed(3), cx, botY+14);
+    }
+
+    // Axis for right
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(rightX0, baseY); ctx.lineTo(rightX0+colW, baseY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rightX0, topY+20); ctx.lineTo(rightX0+colW, topY+20); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
+    ctx.fillText('1.0', rightX0-4, topY+24);
+    ctx.fillText('0.0', rightX0-4, baseY+3);
+
+    // Arrow between
+    ctx.strokeStyle='rgba(251,191,36,0.3)'; ctx.lineWidth=2;
+    const arrowY = midY;
+    const ax1 = leftX0+colW+4, ax2 = rightX0-4;
+    ctx.beginPath(); ctx.moveTo(ax1, arrowY); ctx.lineTo(ax2, arrowY); ctx.stroke();
+    ctx.fillStyle='rgba(251,191,36,0.6)';
+    ctx.beginPath(); ctx.moveTo(ax2, arrowY); ctx.lineTo(ax2-10, arrowY-5); ctx.lineTo(ax2-10, arrowY+5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(251,191,36,0.8)'; ctx.font='bold 11px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('softmax(&tau;='+tau.toFixed(2)+')', (ax1+ax2)/2, arrowY-8);
+
+    // Save layout for drag
+    canvas._layout = { leftX0, rightX0, barSpace, barWidth, zeroLineY, maxH, n, topY, botY };
+
+    // Sum check
+    const sum = probs.reduce((a,b)=>a+b,0);
+    document.getElementById('overlay').innerHTML =
+      `Sum of probabilities = <span class="value">${sum.toFixed(4)}</span> (always 1!) &middot; Max prob: <span class="value">class ${probs.indexOf(Math.max(...probs))}</span>`;
+  }
+
+  canvas.addEventListener('pointerdown', e=>{
+    const L = canvas._layout; if(!L) return;
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    for(let i=0;i<L.n;i++){
+      const cx = L.leftX0 + L.barSpace*(i+0.5);
+      if(Math.abs(mx-cx) < L.barWidth/2+8 && my > L.topY-20 && my < L.botY){
+        dragging = i;
+        updateLogitFromMouse(my, L);
+        return;
+      }
+    }
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(dragging<0) return;
+    const r=canvas.getBoundingClientRect();
+    updateLogitFromMouse(e.clientY-r.top, canvas._layout);
+  });
+  canvas.addEventListener('pointerup', ()=>dragging=-1);
+  canvas.addEventListener('pointerleave', ()=>dragging=-1);
+
+  function updateLogitFromMouse(my, L){
+    const dy = L.zeroLineY - my;
+    const val = (dy / L.maxH) * 4;
+    logits[dragging] = Math.max(-4, Math.min(4, val));
+    draw();
+  }
+
+  document.getElementById('n-slider').addEventListener('input',e=>{
+    const n = parseInt(e.target.value);
+    document.getElementById('n-val').textContent = n;
+    if(n > logits.length){
+      while(logits.length < n) logits.push(Math.random()*4-2);
+    } else {
+      logits = logits.slice(0, n);
+    }
+    draw();
+  });
+  document.getElementById('tau-slider').addEventListener('input',e=>{
+    tau=parseFloat(e.target.value); document.getElementById('tau-val').textContent=tau.toFixed(2); draw();
+  });
+  document.getElementById('btn-randomize').addEventListener('click',()=>{
+    logits = logits.map(()=>Math.random()*6-3);
+    draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

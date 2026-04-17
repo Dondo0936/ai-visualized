@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tokenization - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Tokenization</h1>
+      <span class="topic-desc">Type anything &mdash; see how an LLM chops it into tokens</span>
+    </div>
+
+    <div class="canvas-area" style="display:flex;flex-direction:column;padding:40px;gap:24px;overflow-y:auto;">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Your Text</div>
+        <textarea id="input" style="width:100%;min-height:90px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;font-family:var(--font-mono);font-size:1.05rem;color:var(--text-primary);resize:vertical;outline:none;">The quick brown fox jumps over the lazy dog. Tokenization isn't always intuitive!</textarea>
+      </div>
+
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
+          Tokens: <span id="token-count" style="color:var(--cyan)">0</span> &middot;
+          Characters: <span id="char-count" style="color:var(--cyan)">0</span> &middot;
+          Avg chars/token: <span id="avg-count" style="color:var(--cyan)">0.0</span>
+        </div>
+        <div id="tokens-out" style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;min-height:120px;font-family:var(--font-mono);font-size:1.05rem;line-height:1.8;"></div>
+      </div>
+
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Token IDs (as the model sees them)</div>
+        <div id="ids-out" style="padding:12px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;min-height:40px;font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);word-break:break-all;line-height:1.8;"></div>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">LLMs don't see letters &mdash; they see tokens</div>
+        <div class="guide-text">
+          Before an LLM processes your text, it's chopped into <strong>tokens</strong> (word pieces). Each token becomes a number. Common words = 1 token. Rare words get split into pieces. This is why "unhappiness" might become ["un", "happiness"] or even ["un", "happy", "ness"].
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Try These</h3>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-secondary preset-btn" data-text="Hello, world!">Hello, world!</button>
+          <button class="btn btn-secondary preset-btn" data-text="antidisestablishmentarianism">Long word</button>
+          <button class="btn btn-secondary preset-btn" data-text="1234567890">Numbers</button>
+          <button class="btn btn-secondary preset-btn" data-text="Supercalifragilisticexpialidocious!">Made-up word</button>
+          <button class="btn btn-secondary preset-btn" data-text="Xin ch&agrave;o th&#7871; gi&#7899;i">Vietnamese</button>
+          <button class="btn btn-secondary preset-btn" data-text="function myAdd(a, b) { return a + b; }">Code</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Why Split Words?</h3>
+        <div class="info-box">
+          If every word got its own token, the vocabulary would be <strong>millions of entries</strong>. Instead, modern LLMs use <strong>~50,000 tokens</strong> by splitting rare words into common pieces. This lets the model handle words it has never seen before &mdash; it recognizes the pieces.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>The Algorithm (BPE)</h3>
+        <div class="info-box">
+          <strong>Byte Pair Encoding</strong> starts with individual characters, then repeatedly merges the most common pair. Over millions of documents, "th" becomes a token, then "the", then " the". Eventually it knows full words AND their pieces.<br><br>
+          <em>What you see here is a simplified simulation &mdash; real GPT tokenizers use ~100K trained tokens.</em>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Fun Facts</h3>
+        <div class="info-box">
+          &bull; GPT-4 has <strong>100,277</strong> unique tokens<br>
+          &bull; Leading spaces matter: " hello" and "hello" are different tokens<br>
+          &bull; Emoji often take multiple tokens<br>
+          &bull; Your API costs are measured in tokens, not words<br>
+          &bull; Non-English languages usually use more tokens per word
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Connection to the Model</h3>
+        <div class="info-box">
+          Each token ID looks up a learned <a href="embeddings.html">embedding</a> vector. Those vectors flow through transformer layers, get <a href="self-attention.html">attended</a> to each other, and finally produce logits that become the next token's probability via <a href="temperature.html">softmax</a>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const input = document.getElementById('input');
+  const tokensOut = document.getElementById('tokens-out');
+  const idsOut = document.getElementById('ids-out');
+
+  // Common "tokens" we'll pretend are in the vocab (simplified BPE approximation)
+  const commonTokens = [
+    ' the', ' a', ' an', ' of', ' to', ' in', ' is', ' and', ' for', ' that', ' it', ' as',
+    ' was', ' are', ' on', ' with', ' by', ' this', ' but', ' not', ' be', ' have', ' or',
+    ' I', ' you', ' he', ' she', ' we', ' they', ' his', ' her', ' my', ' your',
+    ' quick', ' brown', ' fox', ' jumps', ' over', ' lazy', ' dog', ' cat', ' sat', ' mat',
+    ' can', ' will', ' would', ' could', ' should', ' do', ' does', ' did', ' say', ' said',
+    ' one', ' two', ' three', ' four', ' five', ' six', ' seven', ' eight', ' nine', ' ten',
+    'ing', 'ed', 'ly', 'er', 'est', 'tion', 'ness', 'ment', 'able', 'ful', 'less',
+    'un', 're', 'pre', 'dis', 'anti', 'sub', 'super', 'inter',
+    'hello', 'world', 'function', 'return', 'if', 'else', 'for', 'while', 'def', 'class',
+  ];
+
+  function hashToColor(s){
+    let h=0;
+    for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i))|0;
+    const hue = Math.abs(h) % 360;
+    return `hsl(${hue}, 45%, ${32 + (Math.abs(h)%20)}%)`;
+  }
+  function hashToId(s){
+    let h=0;
+    for(let i=0;i<s.length;i++) h = ((h*131 + s.charCodeAt(i))|0)>>>0;
+    return 1000 + (h % 99000);
+  }
+
+  function tokenize(text){
+    const tokens = [];
+    let i = 0;
+    while(i < text.length){
+      let matched = null;
+      // Try common tokens first (longest match)
+      const sorted = [...commonTokens].sort((a,b)=>b.length-a.length);
+      for(const t of sorted){
+        if(text.substr(i, t.length) === t){ matched = t; break; }
+      }
+      if(matched){ tokens.push(matched); i += matched.length; continue; }
+
+      // Split word into chunks of 3-4 chars (simulating BPE sub-word split)
+      // Find the word boundary
+      if(/\s/.test(text[i])){ tokens.push(text[i]); i++; continue; }
+      if(/[.,!?;:'"()\[\]{}\-]/.test(text[i])){ tokens.push(text[i]); i++; continue; }
+
+      // Grab up to the next boundary
+      let j = i;
+      while(j < text.length && !/[\s.,!?;:'"()\[\]{}\-]/.test(text[j])) j++;
+      const word = text.substring(i, j);
+
+      // Split word into chunks of 3-5 chars
+      let k = 0;
+      while(k < word.length){
+        const len = Math.min(4 + (k%2), word.length - k);
+        tokens.push(word.substr(k, len));
+        k += len;
+      }
+      i = j;
+    }
+    return tokens;
+  }
+
+  function render(){
+    const text = input.value;
+    const tokens = tokenize(text);
+    tokensOut.innerHTML = '';
+    const ids = [];
+
+    tokens.forEach(t => {
+      const span = document.createElement('span');
+      const display = t.replace(/ /g, '\u00B7').replace(/\n/g,'\u21B5');
+      span.textContent = display;
+      span.title = JSON.stringify(t);
+      span.style.cssText = `display:inline-block;padding:4px 8px;margin:2px;border-radius:6px;background:${hashToColor(t)};color:#fff;white-space:pre;border:1px solid rgba(255,255,255,0.1);`;
+      tokensOut.appendChild(span);
+      ids.push(hashToId(t));
+    });
+
+    idsOut.textContent = '[' + ids.join(', ') + ']';
+    document.getElementById('token-count').textContent = tokens.length;
+    document.getElementById('char-count').textContent = text.length;
+    document.getElementById('avg-count').textContent = tokens.length ? (text.length/tokens.length).toFixed(1) : '0.0';
+  }
+
+  input.addEventListener('input', render);
+  document.querySelectorAll('[data-text]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      input.value = b.dataset.text;
+      render();
+    });
+  });
+  render();
+})();
+</script>
+</body>
+</html>

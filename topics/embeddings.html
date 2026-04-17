@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Embeddings - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Word Embeddings</h1>
+      <span class="topic-desc">Words as points in space &mdash; similar meanings cluster together</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Click any word &mdash; see its nearest neighbors</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Words are numbers in disguise</div>
+        <div class="guide-text">
+          To do math on words, we turn each word into a <strong>list of numbers</strong> (a <a href="vectors.html">vector</a>). Words with similar meanings end up close together in space. This is learned from reading millions of sentences &mdash; words that appear in similar contexts get similar vectors.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>View</h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" data-scene="clusters">Semantic Clusters</button>
+          <button class="btn btn-secondary" data-scene="analogy">Analogies</button>
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-knn">
+        <h3>Nearest Neighbors</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Show top K</span>
+            <span class="slider-value" id="k-val">5</span>
+          </div>
+          <input type="range" id="k-slider" min="1" max="10" step="1" value="5">
+        </div>
+      </div>
+
+      <div class="control-section" id="sec-analogy" style="display:none">
+        <h3>Classic Analogy</h3>
+        <div class="info-box" style="font-family:var(--font-mono);font-size:0.9rem;text-align:center;">
+          <span style="color:var(--accent-light)">king</span> - <span style="color:var(--red)">man</span> + <span style="color:var(--green)">woman</span> &asymp; <span style="color:var(--cyan)">queen</span>
+        </div>
+        <div class="info-box" style="margin-top:6px">
+          This isn't magic &mdash; it's vector arithmetic! Subtract "man" from "king" to get a "royalty minus male" direction. Add "woman" and you arrive near "queen". The fact that real embeddings learn this from raw text is one of the most remarkable results in AI.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Selected Word</h3>
+        <div class="info-box" id="word-info">
+          Click a word on the canvas to see its nearest neighbors and coordinates.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Real-World Scale</h3>
+        <div class="info-box">
+          What you see here is <strong>2D</strong>. Real embeddings are <strong>768, 1536, or even 4096</strong> dimensions. GPT-3's embeddings are 12,288-dimensional! We squish them down to 2D using techniques like t-SNE or UMAP just to visualize.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>How Distance Is Measured</h3>
+        <div class="info-box">
+          Similarity between two embeddings is usually <strong>cosine similarity</strong> &mdash; the <a href="vectors.html">dot product</a> of the unit vectors. Two words point in nearly the same direction = high similarity (near 1.0). Opposite directions = -1.0. Unrelated = near 0.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  // Hand-crafted 2D embeddings for clarity
+  // Each word: [x, y, cluster]
+  const words = [
+    // Royalty
+    { w:'king',   v:[2.5, 2.0], c:0 },
+    { w:'queen',  v:[1.8, 2.2], c:0 },
+    { w:'prince', v:[2.8, 1.6], c:0 },
+    { w:'princess',v:[2.0, 1.5], c:0 },
+    { w:'throne', v:[3.0, 2.3], c:0 },
+    { w:'crown',  v:[2.3, 2.5], c:0 },
+    // Gender
+    { w:'man',    v:[2.5, -1.0], c:1 },
+    { w:'woman',  v:[1.8, -1.0], c:1 },
+    { w:'boy',    v:[2.8, -1.4], c:1 },
+    { w:'girl',   v:[2.0, -1.5], c:1 },
+    // Animals
+    { w:'cat',    v:[-2.0, 2.0], c:2 },
+    { w:'dog',    v:[-2.2, 1.6], c:2 },
+    { w:'kitten', v:[-2.3, 2.4], c:2 },
+    { w:'puppy',  v:[-2.5, 1.9], c:2 },
+    { w:'rabbit', v:[-1.8, 2.3], c:2 },
+    { w:'horse',  v:[-2.7, 1.3], c:2 },
+    // Food
+    { w:'apple',  v:[0.5, 2.5], c:3 },
+    { w:'banana', v:[0.8, 2.8], c:3 },
+    { w:'pizza',  v:[0.2, 3.0], c:3 },
+    { w:'bread',  v:[0.6, 3.2], c:3 },
+    { w:'pasta',  v:[0.3, 2.7], c:3 },
+    // Tech
+    { w:'computer', v:[-1.0, -2.5], c:4 },
+    { w:'phone',    v:[-0.5, -2.8], c:4 },
+    { w:'keyboard', v:[-1.5, -2.8], c:4 },
+    { w:'laptop',   v:[-1.2, -2.2], c:4 },
+    { w:'screen',   v:[-0.8, -2.3], c:4 },
+    // Emotions
+    { w:'happy', v:[3.0, 0.5], c:5 },
+    { w:'sad',   v:[3.3, -0.3], c:5 },
+    { w:'angry', v:[3.5, 0.0], c:5 },
+    { w:'excited',v:[3.0, 0.8], c:5 },
+    { w:'tired', v:[3.4, -0.6], c:5 },
+  ];
+
+  const clusterColors = ['#6366f1','#f472b6','#34d399','#fbbf24','#22d3ee','#fb923c'];
+  const clusterNames = ['Royalty','Gender','Animals','Food','Tech','Emotions'];
+
+  let selected = null, scene = 'clusters', k = 5;
+  const xR = [-4.5, 4.5], yR = [-3.5, 3.5];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+  function dist(a,b){ const dx=a[0]-b[0],dy=a[1]-b[1]; return Math.sqrt(dx*dx+dy*dy); }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Subtle grid
+    ctx.strokeStyle='rgba(255,255,255,0.03)'; ctx.lineWidth=1;
+    for(let x=-4;x<=4;x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=-3;y<=3;y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+
+    // Analogy arrows
+    if(scene === 'analogy'){
+      drawAnalogy();
+    } else {
+      // Distance rings from selected
+      if(selected){
+        const sorted = words.map(w=>({w,d:dist(w.v, selected.v)})).sort((a,b)=>a.d-b.d);
+        const neighbors = sorted.slice(1, k+1);
+        for(const n of neighbors){
+          const [x1,y1] = toC(selected.v[0], selected.v[1]);
+          const [x2,y2] = toC(n.w.v[0], n.w.v[1]);
+          ctx.strokeStyle='rgba(251,191,36,0.3)'; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        }
+      }
+    }
+
+    // Draw words
+    for(const word of words){
+      const [px,py] = toC(word.v[0], word.v[1]);
+      const color = clusterColors[word.c];
+      const isSel = selected && word.w === selected.w;
+
+      // Dot
+      ctx.shadowColor = color; ctx.shadowBlur = isSel?14:4;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(px, py, isSel?8:5, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      if(isSel){ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill();}
+
+      // Label
+      ctx.font = isSel?'bold 13px Inter,sans-serif':'12px Inter,sans-serif';
+      ctx.fillStyle = isSel?'#fff':'rgba(255,255,255,0.7)';
+      ctx.textAlign = 'left';
+      ctx.fillText(word.w, px+10, py+4);
+
+      word._screen = [px, py];
+    }
+
+    // Legend
+    const lx = W-140, ly = 20;
+    ctx.fillStyle='rgba(14,14,26,0.85)';
+    ctx.beginPath(); ctx.roundRect(lx, ly, 128, clusterColors.length*22+14, 8); ctx.fill();
+    ctx.strokeStyle='rgba(30,30,53,0.8)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.font='11px Inter,sans-serif'; ctx.textAlign='left';
+    clusterColors.forEach((col, i) => {
+      const y = ly + 18 + i*22;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(lx+16, y-4, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillText(clusterNames[i], lx+28, y);
+    });
+  }
+
+  function drawAnalogy(){
+    const king = words.find(w=>w.w==='king');
+    const man = words.find(w=>w.w==='man');
+    const woman = words.find(w=>w.w==='woman');
+    const queen = words.find(w=>w.w==='queen');
+
+    // Draw vectors king -> ??? (king - man + woman)
+    const target = [king.v[0]-man.v[0]+woman.v[0], king.v[1]-man.v[1]+woman.v[1]];
+
+    // Line from king to target
+    const [kx,ky] = toC(king.v[0], king.v[1]);
+    const [tx,ty] = toC(target[0], target[1]);
+    const [mx,my] = toC(man.v[0], man.v[1]);
+    const [wx,wy] = toC(woman.v[0], woman.v[1]);
+
+    // king - man (red arrow)
+    ctx.strokeStyle='rgba(248,113,113,0.7)'; ctx.lineWidth=2;
+    drawArrow(mx,my, kx,ky, '#f87171');
+
+    // + woman (green)
+    const [kmx, kmy] = toC(king.v[0]-man.v[0], king.v[1]-man.v[1]);
+    ctx.strokeStyle='rgba(52,211,153,0.7)';
+    drawArrow(wx,wy, tx,ty, '#34d399');
+
+    // Target point
+    ctx.fillStyle='rgba(251,191,36,0.3)'; ctx.beginPath(); ctx.arc(tx,ty,18,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(tx,ty,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fbbf24'; ctx.font='bold 12px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('king - man + woman', tx, ty-24);
+    ctx.fillText('\u2248 queen?', tx, ty-10);
+  }
+
+  function drawArrow(x1,y1,x2,y2,color){
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.fillStyle=color;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    const a = Math.atan2(y2-y1, x2-x1);
+    ctx.beginPath(); ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-10*Math.cos(a-0.35), y2-10*Math.sin(a-0.35));
+    ctx.lineTo(x2-10*Math.cos(a+0.35), y2-10*Math.sin(a+0.35));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function updateInfo(){
+    const info = document.getElementById('word-info');
+    if(!selected){
+      info.innerHTML = 'Click a word on the canvas to see its nearest neighbors.';
+      document.getElementById('overlay').textContent = 'Click any word &mdash; see its nearest neighbors';
+      return;
+    }
+    const sorted = words.map(w=>({w,d:dist(w.v, selected.v)})).sort((a,b)=>a.d-b.d);
+    const neighbors = sorted.slice(1, k+1);
+    let html = `<strong style="color:${clusterColors[selected.c]}">${selected.w}</strong><br>`;
+    html += `<span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted)">v = (${selected.v[0].toFixed(2)}, ${selected.v[1].toFixed(2)})</span><br><br>`;
+    html += '<strong>Nearest:</strong><br>';
+    neighbors.forEach((n,i)=>{
+      html += `<span style="font-family:var(--font-mono);font-size:0.78rem">${i+1}. <span style="color:${clusterColors[n.w.c]}">${n.w.w}</span> &mdash; dist: ${n.d.toFixed(2)}</span><br>`;
+    });
+    info.innerHTML = html;
+    document.getElementById('overlay').innerHTML = `"<span class="value">${selected.w}</span>" nearest: ${neighbors.slice(0,3).map(n=>n.w.w).join(', ')}`;
+  }
+
+  canvas.addEventListener('click', e=>{
+    if(scene !== 'clusters') return;
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    let best=null, bd=Infinity;
+    for(const w of words){
+      if(!w._screen) continue;
+      const d = Math.hypot(mx-w._screen[0], my-w._screen[1]);
+      if(d<bd && d<30){best=w;bd=d;}
+    }
+    if(best){selected = best; updateInfo(); draw();}
+  });
+
+  document.querySelectorAll('[data-scene]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-scene]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      scene = b.dataset.scene;
+      document.getElementById('sec-knn').style.display = scene==='clusters'?'':'none';
+      document.getElementById('sec-analogy').style.display = scene==='analogy'?'':'none';
+      selected = null; updateInfo(); draw();
+    });
+  });
+  document.getElementById('k-slider').addEventListener('input',e=>{
+    k = parseInt(e.target.value);
+    document.getElementById('k-val').textContent = k;
+    updateInfo(); draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

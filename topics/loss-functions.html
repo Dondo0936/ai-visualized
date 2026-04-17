@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loss Functions - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Loss Functions</h1>
+      <span class="topic-desc">How models measure "how wrong I was" &mdash; compare MSE, MAE, Huber, Cross-Entropy</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Move mouse to probe loss at different errors</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">A loss function rates the model's mistakes</div>
+        <div class="guide-text">
+          To train a model, we need a <strong>single number</strong> that says "you were this wrong." Different tasks need different loss functions. <strong>Regression</strong> (predict a number): MSE, MAE. <strong>Classification</strong> (predict a class): Cross-Entropy.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Regression Losses</h3>
+        <div class="toggle-chips">
+          <div class="chip active" style="border-color:#6366f1;color:#6366f1" id="tog-mse">MSE (L2)</div>
+          <div class="chip active" style="border-color:#22d3ee;color:#22d3ee" id="tog-mae">MAE (L1)</div>
+          <div class="chip" style="border-color:#34d399;color:#34d399" id="tog-huber">Huber</div>
+        </div>
+        <div class="slider-group" id="huber-group" style="display:none;margin-top:6px">
+          <div class="slider-label"><span>Huber &delta;</span><span class="slider-value" id="delta-val">1.00</span></div>
+          <input type="range" id="delta-slider" min="0.1" max="3" step="0.05" value="1">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Classification Loss</h3>
+        <div class="toggle-chips">
+          <div class="chip" style="border-color:#f87171;color:#f87171" id="tog-ce">Cross-Entropy (true label = 1)</div>
+        </div>
+        <div class="info-box" style="margin-top:6px;font-size:0.76rem">
+          Cross-entropy measures how much <strong>probability</strong> the model gave to the correct answer. Low prob = huge loss. High prob = near-zero loss.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Key Differences</h3>
+        <div class="info-box">
+          <strong>MSE</strong> squares the error &mdash; punishes outliers HARD. Smooth gradient. Default for regression.<br><br>
+          <strong>MAE</strong> takes absolute value &mdash; treats all errors equally. More robust to outliers, but gradient is not smooth at zero.<br><br>
+          <strong>Huber</strong> = best of both. Quadratic near zero (smooth), linear far from zero (robust).<br><br>
+          <strong>Cross-Entropy</strong> heavily penalizes being confident AND wrong. Used in every classifier (including GPT for next-token prediction!).
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Why It Matters</h3>
+        <div class="info-box">
+          The choice of loss function decides what "good" means to the model. Change it, and the model learns different things. Research papers often introduce new loss functions to fix specific problems (e.g., focal loss for imbalanced classes).
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Related</h3>
+        <div class="info-box">
+          Once you have a loss, you minimize it with <a href="gradient-descent.html">gradient descent</a> &mdash; the <a href="slopes-and-derivatives.html">derivative</a> of the loss w.r.t. each weight tells you which direction to move.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  let showMSE=true, showMAE=true, showHuber=false, showCE=false;
+  let delta = 1;
+  let mouseX = null;
+
+  const xR = [-3, 3], yR = [-0.5, 5];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+  function toD(px,py){ return [xR[0]+(px/W)*(xR[1]-xR[0]), yR[0]+((H-py)/H)*(yR[1]-yR[0])]; }
+
+  const losses = {
+    MSE: { fn: err => err*err, color: '#6366f1', label: 'MSE: L = e²' },
+    MAE: { fn: err => Math.abs(err), color: '#22d3ee', label: 'MAE: L = |e|' },
+    Huber: { fn: err => Math.abs(err) <= delta ? 0.5*err*err : delta*(Math.abs(err) - 0.5*delta), color: '#34d399', label: 'Huber' },
+    CE: { fn: err => { const p = 1/(1+Math.exp(-err)); return -Math.log(Math.max(p, 1e-9)); }, color: '#f87171', label: 'Cross-Entropy (logit e)' },
+  };
+
+  function drawCurve(fn, color, label, active){
+    if(!active) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); let started=false;
+    for(let px=0; px<W; px++){
+      const x = xR[0] + (px/W)*(xR[1]-xR[0]);
+      const y = fn(x);
+      if(!isFinite(y) || y > 100) { started=false; continue; }
+      const [cx,cy] = toC(x, y);
+      if(cy < -50 || cy > H+50) { started=false; continue; }
+      if(!started) { ctx.moveTo(cx,cy); started=true; } else ctx.lineTo(cx,cy);
+    }
+    ctx.stroke();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=-2;x<=2;x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=1;y<=4;y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+
+    // Axes
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+
+    // Labels
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
+    for(let x=-2;x<=2;x++){if(!x)continue; const[px]=toC(x,0); ctx.fillText(x,px,oy+14);}
+    ctx.textAlign='right';
+    for(let y=1;y<=4;y++){const[,py]=toC(0,y); ctx.fillText(y,ox-6,py+4);}
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.font='bold 12px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('error (prediction - true)', W/2, H-18);
+    ctx.save(); ctx.translate(16, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('loss value', 0, 0); ctx.restore();
+
+    // Curves
+    drawCurve(losses.MSE.fn, losses.MSE.color, losses.MSE.label, showMSE);
+    drawCurve(losses.MAE.fn, losses.MAE.color, losses.MAE.label, showMAE);
+    drawCurve(losses.Huber.fn, losses.Huber.color, losses.Huber.label, showHuber);
+    drawCurve(losses.CE.fn, losses.CE.color, losses.CE.label, showCE);
+
+    // Probe
+    if(mouseX !== null){
+      const[dx,_]=toD(mouseX, 0);
+      ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(mouseX, 0); ctx.lineTo(mouseX, H); ctx.stroke();
+      ctx.setLineDash([]);
+
+      const rows = [];
+      if(showMSE) rows.push({k:'MSE', v:losses.MSE.fn(dx), c:losses.MSE.color});
+      if(showMAE) rows.push({k:'MAE', v:losses.MAE.fn(dx), c:losses.MAE.color});
+      if(showHuber) rows.push({k:'Huber', v:losses.Huber.fn(dx), c:losses.Huber.color});
+      if(showCE) rows.push({k:'CE', v:losses.CE.fn(dx), c:losses.CE.color});
+
+      rows.forEach(r => {
+        const[px,py] = toC(dx, r.v);
+        if(py > -20 && py < H+20){
+          ctx.fillStyle = r.c;
+          ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px,py,2,0,Math.PI*2); ctx.fill();
+        }
+      });
+
+      // Update overlay
+      let ovText = `error = <span class="value">${dx.toFixed(2)}</span>`;
+      rows.forEach(r => {
+        ovText += ` &middot; ${r.k}=<span style="color:${r.c}">${r.v.toFixed(3)}</span>`;
+      });
+      document.getElementById('overlay').innerHTML = ovText;
+    }
+
+    // Legend
+    const active = [];
+    if(showMSE) active.push({n:'MSE: e²', c:losses.MSE.color});
+    if(showMAE) active.push({n:'MAE: |e|', c:losses.MAE.color});
+    if(showHuber) active.push({n:`Huber (δ=${delta.toFixed(1)})`, c:losses.Huber.color});
+    if(showCE) active.push({n:'Cross-Entropy', c:losses.CE.color});
+
+    if(active.length){
+      const lx=16, ly=16, lh=active.length*18+16, lw=180;
+      ctx.fillStyle='rgba(14,14,26,0.85)';
+      ctx.beginPath(); ctx.roundRect(lx,ly,lw,lh,8); ctx.fill();
+      ctx.strokeStyle='rgba(30,30,53,0.8)'; ctx.stroke();
+      ctx.font='11px JetBrains Mono'; ctx.textAlign='left';
+      active.forEach((r,i) => {
+        const y = ly+14+i*18;
+        ctx.fillStyle=r.c; ctx.beginPath(); ctx.roundRect(lx+10, y-8, 10, 10, 2); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.fillText(r.n, lx+28, y);
+      });
+    }
+  }
+
+  canvas.addEventListener('mousemove', e=>{
+    const r=canvas.getBoundingClientRect();
+    mouseX = e.clientX - r.left; draw();
+  });
+  canvas.addEventListener('mouseleave', ()=>{ mouseX=null; draw(); });
+
+  document.getElementById('tog-mse').addEventListener('click',function(){showMSE=!showMSE;this.classList.toggle('active');draw();});
+  document.getElementById('tog-mae').addEventListener('click',function(){showMAE=!showMAE;this.classList.toggle('active');draw();});
+  document.getElementById('tog-huber').addEventListener('click',function(){
+    showHuber=!showHuber;this.classList.toggle('active');
+    document.getElementById('huber-group').style.display = showHuber?'':'none';
+    draw();
+  });
+  document.getElementById('tog-ce').addEventListener('click',function(){showCE=!showCE;this.classList.toggle('active');draw();});
+  document.getElementById('delta-slider').addEventListener('input',e=>{
+    delta = parseFloat(e.target.value); document.getElementById('delta-val').textContent=delta.toFixed(2); draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

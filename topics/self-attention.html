@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Attention - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Self-Attention</h1>
+      <span class="topic-desc">Click any token &mdash; see what it "pays attention to" in the sentence</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Click a word in the sentence above the matrix</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Attention = "who should I listen to?"</div>
+        <div class="guide-text">
+          When you read the word "it" in "<em>The cat sat on the mat because it was tired</em>", your brain knows "it" refers to the cat. Self-attention is how transformers do this: for each word, it computes how much to <strong>pay attention to every other word</strong>.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Sentence</h3>
+        <div class="btn-group" style="flex-wrap:wrap">
+          <button class="btn btn-secondary active" data-sent="0">Cat &amp; mat</button>
+          <button class="btn btn-secondary" data-sent="1">Bank</button>
+          <button class="btn btn-secondary" data-sent="2">Apple</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Temperature (Softmax)</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>&tau; (sharpness)</span>
+            <span class="slider-value" id="tau-val">1.00</span>
+          </div>
+          <input type="range" id="tau-slider" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="info-box" style="margin-top:6px">
+          Lower &tau; = <strong>sharper attention</strong> (focus on one word). Higher &tau; = <strong>more even</strong> (distributed).
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>The 3 Matrices</h3>
+        <div class="info-box">
+          Every word gets turned into three vectors:<br><br>
+          <span style="color:var(--accent-light)">&#9679; <strong>Query (Q)</strong></span> &mdash; "What am I looking for?"<br>
+          <span style="color:var(--cyan)">&#9679; <strong>Key (K)</strong></span> &mdash; "What do I contain?"<br>
+          <span style="color:var(--green)">&#9679; <strong>Value (V)</strong></span> &mdash; "What do I deliver?"<br><br>
+          Attention from word A to word B = <code>softmax(Q_A &middot; K_B)</code> &mdash; how much A's query matches B's key.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Step-by-Step</h3>
+        <div class="info-box" id="step-explain">
+          Click a token to see how attention is computed for that word.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>How It Scales Up</h3>
+        <div class="info-box">
+          Real transformers have <strong>many attention heads</strong> (8-96) that learn different relationships. GPT-4 uses multi-head attention in every one of its ~100+ layers. Each head might track grammar, semantics, or long-range references. All powered by the exact operation you see below.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  const sentences = [
+    { tokens: ['The','cat','sat','on','the','mat','because','it','was','tired'],
+      // attention weights: it[7] mostly attends to cat[1]
+      matrix: null, // will be computed
+      meaning: [[0,0,0,0,0,0,0,0,0,0],
+                [0,1,0.2,0.1,0,0.2,0,0.1,0,0],
+                [0,0.3,1,0.4,0,0.3,0,0,0.2,0.1],
+                [0,0,0.3,1,0.3,0.5,0,0,0,0],
+                [0.5,0,0,0.2,1,0.4,0,0,0,0],
+                [0.3,0.2,0.2,0.3,0.3,1,0,0.1,0,0],
+                [0,0.2,0.5,0.1,0,0.1,1,0.3,0.2,0.3],
+                [0,0.8,0.2,0,0,0.1,0.2,1,0.3,0.4],
+                [0,0.3,0.3,0,0,0,0.2,0.3,1,0.4],
+                [0,0.4,0.2,0,0,0,0.2,0.6,0.5,1]] },
+    { tokens: ['I','went','to','the','bank','to','deposit','money'],
+      meaning: [[1,0.2,0.1,0.1,0.1,0,0,0.1],
+                [0.3,1,0.3,0.1,0.2,0.1,0.1,0.1],
+                [0.1,0.3,1,0.3,0.2,0.2,0.1,0.1],
+                [0.1,0.1,0.3,1,0.6,0.1,0.1,0.2],
+                [0.1,0.1,0.2,0.4,1,0.1,0.3,0.8],
+                [0.1,0.2,0.3,0.1,0.1,1,0.3,0.1],
+                [0,0.1,0.2,0.1,0.4,0.3,1,0.7],
+                [0,0.1,0.1,0.1,0.6,0.1,0.5,1]] },
+    { tokens: ['Apple','released','a','new','phone','but','the','apple','was','red'],
+      meaning: [[1,0.3,0,0.2,0.6,0,0,0.2,0,0],
+                [0.4,1,0.2,0.2,0.4,0.1,0,0.1,0.1,0],
+                [0,0.2,1,0.3,0.2,0,0,0,0,0],
+                [0.1,0.2,0.3,1,0.4,0,0,0,0,0],
+                [0.7,0.3,0.2,0.4,1,0.1,0.1,0.1,0,0],
+                [0,0.2,0,0,0.2,1,0.3,0.3,0.2,0.1],
+                [0,0,0,0,0,0.3,1,0.4,0.1,0.1],
+                [0.1,0,0,0,0.1,0.1,0.4,1,0.3,0.7],
+                [0,0,0,0,0,0.1,0.1,0.3,1,0.5],
+                [0,0,0,0,0,0,0,0.8,0.5,1]] },
+  ];
+
+  let sent = 0, selected = -1, tau = 1;
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function softmax(arr, tau){
+    const max = Math.max(...arr);
+    const exp = arr.map(v => Math.exp((v-max)/tau));
+    const sum = exp.reduce((a,b)=>a+b,0);
+    return exp.map(v=>v/sum);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    const s = sentences[sent];
+    const n = s.tokens.length;
+
+    // Compute attention matrix: each row = softmax of raw scores
+    const attn = s.meaning.map(row => softmax(row, tau));
+
+    // Layout
+    const pad = 40;
+    const tokenRowH = 50;
+    const headerH = tokenRowH * 2 + 20;
+    const matrixTop = headerH + 20;
+    const availH = H - matrixTop - 40;
+    const availW = W - pad*2;
+    const cellSize = Math.min(availW/(n+2), availH/n, 42);
+    const matrixW = cellSize * n;
+    const matrixH = cellSize * n;
+    const matrixX = (W - matrixW)/2;
+    const matrixY = matrixTop + 20;
+
+    // Draw tokens at top (queries)
+    ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='10px JetBrains Mono';
+    ctx.fillText('QUERY (who is asking?)', W/2, 20);
+
+    ctx.font='bold 13px Inter,sans-serif';
+    for(let i=0;i<n;i++){
+      const x = matrixX + cellSize*i + cellSize/2;
+      const y = tokenRowH;
+      const isSelected = i===selected;
+      ctx.fillStyle = isSelected ? 'rgba(99,102,241,0.25)' : 'rgba(14,14,26,0.8)';
+      ctx.strokeStyle = isSelected ? '#818cf8' : 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = isSelected ? 2 : 1;
+      const tw = ctx.measureText(s.tokens[i]).width + 14;
+      ctx.beginPath(); ctx.roundRect(x-tw/2, y-16, tw, 26, 6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = isSelected ? '#818cf8' : 'rgba(255,255,255,0.7)';
+      ctx.fillText(s.tokens[i], x, y+3);
+
+      // Arrow down to matrix
+      if(isSelected){
+        ctx.strokeStyle='#818cf8'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x, y+10); ctx.lineTo(x, matrixY-4); ctx.stroke();
+      }
+    }
+
+    // Draw tokens on left side (keys)
+    ctx.textAlign='right';
+    ctx.font='11px JetBrains Mono'; ctx.fillStyle='rgba(34,211,238,0.5)';
+    ctx.save(); ctx.translate(matrixX-matrixW-20, matrixY+matrixH/2); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center'; ctx.fillText('KEY (who is answering?)', 0, 0); ctx.restore();
+
+    ctx.textAlign='right'; ctx.font='bold 12px Inter,sans-serif';
+    for(let j=0;j<n;j++){
+      ctx.fillStyle='rgba(255,255,255,0.6)';
+      ctx.fillText(s.tokens[j], matrixX-8, matrixY+cellSize*j+cellSize/2+4);
+    }
+
+    // Draw attention matrix
+    for(let i=0;i<n;i++){
+      for(let j=0;j<n;j++){
+        const val = attn[i][j];
+        const isRow = i===selected;
+        const alpha = isRow ? val : val*0.3;
+        const col = selected>=0 && !isRow ? `rgba(99,102,241,${alpha*0.4})` : `rgba(99,102,241,${alpha})`;
+        ctx.fillStyle = col;
+        const x = matrixX+cellSize*j, y = matrixY+cellSize*i;
+        ctx.fillRect(x, y, cellSize-1, cellSize-1);
+
+        // Value text
+        if(val>0.1 && isRow){
+          ctx.fillStyle = val>0.5?'#fff':'rgba(255,255,255,0.8)';
+          ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
+          ctx.fillText(val.toFixed(2), x+cellSize/2, y+cellSize/2+3);
+        }
+      }
+    }
+
+    // Matrix border
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+    ctx.strokeRect(matrixX, matrixY, matrixW, matrixH);
+
+    // Highlight selected row
+    if(selected>=0){
+      ctx.strokeStyle='#818cf8'; ctx.lineWidth=2;
+      ctx.strokeRect(matrixX, matrixY+cellSize*selected, matrixW, cellSize);
+
+      // Show softmax bars below matrix
+      const barY = matrixY+matrixH+24;
+      const barH = 28;
+      ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px JetBrains Mono'; ctx.textAlign='left';
+      ctx.fillText('Attention weights for "'+s.tokens[selected]+'":', matrixX, barY-6);
+
+      for(let j=0;j<n;j++){
+        const w = attn[selected][j];
+        const barW = cellSize-1;
+        const x = matrixX+cellSize*j;
+        ctx.fillStyle='rgba(255,255,255,0.04)';
+        ctx.fillRect(x, barY, barW, barH);
+        ctx.fillStyle=`rgba(99,102,241,${0.4+w*0.6})`;
+        ctx.fillRect(x, barY+barH*(1-w), barW, barH*w);
+      }
+    }
+
+    // Store layout for click detection
+    canvas._layout = { matrixX, matrixY, cellSize, n, tokenRowH };
+
+    updateExplain();
+  }
+
+  function updateExplain(){
+    const el = document.getElementById('step-explain');
+    const ov = document.getElementById('overlay');
+    if(selected<0){
+      el.textContent = 'Click a token to see how attention is computed for that word.';
+      ov.textContent = 'Click a word in the sentence above the matrix';
+      return;
+    }
+    const s = sentences[sent];
+    const attn = softmax(s.meaning[selected], tau);
+    const topIdxs = [...attn.keys()].sort((a,b)=>attn[b]-attn[a]).slice(0,3);
+    const topList = topIdxs.map(i=>`<strong>${s.tokens[i]}</strong> (${(attn[i]*100).toFixed(0)}%)`).join(', ');
+    el.innerHTML = `When the model processes "<strong>${s.tokens[selected]}</strong>", it pays most attention to: ${topList}.<br><br>The output for this token is a <strong>weighted sum of all tokens' Values</strong> using these weights.`;
+    ov.innerHTML = `Row <span class="value">${selected}</span> &mdash; "${s.tokens[selected]}" attends most to "<span class="value">${s.tokens[topIdxs[0]]}</span>"`;
+  }
+
+  canvas.addEventListener('click', e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    const L = canvas._layout;
+    if(!L) return;
+    // Click on top token row
+    if(my < L.tokenRowH+16){
+      for(let i=0;i<L.n;i++){
+        const tx = L.matrixX + L.cellSize*i + L.cellSize/2;
+        if(Math.abs(mx-tx) < L.cellSize/2+10){ selected = selected===i?-1:i; draw(); return; }
+      }
+    }
+    // Click on matrix row
+    if(mx>=L.matrixX && mx<L.matrixX+L.cellSize*L.n &&
+       my>=L.matrixY && my<L.matrixY+L.cellSize*L.n){
+      selected = Math.floor((my-L.matrixY)/L.cellSize);
+      draw();
+    }
+  });
+
+  document.querySelectorAll('[data-sent]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-sent]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      sent = parseInt(b.dataset.sent); selected = -1; draw();
+    });
+  });
+  document.getElementById('tau-slider').addEventListener('input',e=>{
+    tau = parseFloat(e.target.value);
+    document.getElementById('tau-val').textContent = tau.toFixed(2);
+    draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

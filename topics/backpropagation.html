@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backpropagation - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Backpropagation</h1>
+      <span class="topic-desc">Gradients flowing backward through a computation &mdash; the chain rule in action</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Click Forward, then Backward to see gradients flow</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Training = forward + backward</div>
+        <div class="guide-text">
+          <strong>Forward pass:</strong> push inputs through the network, get a prediction, measure the loss. <strong>Backward pass:</strong> compute how much each weight contributed to the error using the <a href="slopes-and-derivatives.html">chain rule</a>. Each weight gets a gradient. <a href="gradient-descent.html">Gradient descent</a> then nudges every weight in the direction that reduces loss.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Inputs</h3>
+        <div class="slider-group">
+          <div class="slider-label"><span>x&#8321;</span><span class="slider-value" id="x1-val">1.00</span></div>
+          <input type="range" id="x1-slider" min="-2" max="2" step="0.05" value="1">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>x&#8322;</span><span class="slider-value" id="x2-val">-0.50</span></div>
+          <input type="range" id="x2-slider" min="-2" max="2" step="0.05" value="-0.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>target y</span><span class="slider-value" id="tgt-val">1.00</span></div>
+          <input type="range" id="tgt-slider" min="-2" max="2" step="0.05" value="1">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Run</h3>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-fwd" style="flex:1">1. Forward &rarr;</button>
+          <button class="btn btn-primary" id="btn-bwd" style="flex:1" disabled>2. &larr; Backward</button>
+        </div>
+        <button class="btn btn-secondary" id="btn-step" style="width:100%;margin-top:6px">Apply Gradient Step (&alpha;=0.1)</button>
+        <button class="btn btn-secondary" id="btn-reset" style="width:100%;margin-top:6px">Reset Weights</button>
+      </div>
+
+      <div class="control-section">
+        <h3>Current Loss</h3>
+        <div style="font-family:var(--font-mono);font-size:1.4rem;font-weight:700;text-align:center;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);color:var(--red)" id="loss-val">
+          &mdash;
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>The Chain Rule</h3>
+        <div class="info-box">
+          To find how much weight <code>w</code> affects loss <code>L</code>, we multiply gradients along the path:<br><br>
+          <span style="font-family:var(--font-mono)">&part;L/&part;w = &part;L/&part;y &middot; &part;y/&part;h &middot; &part;h/&part;w</span><br><br>
+          Each piece is easy (just a local derivative). The product gives you the full gradient. This is what lets us train networks with <strong>billions of parameters</strong>.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Real Networks</h3>
+        <div class="info-box">
+          Modern deep learning frameworks (PyTorch, TensorFlow, JAX) do backprop automatically &mdash; "autodiff". You write the forward pass; they compute gradients for free. GPT-4 has ~1.7T parameters. Every single one gets a gradient on every training step.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  // Tiny network: 2 inputs -> 2 hidden (tanh) -> 1 output (linear)
+  // Loss = (output - target)^2
+  let x1=1, x2=-0.5, target=1;
+  let w = {
+    w11: 0.5, w12: -0.3,  // input 1 to hidden 1 & 2
+    w21: -0.7, w22: 0.4,  // input 2 to hidden 1 & 2
+    v1: 0.8, v2: -0.6,    // hidden to output
+    b1: 0.1, b2: -0.2,    // hidden biases
+    bo: 0,                // output bias
+  };
+  let state = null; // forward state
+  let grads = null; // backward state
+  let phase = 'idle'; // idle, forward, backward
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function forward(){
+    const z1 = w.w11*x1 + w.w21*x2 + w.b1;
+    const z2 = w.w12*x1 + w.w22*x2 + w.b2;
+    const h1 = Math.tanh(z1);
+    const h2 = Math.tanh(z2);
+    const y = w.v1*h1 + w.v2*h2 + w.bo;
+    const L = 0.5*(y-target)*(y-target);
+    return { z1,z2,h1,h2,y,L };
+  }
+
+  function backward(s){
+    const dL_dy = s.y - target;
+    const dy_dh1 = w.v1;
+    const dy_dh2 = w.v2;
+    const dh1_dz1 = 1 - s.h1*s.h1;
+    const dh2_dz2 = 1 - s.h2*s.h2;
+
+    const dL_dh1 = dL_dy * dy_dh1;
+    const dL_dh2 = dL_dy * dy_dh2;
+    const dL_dz1 = dL_dh1 * dh1_dz1;
+    const dL_dz2 = dL_dh2 * dh2_dz2;
+
+    return {
+      dL_dy,
+      dL_dh1, dL_dh2,
+      dL_dz1, dL_dz2,
+      dL_dw11: dL_dz1 * x1,
+      dL_dw21: dL_dz1 * x2,
+      dL_dw12: dL_dz2 * x1,
+      dL_dw22: dL_dz2 * x2,
+      dL_dv1: dL_dy * s.h1,
+      dL_dv2: dL_dy * s.h2,
+      dL_db1: dL_dz1,
+      dL_db2: dL_dz2,
+      dL_dbo: dL_dy,
+    };
+  }
+
+  function gradStep(){
+    if(!grads) return;
+    const lr = 0.1;
+    w.w11 -= lr*grads.dL_dw11; w.w21 -= lr*grads.dL_dw21;
+    w.w12 -= lr*grads.dL_dw12; w.w22 -= lr*grads.dL_dw22;
+    w.v1 -= lr*grads.dL_dv1;   w.v2 -= lr*grads.dL_dv2;
+    w.b1 -= lr*grads.dL_db1;   w.b2 -= lr*grads.dL_db2;
+    w.bo -= lr*grads.dL_dbo;
+    state = null; grads = null; phase='idle';
+    document.getElementById('btn-bwd').disabled = true;
+    draw();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    const nodeR = 28;
+    const pad = 60;
+    const inX = pad;
+    const hidX = W*0.4;
+    const outX = W*0.68;
+    const lossX = W - pad - 20;
+
+    const y1 = H*0.35, y2 = H*0.65;
+    const yHid1 = H*0.35, yHid2 = H*0.65;
+    const yOut = H*0.5, yLoss = H*0.5;
+
+    function drawNode(x, y, label, value, color='#1e1e35', borderColor='#3d3d6b'){
+      ctx.fillStyle=color; ctx.strokeStyle=borderColor; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(x, y, nodeR, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 12px Inter,sans-serif'; ctx.textAlign='center';
+      ctx.fillText(label, x, y-3);
+      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='10px JetBrains Mono';
+      ctx.fillText(value, x, y+12);
+    }
+
+    function drawEdge(x1,y1,x2,y2, weight, color='rgba(255,255,255,0.15)', backprop=false){
+      ctx.strokeStyle = color;
+      const intensity = Math.min(1, Math.abs(weight)/2);
+      ctx.lineWidth = 1 + intensity * 2.5;
+      if(backprop) ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(x1+nodeR-2, y1); ctx.lineTo(x2-nodeR+2, y2); ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
+      ctx.fillStyle=color;
+      const mx=(x1+x2)/2, my=(y1+y2)/2;
+      ctx.fillText(weight.toFixed(2), mx, my-4);
+    }
+
+    // Colors based on phase
+    const fwdOn = phase === 'forward' || phase === 'backward';
+    const bwdOn = phase === 'backward';
+
+    // Edges (inputs to hidden)
+    const iColor = fwdOn ? '#22d3ee' : 'rgba(255,255,255,0.15)';
+    drawEdge(inX, y1, hidX, yHid1, w.w11, iColor);
+    drawEdge(inX, y1, hidX, yHid2, w.w12, iColor);
+    drawEdge(inX, y2, hidX, yHid1, w.w21, iColor);
+    drawEdge(inX, y2, hidX, yHid2, w.w22, iColor);
+
+    // Edges (hidden to output)
+    drawEdge(hidX, yHid1, outX, yOut, w.v1, iColor);
+    drawEdge(hidX, yHid2, outX, yOut, w.v2, iColor);
+
+    // Output to loss
+    drawEdge(outX, yOut, lossX, yLoss, 1, iColor);
+
+    // Backprop arrows (dashed, red)
+    if(bwdOn && grads){
+      const bC = '#f87171';
+      drawEdge(lossX, yLoss, outX, yOut, grads.dL_dy, bC, true);
+      drawEdge(outX, yOut, hidX, yHid1, grads.dL_dh1, bC, true);
+      drawEdge(outX, yOut, hidX, yHid2, grads.dL_dh2, bC, true);
+      drawEdge(hidX, yHid1, inX, y1, grads.dL_dw11, bC, true);
+      drawEdge(hidX, yHid2, inX, y1, grads.dL_dw12, bC, true);
+      drawEdge(hidX, yHid1, inX, y2, grads.dL_dw21, bC, true);
+      drawEdge(hidX, yHid2, inX, y2, grads.dL_dw22, bC, true);
+    }
+
+    // Nodes
+    const inActiveColor = fwdOn?'#1a4060':'#1e1e35';
+    const inBorder = fwdOn?'#22d3ee':'#3d3d6b';
+    drawNode(inX, y1, 'x\u2081', x1.toFixed(2), inActiveColor, inBorder);
+    drawNode(inX, y2, 'x\u2082', x2.toFixed(2), inActiveColor, inBorder);
+
+    const hActive = fwdOn && state;
+    drawNode(hidX, yHid1, 'h\u2081', hActive?state.h1.toFixed(2):'?', hActive?'#1a4060':'#1e1e35', hActive?'#22d3ee':'#3d3d6b');
+    drawNode(hidX, yHid2, 'h\u2082', hActive?state.h2.toFixed(2):'?', hActive?'#1a4060':'#1e1e35', hActive?'#22d3ee':'#3d3d6b');
+
+    drawNode(outX, yOut, 'y\u0302', hActive?state.y.toFixed(2):'?', hActive?'#1a4060':'#1e1e35', hActive?'#22d3ee':'#3d3d6b');
+
+    // Loss node
+    const lActive = fwdOn && state;
+    drawNode(lossX, yLoss, 'L', lActive?state.L.toFixed(3):'?', lActive?'#602030':'#1e1e35', lActive?'#f87171':'#3d3d6b');
+
+    // Layer labels
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('INPUTS', inX, 28);
+    ctx.fillText('HIDDEN (tanh)', hidX, 28);
+    ctx.fillText('OUTPUT', outX, 28);
+    ctx.fillText('LOSS', lossX, 28);
+
+    // Target annotation
+    ctx.fillStyle='rgba(251,191,36,0.7)';
+    ctx.font='11px JetBrains Mono';
+    ctx.fillText(`target = ${target.toFixed(2)}`, lossX, H-20);
+
+    // Phase indicator
+    let msg = '';
+    if(phase==='idle') msg = 'Click "Forward" to compute predictions';
+    else if(phase==='forward') msg = 'Forward pass complete. Click "Backward" to compute gradients.';
+    else if(phase==='backward') msg = 'Gradients computed. Click "Apply Gradient Step" to update weights.';
+    document.getElementById('overlay').textContent = msg;
+
+    if(state) document.getElementById('loss-val').textContent = state.L.toFixed(4);
+    else document.getElementById('loss-val').textContent = '—';
+  }
+
+  document.getElementById('x1-slider').addEventListener('input',e=>{x1=parseFloat(e.target.value);document.getElementById('x1-val').textContent=x1.toFixed(2);state=null;grads=null;phase='idle';document.getElementById('btn-bwd').disabled=true;draw();});
+  document.getElementById('x2-slider').addEventListener('input',e=>{x2=parseFloat(e.target.value);document.getElementById('x2-val').textContent=x2.toFixed(2);state=null;grads=null;phase='idle';document.getElementById('btn-bwd').disabled=true;draw();});
+  document.getElementById('tgt-slider').addEventListener('input',e=>{target=parseFloat(e.target.value);document.getElementById('tgt-val').textContent=target.toFixed(2);state=null;grads=null;phase='idle';document.getElementById('btn-bwd').disabled=true;draw();});
+
+  document.getElementById('btn-fwd').addEventListener('click',()=>{
+    state = forward(); phase='forward';
+    document.getElementById('btn-bwd').disabled = false;
+    draw();
+  });
+  document.getElementById('btn-bwd').addEventListener('click',()=>{
+    if(!state) return;
+    grads = backward(state); phase='backward'; draw();
+  });
+  document.getElementById('btn-step').addEventListener('click',gradStep);
+  document.getElementById('btn-reset').addEventListener('click',()=>{
+    w = { w11:0.5,w12:-0.3,w21:-0.7,w22:0.4,v1:0.8,v2:-0.6,b1:0.1,b2:-0.2,bo:0 };
+    state=null; grads=null; phase='idle';
+    document.getElementById('btn-bwd').disabled=true;
+    draw();
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

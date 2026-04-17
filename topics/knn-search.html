@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KNN & Vector Search - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>KNN &amp; Vector Search</h1>
+      <span class="topic-desc">Move the query point &mdash; the K nearest neighbors vote on the class</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">Drag the yellow query point or click anywhere to place it</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">"Tell me who your neighbors are..."</div>
+        <div class="guide-text">
+          <strong>K-Nearest Neighbors</strong> is the simplest classifier imaginable: to classify a new point, find the K closest known points and <strong>vote</strong>. Yet this basic idea powers massive systems: semantic search, recommendation engines, RAG (retrieval-augmented generation) all use nearest-neighbor search over embedding vectors.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>K (number of neighbors)</h3>
+        <div class="slider-group">
+          <div class="slider-label"><span>K</span><span class="slider-value" id="k-val">5</span></div>
+          <input type="range" id="k-slider" min="1" max="25" step="1" value="5">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Distance Metric</h3>
+        <div class="btn-group">
+          <button class="btn btn-secondary active" data-dist="euclidean">Euclidean</button>
+          <button class="btn btn-secondary" data-dist="manhattan">Manhattan</button>
+          <button class="btn btn-secondary" data-dist="cosine">Cosine</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Decision Regions</h3>
+        <div class="toggle-chips">
+          <div class="chip active" id="tog-regions">Show Regions</div>
+          <div class="chip active" id="tog-lines">Show Lines to Neighbors</div>
+          <div class="chip" id="tog-circle">Show K-Circle</div>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Dataset</h3>
+        <div class="btn-group" style="flex-wrap:wrap">
+          <button class="btn btn-secondary active" data-ds="clusters">3 Clusters</button>
+          <button class="btn btn-secondary" data-ds="rings">Rings</button>
+          <button class="btn btn-secondary" data-ds="mixed">Mixed</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Query Result</h3>
+        <div class="info-box" id="result" style="text-align:center;font-size:1rem">
+          Move the query to see predicted class.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Scaling Up</h3>
+        <div class="info-box">
+          Real vector databases (Pinecone, Weaviate, pgvector) search billions of <a href="embeddings.html">embeddings</a> using <strong>approximate KNN</strong> (HNSW, IVF). They're behind: semantic search, image search, RAG in LLM apps, recommendation systems. Same algorithm, just smarter indexing.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  const colors = ['#6366f1', '#22d3ee', '#34d399', '#f472b6'];
+  const classNames = ['Class A', 'Class B', 'Class C', 'Class D'];
+  let k = 5, metric = 'euclidean';
+  let showRegions = true, showLines = true, showCircle = false;
+  let query = [0, 0];
+  let dragging = false;
+  let data = [];
+  const xR = [-5,5], yR = [-5,5];
+
+  function genCluster(cx, cy, n, cls, spread){
+    const out=[];
+    for(let i=0;i<n;i++){
+      out.push({x: cx+(Math.random()-0.5)*spread, y: cy+(Math.random()-0.5)*spread, cls});
+    }
+    return out;
+  }
+
+  const datasets = {
+    clusters: () => [...genCluster(-2.5, 2, 18, 0, 2), ...genCluster(2.5, 2, 18, 1, 2), ...genCluster(0, -2.5, 18, 2, 2)],
+    rings: () => {
+      const out=[];
+      for(let i=0;i<24;i++){ const a=Math.random()*Math.PI*2; out.push({x:Math.cos(a)*3.5+(Math.random()-0.5)*0.6, y:Math.sin(a)*3.5+(Math.random()-0.5)*0.6, cls:0}); }
+      for(let i=0;i<24;i++){ const a=Math.random()*Math.PI*2; out.push({x:Math.cos(a)*1.5+(Math.random()-0.5)*0.6, y:Math.sin(a)*1.5+(Math.random()-0.5)*0.6, cls:1}); }
+      return out;
+    },
+    mixed: () => {
+      const out = [...genCluster(-2, 2, 15, 0, 2.5), ...genCluster(2, -2, 15, 1, 2.5)];
+      // A few outliers
+      for(let i=0;i<5;i++) out.push({x:(Math.random()-0.5)*8, y:(Math.random()-0.5)*8, cls:Math.floor(Math.random()*2)});
+      return out;
+    },
+  };
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+  function toD(px,py){ return [xR[0]+(px/W)*(xR[1]-xR[0]), yR[0]+((H-py)/H)*(yR[1]-yR[0])]; }
+
+  function distance(a, b){
+    if(metric === 'euclidean') return Math.hypot(a[0]-b[0], a[1]-b[1]);
+    if(metric === 'manhattan') return Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]);
+    // cosine: 1 - cos(angle). Magnitude matters less.
+    const dot = a[0]*b[0] + a[1]*b[1];
+    const ma = Math.hypot(a[0],a[1])||0.001;
+    const mb = Math.hypot(b[0],b[1])||0.001;
+    return 1 - dot/(ma*mb);
+  }
+
+  function knn(point){
+    return [...data].map(d => ({...d, dist: distance([d.x,d.y], point)}))
+      .sort((a,b)=>a.dist-b.dist).slice(0, k);
+  }
+
+  function majorityVote(neighbors){
+    const counts = {};
+    neighbors.forEach(n=>counts[n.cls]=(counts[n.cls]||0)+1);
+    let best=-1, bv=-1;
+    for(const c in counts){ if(counts[c]>bv){bv=counts[c];best=parseInt(c);} }
+    return {cls:best, count:bv, counts};
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Decision regions (sample grid)
+    if(showRegions){
+      const step = 14;
+      for(let py=0;py<H;py+=step){
+        for(let px=0;px<W;px+=step){
+          const [dx,dy] = toD(px+step/2, py+step/2);
+          const nn = knn([dx,dy]);
+          const vote = majorityVote(nn);
+          ctx.fillStyle = colors[vote.cls] + '22';
+          ctx.fillRect(px, py, step, step);
+        }
+      }
+    }
+
+    // Grid
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    for(let x=-4;x<=4;x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=-4;y<=4;y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+
+    // Axes
+    ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+
+    const neighbors = knn(query);
+    const vote = majorityVote(neighbors);
+
+    // Lines to neighbors
+    if(showLines){
+      const [qx,qy] = toC(query[0], query[1]);
+      neighbors.forEach(n => {
+        const [nx,ny] = toC(n.x, n.y);
+        ctx.strokeStyle = colors[n.cls] + '88'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(qx,qy); ctx.lineTo(nx,ny); ctx.stroke();
+      });
+    }
+
+    // K-circle (for euclidean)
+    if(showCircle && metric === 'euclidean' && neighbors.length > 0){
+      const maxDist = neighbors[neighbors.length-1].dist;
+      const [qx,qy] = toC(query[0], query[1]);
+      const [ex,] = toC(query[0] + maxDist, query[1]);
+      const r = Math.abs(ex - qx);
+      ctx.strokeStyle='rgba(251,191,36,0.5)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.arc(qx, qy, r, 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Data points
+    data.forEach(d => {
+      const [px,py] = toC(d.x, d.y);
+      const isNeighbor = neighbors.some(n => n === d || (n.x===d.x && n.y===d.y));
+      ctx.fillStyle = colors[d.cls];
+      ctx.globalAlpha = isNeighbor ? 1 : 0.75;
+      ctx.beginPath(); ctx.arc(px, py, isNeighbor?6:4, 0, Math.PI*2); ctx.fill();
+      if(isNeighbor){
+        ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    // Query point
+    const [qx,qy] = toC(query[0], query[1]);
+    ctx.shadowColor = colors[vote.cls] || '#fbbf24'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath(); ctx.arc(qx, qy, 10, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#08080f';
+    ctx.beginPath(); ctx.arc(qx, qy, 5, 0, Math.PI*2); ctx.fill();
+    ctx.font='bold 10px JetBrains Mono'; ctx.fillStyle='#fbbf24'; ctx.textAlign='center';
+    ctx.fillText('?', qx, qy+4);
+
+    // Update info
+    const voteCounts = Object.entries(vote.counts).map(([c,n])=>`<span style="color:${colors[c]}">${classNames[c]}</span>: ${n}`).join(' &middot; ');
+    document.getElementById('result').innerHTML =
+      `Predicted: <strong style="color:${colors[vote.cls]}">${classNames[vote.cls]}</strong><br>` +
+      `<span style="font-size:0.8rem;color:var(--text-muted)">Votes: ${voteCounts}</span>`;
+    document.getElementById('overlay').innerHTML =
+      `Query (${query[0].toFixed(2)}, ${query[1].toFixed(2)}) &rarr; K=${k} neighbors &rarr; <span class="value" style="color:${colors[vote.cls]}">${classNames[vote.cls]}</span>`;
+  }
+
+  // Interactions
+  canvas.addEventListener('pointerdown', e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    const [qpx,qpy] = toC(query[0], query[1]);
+    if(Math.hypot(mx-qpx, my-qpy) < 20){ dragging=true; return; }
+    // Otherwise click to place
+    const [x,y] = toD(mx, my);
+    query = [Math.max(-4.5,Math.min(4.5,x)), Math.max(-4.5,Math.min(4.5,y))];
+    draw();
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const r=canvas.getBoundingClientRect();
+    const [x,y] = toD(e.clientX-r.left, e.clientY-r.top);
+    query = [Math.max(-4.5,Math.min(4.5,x)), Math.max(-4.5,Math.min(4.5,y))];
+    draw();
+  });
+  canvas.addEventListener('pointerup', ()=>dragging=false);
+  canvas.addEventListener('pointerleave', ()=>dragging=false);
+
+  document.getElementById('k-slider').addEventListener('input',e=>{
+    k=parseInt(e.target.value); document.getElementById('k-val').textContent=k; draw();
+  });
+  document.querySelectorAll('[data-dist]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-dist]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); metric=b.dataset.dist; draw();
+    });
+  });
+  document.querySelectorAll('[data-ds]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-ds]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      data = datasets[b.dataset.ds](); draw();
+    });
+  });
+  document.getElementById('tog-regions').addEventListener('click',function(){showRegions=!showRegions;this.classList.toggle('active');draw();});
+  document.getElementById('tog-lines').addEventListener('click',function(){showLines=!showLines;this.classList.toggle('active');draw();});
+  document.getElementById('tog-circle').addEventListener('click',function(){showCircle=!showCircle;this.classList.toggle('active');draw();});
+
+  data = datasets.clusters();
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

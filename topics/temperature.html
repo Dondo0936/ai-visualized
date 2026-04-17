@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Softmax Temperature - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Softmax Temperature</h1>
+      <span class="topic-desc">Drag the temperature slider to see how an LLM picks its next word</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        Temperature: <span class="value" id="ov-temp">1.00</span> &mdash; <span id="ov-desc">balanced</span>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">Temperature = how "creative" the AI is</div>
+        <div class="guide-text">
+          When ChatGPT picks the next word, it has raw "scores" (called <strong>logits</strong>) for every possible word. Softmax turns these into probabilities. <strong>Temperature</strong> controls how much the model favors the top word vs. exploring alternatives.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Temperature (&tau;)</h3>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Drag to control randomness</span>
+            <span class="slider-value" id="tau-val">1.00</span>
+          </div>
+          <input type="range" id="tau-slider" min="0.05" max="3" step="0.01" value="1">
+        </div>
+        <div class="btn-group" style="margin-top:6px;flex-wrap:wrap">
+          <button class="btn btn-secondary" data-temp="0.1">0.1</button>
+          <button class="btn btn-secondary" data-temp="0.7">0.7</button>
+          <button class="btn btn-secondary active" data-temp="1.0">1.0</button>
+          <button class="btn btn-secondary" data-temp="1.5">1.5</button>
+          <button class="btn btn-secondary" data-temp="2.5">2.5</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Prompt</h3>
+        <div class="btn-group" style="flex-wrap:wrap">
+          <button class="btn btn-secondary active" data-prompt="0">"The cat sat on the ___"</button>
+        </div>
+        <div class="btn-group" style="flex-wrap:wrap;margin-top:6px">
+          <button class="btn btn-secondary" data-prompt="1">"I feel so ___"</button>
+          <button class="btn btn-secondary" data-prompt="2">"2 + 2 = ___"</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Sample Next Word</h3>
+        <button class="btn btn-primary" id="btn-sample" style="width:100%">Sample a word</button>
+        <div style="font-family:var(--font-mono);font-size:0.85rem;text-align:center;padding:12px;margin-top:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);min-height:46px;">
+          <span id="sampled" style="color:var(--cyan);font-weight:700;font-size:1.1rem">&mdash;</span>
+        </div>
+        <div class="info-box" style="margin-top:6px">
+          Samples a word using the current probabilities. At low &tau;, you'll almost always get the same top word. At high &tau;, each click is unpredictable.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Intuition</h3>
+        <div class="info-box" id="intuition">
+          At &tau; = 1.0, the model samples using the raw probabilities. Likely words come up more often, but there's still variety.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>In Real LLMs</h3>
+        <div class="info-box">
+          <strong>&tau; = 0</strong> &mdash; Always picks the top word. Deterministic, but repetitive and robotic.<br>
+          <strong>&tau; = 0.7</strong> &mdash; Default for many chatbots. Coherent but not boring.<br>
+          <strong>&tau; = 1.0</strong> &mdash; Balanced &mdash; raw model probabilities.<br>
+          <strong>&tau; &gt; 1.5</strong> &mdash; Creative writing. Can go off-rails.<br>
+          <strong>&tau; = &infin;</strong> &mdash; Uniform random &mdash; complete gibberish.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Formula</h3>
+        <div class="formula">
+          p<sub>i</sub> = exp(z<sub>i</sub> / &tau;) / &Sigma; exp(z<sub>j</sub> / &tau;)
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  const prompts = [
+    { text: 'The cat sat on the ___',
+      words: ['mat','floor','couch','roof','bed','chair','table','tree','moon','ceiling'],
+      logits: [4.2, 3.1, 2.8, 1.5, 2.2, 2.0, 1.8, 0.8, -0.5, 0.3] },
+    { text: 'I feel so ___',
+      words: ['happy','tired','sad','excited','hungry','alone','confused','alive','weird','blessed'],
+      logits: [3.8, 3.5, 2.9, 2.7, 2.3, 1.9, 1.4, 1.2, 0.6, 0.4] },
+    { text: '2 + 2 = ___',
+      words: ['4','four','5','3','8','22','7','pi','apple','six'],
+      logits: [7.5, 4.2, 0.3, 0.1, 0.0, 0.5, -0.2, -1.5, -2.5, -0.8] },
+  ];
+
+  let promptIdx = 0, tau = 1;
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function softmax(logits, tau){
+    const max = Math.max(...logits);
+    const exp = logits.map(z => Math.exp((z-max)/tau));
+    const sum = exp.reduce((a,b)=>a+b,0);
+    return exp.map(v=>v/sum);
+  }
+
+  function heatColor(t){
+    // Cool to warm: blue -> cyan -> yellow -> red
+    if(t<0.33){const s=t/0.33; return `rgb(${Math.floor(30+s*50)},${Math.floor(100+s*100)},${Math.floor(200+s*30)})`;}
+    if(t<0.66){const s=(t-0.33)/0.33; return `rgb(${Math.floor(80+s*170)},${Math.floor(200+s*20)},${Math.floor(230-s*150)})`;}
+    const s=(t-0.66)/0.34; return `rgb(${Math.floor(250)},${Math.floor(220-s*100)},${Math.floor(80-s*60)})`;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    const p = prompts[promptIdx];
+    const probs = softmax(p.logits, tau);
+
+    // Draw prompt header
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='12px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('Prompt:', W/2, 28);
+    ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 20px Inter,sans-serif';
+    ctx.fillText(p.text, W/2, 58);
+
+    // Layout: horizontal bar chart
+    const topMargin = 90;
+    const bottomMargin = 40;
+    const leftLabel = 120;
+    const rightPad = 80;
+    const availH = H - topMargin - bottomMargin;
+    const availW = W - leftLabel - rightPad;
+    const barH = Math.min(36, availH/p.words.length - 4);
+    const gap = 4;
+    const totalH = p.words.length * (barH + gap);
+    const startY = topMargin + (availH - totalH)/2;
+
+    // Sort by probability for visual ranking
+    const indexed = p.words.map((w,i)=>({w, i, prob: probs[i], logit: p.logits[i]}));
+    indexed.sort((a,b)=>b.prob-a.prob);
+
+    const maxProb = indexed[0].prob;
+
+    indexed.forEach((item, rank) => {
+      const y = startY + rank*(barH+gap);
+      const barW = (item.prob / 1) * availW; // full scale 0-1
+
+      // Word label
+      ctx.fillStyle = rank===0 ? '#22d3ee' : 'rgba(255,255,255,0.7)';
+      ctx.font = rank===0 ? 'bold 13px Inter,sans-serif' : '12px Inter,sans-serif';
+      ctx.textAlign='right';
+      ctx.fillText(item.w, leftLabel-10, y+barH/2+4);
+
+      // Background bar
+      ctx.fillStyle='rgba(255,255,255,0.04)';
+      ctx.fillRect(leftLabel, y, availW, barH);
+
+      // Prob bar
+      ctx.fillStyle = heatColor(item.prob/maxProb);
+      ctx.globalAlpha = 0.4 + 0.6*(item.prob);
+      ctx.fillRect(leftLabel, y, barW, barH);
+      ctx.globalAlpha = 1;
+
+      // Prob text
+      ctx.font='11px JetBrains Mono'; ctx.textAlign='left';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.fillText((item.prob*100).toFixed(1)+'%', leftLabel+barW+8, y+barH/2+4);
+
+      // Logit (on left)
+      ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.25)';
+      ctx.font='9px JetBrains Mono';
+      ctx.fillText('z='+item.logit.toFixed(1), 8, y+barH/2+3);
+    });
+
+    // Axis label
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
+    ctx.fillText('probability', leftLabel+availW/2, H-18);
+
+    // Update overlay
+    document.getElementById('ov-temp').textContent = tau.toFixed(2);
+    const desc = tau<0.3?'very confident':tau<0.8?'focused':tau<1.3?'balanced':tau<2?'creative':'chaotic';
+    document.getElementById('ov-desc').textContent = desc;
+
+    updateIntuition();
+  }
+
+  function updateIntuition(){
+    const el = document.getElementById('intuition');
+    let msg;
+    if(tau<0.3){
+      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, the model is <strong>very confident</strong>. One word dominates. Great for math and facts, bad for creative writing.`;
+    } else if(tau<0.8){
+      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities lean toward the top few words. Coherent but not repetitive. This is where most chatbots live.`;
+    } else if(tau<1.3){
+      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities are close to the raw model output. Balanced creativity.`;
+    } else if(tau<2){
+      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities flatten out. The model takes more risks &mdash; good for creative writing, but may produce weird results.`;
+    } else {
+      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities are nearly uniform. The model picks almost randomly. Output becomes chaotic and often nonsensical.`;
+    }
+    el.innerHTML = msg;
+  }
+
+  document.getElementById('tau-slider').addEventListener('input',e=>{
+    tau = parseFloat(e.target.value);
+    document.querySelectorAll('[data-temp]').forEach(b=>b.classList.remove('active'));
+    draw();
+  });
+  document.querySelectorAll('[data-temp]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-temp]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      tau = parseFloat(b.dataset.temp);
+      document.getElementById('tau-slider').value = tau;
+      draw();
+    });
+  });
+  document.querySelectorAll('[data-prompt]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-prompt]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      promptIdx = parseInt(b.dataset.prompt);
+      document.getElementById('sampled').textContent='—';
+      draw();
+    });
+  });
+
+  document.getElementById('btn-sample').addEventListener('click',()=>{
+    const p = prompts[promptIdx];
+    const probs = softmax(p.logits, tau);
+    const r = Math.random();
+    let acc = 0;
+    for(let i=0;i<probs.length;i++){
+      acc += probs[i];
+      if(r<acc){
+        const el = document.getElementById('sampled');
+        el.textContent = p.words[i];
+        el.style.color = i===p.logits.indexOf(Math.max(...p.logits)) ? 'var(--cyan)' : 'var(--yellow)';
+        return;
+      }
+    }
+  });
+
+  resize(); window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>

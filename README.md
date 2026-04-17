@@ -23,9 +23,30 @@ Interactive visualizations that make AI and machine learning concepts intuitive.
 |------|-----------|
 | Gradient Descent (3D) | [Open](https://dondo0936.github.io/ai-visualized/topics/gradient-descent.html) |
 | Activation Functions | [Open](https://dondo0936.github.io/ai-visualized/topics/activation-functions.html) |
-| The Perceptron | [Open](https://dondo0936.github.io/ai-visualized/topics/perceptron.html) |
+| Linear Transformations | [Open](https://dondo0936.github.io/ai-visualized/topics/linear-transformations.html) |
+| Loss Functions | [Open](https://dondo0936.github.io/ai-visualized/topics/loss-functions.html) |
+| Probability & Softmax | [Open](https://dondo0936.github.io/ai-visualized/topics/probability-softmax.html) |
+| Backpropagation | [Open](https://dondo0936.github.io/ai-visualized/topics/backpropagation.html) |
 
-More topics coming: Linear Transformations, Loss Functions, Backpropagation, Self-Attention, Tokenization, Embeddings, Softmax Temperature, KNN & Vector Search.
+### Neural Networks
+
+| Name | Live Demo |
+|------|-----------|
+| The Perceptron | [Open](https://dondo0936.github.io/ai-visualized/topics/perceptron.html) |
+| Neural Network Playground | [Open](https://dondo0936.github.io/ai-visualized/topics/nn-playground.html) |
+| Convolution Filters | [Open](https://dondo0936.github.io/ai-visualized/topics/convolution.html) |
+| Dropout & Regularization | [Open](https://dondo0936.github.io/ai-visualized/topics/regularization.html) |
+
+### Transformers & LLMs
+
+| Name | Live Demo |
+|------|-----------|
+| Tokenization | [Open](https://dondo0936.github.io/ai-visualized/topics/tokenization.html) |
+| Word Embeddings | [Open](https://dondo0936.github.io/ai-visualized/topics/embeddings.html) |
+| Positional Encoding | [Open](https://dondo0936.github.io/ai-visualized/topics/positional-encoding.html) |
+| Self-Attention | [Open](https://dondo0936.github.io/ai-visualized/topics/self-attention.html) |
+| Softmax Temperature | [Open](https://dondo0936.github.io/ai-visualized/topics/temperature.html) |
+| KNN & Vector Search | [Open](https://dondo0936.github.io/ai-visualized/topics/knn-search.html) |
 
 ---
 

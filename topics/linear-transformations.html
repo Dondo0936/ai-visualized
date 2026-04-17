@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linear Transformations - AI Visualized</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="topic-page has-guide">
+    <div class="topic-header">
+      <a href="../index.html" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Back
+      </a>
+      <h1>Linear Transformations</h1>
+      <span class="topic-desc">Change the matrix entries &mdash; watch space stretch, rotate, and shear</span>
+    </div>
+
+    <div class="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        Matrix: [<span id="ov-m">1,0;0,1</span>] &middot; det = <span class="value" id="ov-det">1.00</span>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="guide-banner" id="guide">
+        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+        <div class="guide-step-counter">The Big Idea</div>
+        <div class="guide-title">A matrix is a function that transforms space</div>
+        <div class="guide-text">
+          A 2&times;2 matrix takes any point (x, y) and moves it somewhere new. It's a function! The two columns tell you where the <strong>basis vectors</strong> i&#770; and j&#770; end up. Everything else stretches, rotates, or shears to match.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Matrix Entries</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="slider-group">
+            <div class="slider-label"><span>a</span><span class="slider-value" id="a-val">1.00</span></div>
+            <input type="range" id="a-slider" min="-2" max="2" step="0.01" value="1">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label"><span>b</span><span class="slider-value" id="b-val">0.00</span></div>
+            <input type="range" id="b-slider" min="-2" max="2" step="0.01" value="0">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label"><span>c</span><span class="slider-value" id="c-val">0.00</span></div>
+            <input type="range" id="c-slider" min="-2" max="2" step="0.01" value="0">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label"><span>d</span><span class="slider-value" id="d-val">1.00</span></div>
+            <input type="range" id="d-slider" min="-2" max="2" step="0.01" value="1">
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.88rem;text-align:center;padding:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-top:8px;">
+          M = [ <span id="m-a" style="color:var(--accent-light)">1.00</span> &nbsp; <span id="m-b" style="color:var(--cyan)">0.00</span> ]<br>
+          &nbsp; &nbsp; &nbsp; [ <span id="m-c" style="color:var(--accent-light)">0.00</span> &nbsp; <span id="m-d" style="color:var(--cyan)">1.00</span> ]
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Presets</h3>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-secondary" data-preset="identity">Identity (no change)</button>
+          <button class="btn btn-secondary" data-preset="rotate">Rotate 45&deg;</button>
+          <button class="btn btn-secondary" data-preset="scale">Stretch 2x horizontal</button>
+          <button class="btn btn-secondary" data-preset="shear">Shear</button>
+          <button class="btn btn-secondary" data-preset="reflect">Reflect over y-axis</button>
+          <button class="btn btn-secondary" data-preset="collapse">Collapse to line (det = 0)</button>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Animation</h3>
+        <button class="btn btn-primary" id="btn-anim" style="width:100%">Animate: Identity &rarr; Current</button>
+      </div>
+
+      <div class="control-section">
+        <h3>What's the Determinant?</h3>
+        <div class="info-box" id="det-explain">
+          The <strong>determinant</strong> tells you how much the transformation scales area. det = 1 means area is preserved. det = 2 means it doubles. det = 0 means space collapses onto a line. Negative det means space is flipped.
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3>Connection to AI</h3>
+        <div class="info-box">
+          Every layer of a neural network multiplies its input by a weight matrix. <strong>Matrix multiplication IS a linear transformation.</strong> A 512&times;512 weight matrix transforms 512D space. Stacking these (plus non-linear <a href="activation-functions.html">activations</a>) lets networks learn any function.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  let a=1,b=0,c=0,d=1;
+  let animT = 1; // 0 = identity, 1 = full matrix
+  let animating = false;
+  const xR = [-4,4], yR = [-4,4];
+
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    W=r.width; H=r.height;
+    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    draw();
+  }
+
+  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+
+  function apply(x, y, t){
+    // Interpolate between identity and current matrix
+    const ma = 1 + (a-1)*t;
+    const mb = b*t;
+    const mc = c*t;
+    const md = 1 + (d-1)*t;
+    return [ma*x + mb*y, mc*x + md*y];
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+
+    // Original grid (faint)
+    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+    for(let x=-3;x<=3;x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    for(let y=-3;y<=3;y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+
+    // Transformed grid
+    ctx.strokeStyle='rgba(99,102,241,0.3)'; ctx.lineWidth=1.2;
+    for(let x=-3;x<=3;x++){
+      ctx.beginPath();
+      for(let y=-3;y<=3.01;y+=0.1){
+        const [tx,ty] = apply(x, y, animT);
+        const [cx,cy] = toC(tx, ty);
+        if(y===-3) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+      }
+      ctx.stroke();
+    }
+    for(let y=-3;y<=3;y++){
+      ctx.beginPath();
+      for(let x=-3;x<=3.01;x+=0.1){
+        const [tx,ty] = apply(x, y, animT);
+        const [cx,cy] = toC(tx, ty);
+        if(x===-3) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+      }
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1.5;
+    const[ox,oy]=toC(0,0);
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+
+    // Unit square (shaded)
+    const corners = [[0,0],[1,0],[1,1],[0,1]];
+    const trans = corners.map(p => apply(p[0],p[1],animT));
+    ctx.fillStyle='rgba(251,191,36,0.12)';
+    ctx.beginPath();
+    trans.forEach((p,i)=>{
+      const [x,y] = toC(p[0],p[1]);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=1; ctx.stroke();
+
+    // Basis vectors
+    function drawBasis(to, color, label){
+      const [x1,y1]=toC(0,0), [x2,y2]=toC(to[0],to[1]);
+      ctx.strokeStyle=color; ctx.lineWidth=3; ctx.fillStyle=color;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      const ang=Math.atan2(y2-y1,x2-x1);
+      ctx.beginPath(); ctx.moveTo(x2,y2);
+      ctx.lineTo(x2-14*Math.cos(ang-0.35), y2-14*Math.sin(ang-0.35));
+      ctx.lineTo(x2-14*Math.cos(ang+0.35), y2-14*Math.sin(ang+0.35));
+      ctx.closePath(); ctx.fill();
+
+      ctx.fillStyle=color; ctx.font='bold 13px Inter,sans-serif';
+      ctx.fillText(label, x2+10, y2-6);
+    }
+
+    const iHat = apply(1,0,animT);
+    const jHat = apply(0,1,animT);
+    drawBasis(iHat, '#818cf8', 'i\u0302 ('+iHat[0].toFixed(1)+','+iHat[1].toFixed(1)+')');
+    drawBasis(jHat, '#22d3ee', 'j\u0302 ('+jHat[0].toFixed(1)+','+jHat[1].toFixed(1)+')');
+
+    // Update overlay
+    const det = a*d - b*c;
+    document.getElementById('ov-m').textContent = `${a.toFixed(1)},${b.toFixed(1)};${c.toFixed(1)},${d.toFixed(1)}`;
+    document.getElementById('ov-det').textContent = det.toFixed(2);
+
+    // Determinant explanation
+    let explain;
+    if(Math.abs(det) < 0.01) explain = `det = 0 &mdash; space is <strong>collapsed</strong> onto a line. The transformation loses information. Cannot be reversed.`;
+    else if(det < 0) explain = `det = ${det.toFixed(2)} &mdash; <strong>negative</strong>. Space has been <strong>flipped</strong> (reflected). Area scales by ${Math.abs(det).toFixed(2)}.`;
+    else if(det < 1) explain = `det = ${det.toFixed(2)} &mdash; space is <strong>compressed</strong>. The unit square (yellow) is smaller than original. Shrinks area.`;
+    else if(Math.abs(det-1) < 0.05) explain = `det = ${det.toFixed(2)} &mdash; area is <strong>preserved</strong>. This is a rotation, shear, or combination that keeps sizes the same.`;
+    else explain = `det = ${det.toFixed(2)} &mdash; space is <strong>expanded</strong>. Area scales by ${det.toFixed(2)}.`;
+    document.getElementById('det-explain').innerHTML = explain;
+  }
+
+  function updateMatrix(){
+    document.getElementById('a-val').textContent=a.toFixed(2);
+    document.getElementById('b-val').textContent=b.toFixed(2);
+    document.getElementById('c-val').textContent=c.toFixed(2);
+    document.getElementById('d-val').textContent=d.toFixed(2);
+    document.getElementById('m-a').textContent=a.toFixed(2);
+    document.getElementById('m-b').textContent=b.toFixed(2);
+    document.getElementById('m-c').textContent=c.toFixed(2);
+    document.getElementById('m-d').textContent=d.toFixed(2);
+    draw();
+  }
+
+  ['a','b','c','d'].forEach(n=>{
+    document.getElementById(n+'-slider').addEventListener('input',e=>{
+      const v=parseFloat(e.target.value);
+      if(n==='a') a=v; else if(n==='b') b=v; else if(n==='c') c=v; else d=v;
+      updateMatrix();
+    });
+  });
+
+  const presets = {
+    identity: [1,0,0,1],
+    rotate: [Math.cos(Math.PI/4), -Math.sin(Math.PI/4), Math.sin(Math.PI/4), Math.cos(Math.PI/4)],
+    scale: [2,0,0,1],
+    shear: [1,1,0,1],
+    reflect: [-1,0,0,1],
+    collapse: [1,1,1,1],
+  };
+  document.querySelectorAll('[data-preset]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const p = presets[b.dataset.preset];
+      [a,_b,c,d]=[p[0],p[1],p[2],p[3]];
+      a=p[0]; b_=p[1]; c_=p[2]; d_=p[3];
+      // Note: reassigning a/b/c/d (not using temp vars)
+    });
+  });
+  // Fix preset handling
+  document.querySelectorAll('[data-preset]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const p = presets[btn.dataset.preset];
+      a=p[0]; b=p[1]; c=p[2]; d=p[3];
+      document.getElementById('a-slider').value=a;
+      document.getElementById('b-slider').value=b;
+      document.getElementById('c-slider').value=c;
+      document.getElementById('d-slider').value=d;
+      updateMatrix();
+    });
+  });
+
+  // Animate
+  document.getElementById('btn-anim').addEventListener('click',()=>{
+    if(animating) return;
+    animating = true; animT = 0;
+    const step = () => {
+      animT += 0.015;
+      if(animT >= 1){ animT=1; animating=false; draw(); return; }
+      draw(); requestAnimationFrame(step);
+    };
+    step();
+  });
+
+  resize(); updateMatrix();
+  window.addEventListener('resize',resize);
+})();
+</script>
+</body>
+</html>
