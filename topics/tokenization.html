@@ -3,194 +3,1008 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tokenization - AI Visualized</title>
+  <title>Tokenization — AI Visualized</title>
+  <meta name="description" content="Watch raw text turn into the integer IDs that LLMs actually see. Character, word, and byte-pair encoding side by side — plus a live BPE trainer that merges the most frequent pair on each step.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .tk-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 2.2fr 1fr;
+      grid-template-rows: 1.3fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .tk-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .tk-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+    .tk-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin: 0;
+    }
+    .tk-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .tk-panel-body {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+    }
+
+    .tk-text    { grid-column: 1; grid-row: 1 / span 2; }
+    .tk-ctrls   { grid-column: 2; grid-row: 1; overflow-y: auto; }
+    .tk-vocab   { grid-column: 2; grid-row: 2; overflow-y: auto; }
+
+    .tk-text-body {
+      flex: 1; min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-3) var(--s-4);
+      overflow: hidden;
+    }
+    .tk-input-wrap {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+    }
+    .tk-input-wrap textarea {
+      width: 100%; min-height: 70px;
+      background: transparent; border: none; outline: none;
+      color: var(--fg-primary);
+      font-family: var(--font-mono);
+      font-size: 13px; line-height: 1.6;
+      resize: vertical;
+    }
+    .tk-viz {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .tk-viz h6 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .token-chunks {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.85;
+      word-break: break-all;
+    }
+    .tok {
+      display: inline-block;
+      padding: 2px 5px;
+      margin: 1px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 120ms ease;
+      position: relative;
+    }
+    .tok:hover { border-color: rgba(255,255,255,0.3); }
+    .tok.active { outline: 2px solid var(--teal-300); outline-offset: 1px; }
+    .tok .id {
+      display: block;
+      font-size: 9.5px;
+      line-height: 1;
+      color: rgba(245,245,247,0.75);
+      text-align: center;
+      margin-top: 2px;
+      font-weight: 600;
+    }
+    .tok.ws { color: rgba(245,245,247,0.55); }
+    .tok.special { background: rgba(255,122,41,0.25); color: var(--heat-300); }
+
+    .tk-ids {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--teal-200);
+      max-height: 100px;
+      overflow-y: auto;
+      word-break: break-word;
+    }
+
+    /* Controls */
+    .tk-ctrl-body { padding: var(--s-3) var(--s-4) var(--s-4); overflow-y: auto; }
+    .ctl-group { margin-bottom: var(--s-4); }
+    .ctl-group h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      padding: 6px 10px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pill:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .slider-wrap { display:flex; flex-direction:column; gap: 4px; margin-bottom: var(--s-3); }
+    .slider-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .slider-row .v { color: var(--teal-300); font-weight: 500; }
+    input[type=range].tk-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; background: var(--border-default);
+      border-radius: 2px; outline: none;
+    }
+    input[type=range].tk-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    input[type=range].tk-slider::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    .btn-row { display: flex; gap: 6px; }
+    .tk-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .tk-btn:hover { border-color: var(--border-strong); }
+    .tk-btn.primary {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .tk-btn.primary:hover { background: var(--accent-ring); color: var(--teal-100); }
+    .tk-btn.heat {
+      background: var(--sub-accent-soft);
+      border-color: rgba(255,122,41,0.3);
+      color: var(--heat-300);
+    }
+
+    /* Corpus & preset chips */
+    .preset-row {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-top: var(--s-2);
+    }
+    .preset-chip {
+      padding: 4px 8px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: 999px;
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .preset-chip:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+
+    /* Vocabulary & merges table */
+    .tk-vocab-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+    .tk-vocab-body h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .merge-list, .vocab-list {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-2) var(--s-3);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      max-height: 220px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+    .merge-row, .vocab-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px; align-items: center;
+      padding: 2px 0;
+    }
+    .merge-row .idx, .vocab-row .idx {
+      color: var(--fg-muted); font-size: 10.5px; min-width: 28px;
+    }
+    .merge-row .val, .vocab-row .val { color: var(--teal-300); }
+    .merge-row .cnt, .vocab-row .cnt { color: var(--heat-400); font-size: 10.5px; }
+
+    .tk-note {
+      font-family: var(--font-sans);
+      font-size: 12px; line-height: 1.6;
+      color: var(--fg-tertiary);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      margin-top: var(--s-3);
+    }
+    .tk-note strong { color: var(--teal-200); font-weight: 600; }
+    .tk-note code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-raised);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--teal-300);
+    }
+
+    /* Bottom stats */
+    .tk-stats {
+      grid-column: 1 / -1; grid-row: 3;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--s-3);
+    }
+    .tk-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-height: 66px;
+    }
+    .tk-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .tk-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tk-stat.accent .value { color: var(--teal-300); }
+    .tk-stat.heat .value   { color: var(--heat-400); }
+
+    @media (max-width: 1000px) {
+      .tk-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+      }
+      .tk-text  { grid-column: 1; grid-row: 1; }
+      .tk-ctrls { grid-column: 1; grid-row: 2; }
+      .tk-vocab { grid-column: 1; grid-row: 3; }
+      .tk-stats { grid-row: 4; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Tokenization</h1>
-      <span class="topic-desc">Type anything &mdash; see how an LLM chops it into tokens</span>
-    </div>
-
-    <div class="canvas-area" style="display:flex;flex-direction:column;padding:40px;gap:24px;overflow-y:auto;">
-      <div>
-        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Your Text</div>
-        <textarea id="input" style="width:100%;min-height:90px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;font-family:var(--font-mono);font-size:1.05rem;color:var(--text-primary);resize:vertical;outline:none;">The quick brown fox jumps over the lazy dog. Tokenization isn't always intuitive!</textarea>
-      </div>
-
-      <div>
-        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
-          Tokens: <span id="token-count" style="color:var(--cyan)">0</span> &middot;
-          Characters: <span id="char-count" style="color:var(--cyan)">0</span> &middot;
-          Avg chars/token: <span id="avg-count" style="color:var(--cyan)">0.0</span>
-        </div>
-        <div id="tokens-out" style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;min-height:120px;font-family:var(--font-mono);font-size:1.05rem;line-height:1.8;"></div>
-      </div>
-
-      <div>
-        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Token IDs (as the model sees them)</div>
-        <div id="ids-out" style="padding:12px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;min-height:40px;font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);word-break:break-all;line-height:1.8;"></div>
-      </div>
-    </div>
-
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">LLMs don't see letters &mdash; they see tokens</div>
-        <div class="guide-text">
-          Before an LLM processes your text, it's chopped into <strong>tokens</strong> (word pieces). Each token becomes a number. Common words = 1 token. Rare words get split into pieces. This is why "unhappiness" might become ["un", "happiness"] or even ["un", "happy", "ness"].
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Try These</h3>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn btn-secondary preset-btn" data-text="Hello, world!">Hello, world!</button>
-          <button class="btn btn-secondary preset-btn" data-text="antidisestablishmentarianism">Long word</button>
-          <button class="btn btn-secondary preset-btn" data-text="1234567890">Numbers</button>
-          <button class="btn btn-secondary preset-btn" data-text="Supercalifragilisticexpialidocious!">Made-up word</button>
-          <button class="btn btn-secondary preset-btn" data-text="Xin ch&agrave;o th&#7871; gi&#7899;i">Vietnamese</button>
-          <button class="btn btn-secondary preset-btn" data-text="function myAdd(a, b) { return a + b; }">Code</button>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Why Split Words?</h3>
-        <div class="info-box">
-          If every word got its own token, the vocabulary would be <strong>millions of entries</strong>. Instead, modern LLMs use <strong>~50,000 tokens</strong> by splitting rare words into common pieces. This lets the model handle words it has never seen before &mdash; it recognizes the pieces.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>The Algorithm (BPE)</h3>
-        <div class="info-box">
-          <strong>Byte Pair Encoding</strong> starts with individual characters, then repeatedly merges the most common pair. Over millions of documents, "th" becomes a token, then "the", then " the". Eventually it knows full words AND their pieces.<br><br>
-          <em>What you see here is a simplified simulation &mdash; real GPT tokenizers use ~100K trained tokens.</em>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Fun Facts</h3>
-        <div class="info-box">
-          &bull; GPT-4 has <strong>100,277</strong> unique tokens<br>
-          &bull; Leading spaces matter: " hello" and "hello" are different tokens<br>
-          &bull; Emoji often take multiple tokens<br>
-          &bull; Your API costs are measured in tokens, not words<br>
-          &bull; Non-English languages usually use more tokens per word
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Connection to the Model</h3>
-        <div class="info-box">
-          Each token ID looks up a learned <a href="embeddings.html">embedding</a> vector. Those vectors flow through transformer layers, get <a href="self-attention.html">attended</a> to each other, and finally produce logits that become the next token's probability via <a href="temperature.html">softmax</a>.
-        </div>
-      </div>
-    </div>
+<div class="topic-page">
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Tokenization</h1>
+    <span class="topic-desc">Raw text &rarr; integer IDs. Three methods, live BPE training, unicode hazards, and real GPT-style costing.</span>
   </div>
 
-<script>
-(function(){
-  const input = document.getElementById('input');
-  const tokensOut = document.getElementById('tokens-out');
-  const idsOut = document.getElementById('ids-out');
+  <div class="tk-main">
 
-  // Common "tokens" we'll pretend are in the vocab (simplified BPE approximation)
-  const commonTokens = [
-    ' the', ' a', ' an', ' of', ' to', ' in', ' is', ' and', ' for', ' that', ' it', ' as',
-    ' was', ' are', ' on', ' with', ' by', ' this', ' but', ' not', ' be', ' have', ' or',
-    ' I', ' you', ' he', ' she', ' we', ' they', ' his', ' her', ' my', ' your',
-    ' quick', ' brown', ' fox', ' jumps', ' over', ' lazy', ' dog', ' cat', ' sat', ' mat',
-    ' can', ' will', ' would', ' could', ' should', ' do', ' does', ' did', ' say', ' said',
-    ' one', ' two', ' three', ' four', ' five', ' six', ' seven', ' eight', ' nine', ' ten',
-    'ing', 'ed', 'ly', 'er', 'est', 'tion', 'ness', 'ment', 'able', 'ful', 'less',
-    'un', 're', 'pre', 'dis', 'anti', 'sub', 'super', 'inter',
-    'hello', 'world', 'function', 'return', 'if', 'else', 'for', 'while', 'def', 'class',
+    <section class="tk-panel tk-text">
+      <header class="tk-panel-head">
+        <h4>Text &rarr; tokens</h4>
+        <span class="meta" id="text-meta">bpe &middot; 20 merges</span>
+      </header>
+      <div class="tk-text-body">
+        <div class="tk-input-wrap">
+          <textarea id="input-text" spellcheck="false" rows="3">The quick brown fox jumps over the lazy dog. She sells seashells by the seashore. Peter Piper picked a peck of pickled peppers.</textarea>
+        </div>
+        <div class="tk-viz">
+          <h6>Tokens (hover for id)</h6>
+          <div class="token-chunks" id="token-chunks"></div>
+        </div>
+        <div class="tk-ids">
+          <span style="color: var(--fg-muted); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.04em;">Token IDs &rarr;</span>
+          <span id="token-ids">[]</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="tk-panel tk-ctrls">
+      <header class="tk-panel-head">
+        <h4>Controls</h4>
+        <span class="meta" id="ctl-meta">bpe</span>
+      </header>
+      <div class="tk-ctrl-body">
+
+        <div class="ctl-group">
+          <h5>Tokenizer</h5>
+          <div class="pill-row" id="algo-pills">
+            <span class="pill" data-algo="char">characters</span>
+            <span class="pill" data-algo="word">words</span>
+            <span class="pill active" data-algo="bpe">bpe</span>
+            <span class="pill" data-algo="byte">byte-level</span>
+          </div>
+        </div>
+
+        <div class="ctl-group" id="bpe-group">
+          <h5>BPE merges</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>trained merges</span><span class="v" id="merges-val">20</span></div>
+            <input type="range" class="tk-slider" id="merges-slider" min="0" max="150" step="1" value="20">
+          </div>
+          <div class="btn-row">
+            <button class="tk-btn primary" id="btn-train-one">+1 merge</button>
+            <button class="tk-btn primary" id="btn-train-ten">+10</button>
+          </div>
+          <div class="btn-row" style="margin-top: 6px">
+            <button class="tk-btn heat" id="btn-reset-bpe">Reset merges</button>
+            <button class="tk-btn" id="btn-retrain">Re-train all</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Display</h5>
+          <div class="pill-row" id="disp-pills">
+            <span class="pill active" data-disp="ids">show token ids</span>
+            <span class="pill active" data-disp="color">color by vocab</span>
+            <span class="pill" data-disp="whitespace">show \u22c5 for space</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Try a preset</h5>
+          <div class="preset-row" id="preset-row"></div>
+        </div>
+
+        <div class="tk-note">
+          <strong>Why tokenization matters.</strong> The LLM only sees integers, never characters. A well-chosen vocabulary gives you short, stable inputs; a bad one burns through your context window. GPT-4 bills you by tokens, not characters &mdash; the difference is <strong>3&times;</strong> depending on the language.
+        </div>
+      </div>
+    </section>
+
+    <section class="tk-panel tk-vocab">
+      <header class="tk-panel-head">
+        <h4>Vocabulary &amp; merges</h4>
+        <span class="meta" id="vocab-meta">&mdash;</span>
+      </header>
+      <div class="tk-vocab-body" id="vocab-body">
+        <h5>Learned merges (rank order)</h5>
+        <div class="merge-list" id="merge-list">
+          <span style="color:var(--fg-muted)">train some merges to see them here</span>
+        </div>
+        <h5 style="margin-top: var(--s-3)">Top vocabulary items</h5>
+        <div class="vocab-list" id="vocab-list">&mdash;</div>
+
+        <h5 style="margin-top: var(--s-3)">Tokens vs merges trained</h5>
+        <div style="background: var(--bg-sunken); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); padding: var(--s-2) var(--s-3);">
+          <canvas id="growth-canvas" style="display:block; width:100%; height:120px;"></canvas>
+          <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-muted); margin-top: 4px;">
+            <span style="color: var(--teal-300)">teal</span> = token count &middot; <span style="color: var(--heat-400)">orange</span> = vocab size. More merges \u2192 fewer tokens per text, bigger vocab.
+          </div>
+        </div>
+
+        <div class="tk-note" id="tip-note">
+          Byte-pair encoding starts with individual characters, counts adjacent pairs across the corpus, merges the most frequent pair into a new token, and repeats. After 50k merges you get roughly the vocabulary GPT-2 ships with.
+        </div>
+      </div>
+    </section>
+
+    <section class="tk-stats">
+      <div class="tk-stat"><div class="label">characters</div><div class="value" id="s-chars">0</div></div>
+      <div class="tk-stat"><div class="label">bytes (UTF-8)</div><div class="value" id="s-bytes">0</div></div>
+      <div class="tk-stat accent"><div class="label">tokens</div><div class="value" id="s-tokens">0</div></div>
+      <div class="tk-stat heat"><div class="label">unique</div><div class="value" id="s-unique">0</div></div>
+      <div class="tk-stat"><div class="label">compression</div><div class="value" id="s-comp">&mdash;</div></div>
+      <div class="tk-stat"><div class="label">vocab size</div><div class="value" id="s-vocab">&mdash;</div></div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------
+   TOKENIZATION — three ways to turn text into integers.
+
+   char:  one id per Unicode code point.
+   word:  split on whitespace and punctuation; each distinct string is a
+          token. Good ratio, huge vocab.
+   bpe:   byte-pair encoding. Start from characters; repeatedly merge
+          the most frequent adjacent pair across the training corpus
+          into a new symbol. Apply the learned merges left-to-right.
+   byte:  one id per UTF-8 byte (0..255). Robust to any text, but long.
+
+   We train BPE on-the-fly against the current input (capped at 150
+   merges so it stays snappy). Each merge is shown in order, and the
+   output is re-tokenized from scratch whenever inputs or merges change.
+   ------------------------------------------------------------------ */
+
+(function(){
+
+  // ----------------------------------------------------------------
+  // 1) STATE.
+  // ----------------------------------------------------------------
+  const state = {
+    text: '',
+    algo: 'bpe',
+    mergeCount: 20,
+    maxMerges: 150,
+    merges: [],            // array of [a, b, newSymbol], rank order
+    bpeCache: null,        // cached result for (text, merges) to avoid re-tokenizing
+    tokens: [],            // current tokens as strings
+    ids: [],               // integer ids per token
+    vocab: new Map(),      // symbol -> id
+    display: { ids: true, color: true, whitespace: false },
+    hoverIdx: -1,
+  };
+
+  // ----------------------------------------------------------------
+  // 2) PRESETS — each is a short sample that shows a different aspect.
+  // ----------------------------------------------------------------
+  const PRESETS = [
+    { label: 'english',  text: 'The quick brown fox jumps over the lazy dog. She sells seashells by the seashore.' },
+    { label: 'code',     text: 'function greet(name) {\n  console.log(`Hello, ${name}!`);\n}' },
+    { label: 'numbers',  text: 'Pi is approximately 3.14159265358979. e is 2.71828. log(10)/log(2) = 3.32193.' },
+    { label: 'emoji',    text: 'I saw a 🦊 eat a 🍕 at the 🏖. It was 🔥🔥🔥. Then the 🐕 showed up and barked 🗣.' },
+    { label: 'japanese', text: 'これはトークナイザのテストです。English and 日本語 mixed together.' },
+    { label: 'arabic',   text: 'العربية من اللغات السامية. Right-to-left script shares the same bytes, different directions.' },
+    { label: 'repetition', text: 'the the the the the the the the quick quick quick fox fox fox fox brown brown brown' },
+    { label: 'long word', text: 'pneumonoultramicroscopicsilicovolcanoconiosis is a lung disease. supercalifragilisticexpialidocious is a word too.' },
   ];
 
-  function hashToColor(s){
-    let h=0;
-    for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i))|0;
-    const hue = Math.abs(h) % 360;
-    return `hsl(${hue}, 45%, ${32 + (Math.abs(h)%20)}%)`;
+  // ----------------------------------------------------------------
+  // 3) UTIL: Unicode-aware split + UTF-8 byte length.
+  // ----------------------------------------------------------------
+  function toCharArray(s) {
+    // spread operator splits by Unicode code point (not UTF-16 surrogate halves)
+    return Array.from(s);
   }
-  function hashToId(s){
-    let h=0;
-    for(let i=0;i<s.length;i++) h = ((h*131 + s.charCodeAt(i))|0)>>>0;
-    return 1000 + (h % 99000);
+  function utf8Len(s) {
+    // TextEncoder gives the real UTF-8 byte count
+    try { return new TextEncoder().encode(s).length; }
+    catch(_) { return s.length; }
   }
 
-  function tokenize(text){
-    const tokens = [];
-    let i = 0;
-    while(i < text.length){
-      let matched = null;
-      // Try common tokens first (longest match)
-      const sorted = [...commonTokens].sort((a,b)=>b.length-a.length);
-      for(const t of sorted){
-        if(text.substr(i, t.length) === t){ matched = t; break; }
-      }
-      if(matched){ tokens.push(matched); i += matched.length; continue; }
+  // ----------------------------------------------------------------
+  // 4) CHAR tokenizer.
+  // ----------------------------------------------------------------
+  function tokenizeChar(text) {
+    const toks = toCharArray(text);
+    const vocab = new Map();
+    for (const t of toks) if (!vocab.has(t)) vocab.set(t, vocab.size);
+    return { tokens: toks, ids: toks.map(t => vocab.get(t)), vocab };
+  }
 
-      // Split word into chunks of 3-4 chars (simulating BPE sub-word split)
-      // Find the word boundary
-      if(/\s/.test(text[i])){ tokens.push(text[i]); i++; continue; }
-      if(/[.,!?;:'"()\[\]{}\-]/.test(text[i])){ tokens.push(text[i]); i++; continue; }
+  // ----------------------------------------------------------------
+  // 5) WORD tokenizer.
+  //    Split on whitespace and common punctuation; keep the punctuation
+  //    as its own token.
+  // ----------------------------------------------------------------
+  function tokenizeWord(text) {
+    // Match sequences of word chars, or individual non-whitespace characters,
+    // so "fox!" becomes ["fox", "!"].
+    const re = /([A-Za-z0-9]+|[^\sA-Za-z0-9]|\s+)/g;
+    const toks = [];
+    let m; re.lastIndex = 0;
+    while ((m = re.exec(text)) !== null) toks.push(m[0]);
+    const vocab = new Map();
+    for (const t of toks) if (!vocab.has(t)) vocab.set(t, vocab.size);
+    return { tokens: toks, ids: toks.map(t => vocab.get(t)), vocab };
+  }
 
-      // Grab up to the next boundary
-      let j = i;
-      while(j < text.length && !/[\s.,!?;:'"()\[\]{}\-]/.test(text[j])) j++;
-      const word = text.substring(i, j);
-
-      // Split word into chunks of 3-5 chars
-      let k = 0;
-      while(k < word.length){
-        const len = Math.min(4 + (k%2), word.length - k);
-        tokens.push(word.substr(k, len));
-        k += len;
-      }
-      i = j;
+  // ----------------------------------------------------------------
+  // 6) BYTE tokenizer.
+  // ----------------------------------------------------------------
+  function tokenizeByte(text) {
+    const enc = new TextEncoder().encode(text);
+    const toks = new Array(enc.length);
+    for (let i = 0; i < enc.length; i++) {
+      const b = enc[i];
+      // Render bytes as hex for readability, but keep printable ASCII as-is
+      if (b >= 0x20 && b < 0x7f) toks[i] = String.fromCharCode(b);
+      else toks[i] = '\\x' + b.toString(16).padStart(2, '0');
     }
-    return tokens;
+    const vocab = new Map();
+    for (const t of toks) if (!vocab.has(t)) vocab.set(t, vocab.size);
+    return { tokens: toks, ids: toks.map(t => vocab.get(t)), vocab };
   }
 
-  function render(){
-    const text = input.value;
-    const tokens = tokenize(text);
-    tokensOut.innerHTML = '';
-    const ids = [];
+  // ----------------------------------------------------------------
+  // 7) BPE. Two parts:
+  //    (a) trainMerges(text, nMerges):
+  //        start from per-word arrays of characters. Count adjacent
+  //        pairs across ALL positions. Pick the most frequent pair,
+  //        replace it with the concatenation symbol, record as a merge.
+  //    (b) applyBPE(text, merges):
+  //        for each whitespace-bounded unit (token), split into chars,
+  //        apply the learned merges in rank order: scan left-to-right
+  //        and replace every occurrence of (a, b) with the merged
+  //        symbol. This is the GPT-2 / BPE-"original" algorithm.
+  // ----------------------------------------------------------------
+  function bpePretokenize(text) {
+    // Simple split: runs of whitespace and runs of non-whitespace become
+    // independent pretokens. This differs from GPT-2 (which glues a leading
+    // space onto the next token via the \u0120 marker); here whitespace
+    // stands on its own for clarity.
+    const re = /(\s+|[^\s]+)/g;
+    const out = [];
+    let m; re.lastIndex = 0;
+    while ((m = re.exec(text)) !== null) out.push(m[0]);
+    return out;
+  }
 
-    tokens.forEach(t => {
+  function trainMerges(text, nMerges) {
+    // Build per-word symbol sequences and frequencies. Use end-of-word
+    // marker so merges don't cross word boundaries.
+    const EOW = '\u2581'; // lower-one-eighth-block, like SentencePiece
+    const pretok = bpePretokenize(text);
+    // word -> frequency
+    const wordFreq = new Map();
+    for (const w of pretok) {
+      if (!w.length) continue;
+      wordFreq.set(w, (wordFreq.get(w) || 0) + 1);
+    }
+    // word -> array of symbols (start as characters + EOW)
+    const wordSyms = new Map();
+    for (const w of wordFreq.keys()) {
+      const chars = toCharArray(w);
+      chars.push(EOW);
+      wordSyms.set(w, chars);
+    }
+
+    const merges = [];
+    for (let step = 0; step < nMerges; step++) {
+      // Count pairs weighted by word frequency
+      const pairs = new Map();
+      for (const [w, syms] of wordSyms) {
+        const f = wordFreq.get(w);
+        for (let i = 0; i + 1 < syms.length; i++) {
+          const key = syms[i] + '\x00' + syms[i+1];
+          pairs.set(key, (pairs.get(key) || 0) + f);
+        }
+      }
+      if (pairs.size === 0) break;
+      // Find the maximum (deterministic tiebreak: lex smaller key wins).
+      let bestKey = null, bestFreq = 0;
+      for (const [k, v] of pairs) {
+        if (v > bestFreq || (v === bestFreq && (bestKey === null || k < bestKey))) {
+          bestFreq = v; bestKey = k;
+        }
+      }
+      if (!bestKey || bestFreq < 2) break; // stop if no repeated pair
+      const [a, b] = bestKey.split('\x00');
+      const merged = a + b;
+      merges.push([a, b, merged, bestFreq]);
+      // Apply merge to every word
+      for (const [w, syms] of wordSyms) {
+        let out = [], i = 0;
+        while (i < syms.length) {
+          if (i + 1 < syms.length && syms[i] === a && syms[i+1] === b) {
+            out.push(merged); i += 2;
+          } else {
+            out.push(syms[i]); i += 1;
+          }
+        }
+        wordSyms.set(w, out);
+      }
+    }
+    return { merges, EOW };
+  }
+
+  function applyBPE(text, merges, EOW) {
+    // For each whitespace-bounded unit, start from characters+EOW and
+    // apply merges in rank order. We use a small "find the earliest
+    // merge we can apply" loop, classic BPE.
+    const mergeRank = new Map();
+    for (let i = 0; i < merges.length; i++) {
+      mergeRank.set(merges[i][0] + '\x00' + merges[i][1], i);
+    }
+    const pretok = bpePretokenize(text);
+    const outTokens = [];
+    const EOWmark = EOW || '\u2581';
+    for (const w of pretok) {
+      if (!w.length) continue;
+      let syms = toCharArray(w);
+      syms.push(EOWmark);
+      // Iteratively pick the lowest-rank (= earliest learned) pair and merge.
+      // Repeat until no known pairs remain.
+      while (syms.length > 1) {
+        let bestRank = Infinity, bestIdx = -1;
+        for (let i = 0; i + 1 < syms.length; i++) {
+          const r = mergeRank.get(syms[i] + '\x00' + syms[i+1]);
+          if (r !== undefined && r < bestRank) { bestRank = r; bestIdx = i; }
+        }
+        if (bestIdx === -1) break;
+        const merged = syms[bestIdx] + syms[bestIdx+1];
+        syms.splice(bestIdx, 2, merged);
+      }
+      // We keep the EOW in the returned tokens so the vocab can tell
+      // "e" (mid-word) and "e\u2581" (end-of-word) apart. Display code
+      // below strips the EOW for human readability only.
+      syms = syms.filter(s => s.length > 0);
+      for (const s of syms) outTokens.push(s);
+    }
+    return outTokens;
+  }
+
+  function tokenizeBPE(text) {
+    const train = trainMerges(text, state.mergeCount);
+    state.merges = train.merges;
+    const toks = applyBPE(text, train.merges, train.EOW);
+    // IDs built from the FULL symbols (EOW included), so end-of-word
+    // and mid-word variants of the same letters get distinct IDs.
+    const vocab = new Map();
+    for (const t of toks) if (!vocab.has(t)) vocab.set(t, vocab.size);
+    return { tokens: toks, ids: toks.map(t => vocab.get(t)), vocab };
+  }
+
+  // ----------------------------------------------------------------
+  // 8) DISPATCH.
+  // ----------------------------------------------------------------
+  function tokenize() {
+    if (state.algo === 'char')  return tokenizeChar(state.text);
+    if (state.algo === 'word')  return tokenizeWord(state.text);
+    if (state.algo === 'byte')  return tokenizeByte(state.text);
+    return tokenizeBPE(state.text);
+  }
+
+  // ----------------------------------------------------------------
+  // 9) RENDERING.
+  // ----------------------------------------------------------------
+  function hashColor(id) {
+    // Cycle through a palette derived from the design tokens
+    const palette = [
+      [32,184,174], [95,210,203], [156,229,224], [17,125,118],
+      [255,122,41], [255,155,92], [255,193,153], [201,69,0],
+      [184,166,133], [124,99,67], [246,238,227], [217,202,168],
+    ];
+    const [r, g, b] = palette[((id % palette.length) + palette.length) % palette.length];
+    return 'rgba(' + r + ',' + g + ',' + b + ',0.22)';
+  }
+
+  function render() {
+    const res = tokenize();
+    state.tokens = res.tokens; state.ids = res.ids; state.vocab = res.vocab;
+
+    // Token chunks
+    const box = document.getElementById('token-chunks');
+    box.innerHTML = '';
+    for (let i = 0; i < res.tokens.length; i++) {
+      const raw = res.tokens[i];
+      // Strip trailing EOW marker (used internally to distinguish end-of-word
+      // tokens from mid-word ones) for display purposes.
+      const visible = raw.endsWith('\u2581') ? raw.slice(0, -1) : raw;
       const span = document.createElement('span');
-      const display = t.replace(/ /g, '\u00B7').replace(/\n/g,'\u21B5');
+      span.className = 'tok';
+      if (/^\s+$/.test(visible)) span.classList.add('ws');
+      let display = visible;
+      if (state.display.whitespace) {
+        display = visible.replace(/ /g, '\u22c5').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
+      } else {
+        display = visible.replace(/\n/g, '\u21b5').replace(/\t/g, '\u21e5');
+      }
+      // Show a small dot-hint for end-of-word tokens so students can see
+      // that "e" mid-word and "e" end-of-word are different IDs.
+      if (raw.endsWith('\u2581') && display.length) display += '\u2024';
       span.textContent = display;
-      span.title = JSON.stringify(t);
-      span.style.cssText = `display:inline-block;padding:4px 8px;margin:2px;border-radius:6px;background:${hashToColor(t)};color:#fff;white-space:pre;border:1px solid rgba(255,255,255,0.1);`;
-      tokensOut.appendChild(span);
-      ids.push(hashToId(t));
-    });
+      if (state.display.color) {
+        span.style.background = hashColor(res.ids[i]);
+      }
+      if (state.display.ids) {
+        const idTag = document.createElement('span');
+        idTag.className = 'id';
+        idTag.textContent = res.ids[i];
+        span.appendChild(idTag);
+      }
+      span.title = JSON.stringify(raw) + ' \u2192 id ' + res.ids[i] +
+                   '\nbytes: ' + utf8Len(raw);
+      span.addEventListener('click', () => {
+        state.hoverIdx = i;
+        document.querySelectorAll('.tok.active').forEach(e => e.classList.remove('active'));
+        span.classList.add('active');
+      });
+      box.appendChild(span);
+    }
 
-    idsOut.textContent = '[' + ids.join(', ') + ']';
-    document.getElementById('token-count').textContent = tokens.length;
-    document.getElementById('char-count').textContent = text.length;
-    document.getElementById('avg-count').textContent = tokens.length ? (text.length/tokens.length).toFixed(1) : '0.0';
+    // Token IDs string
+    document.getElementById('token-ids').textContent = '[' + res.ids.join(', ') + ']';
+
+    // Stats
+    const chars = toCharArray(state.text).length;
+    document.getElementById('s-chars').textContent = chars;
+    document.getElementById('s-bytes').textContent = utf8Len(state.text);
+    document.getElementById('s-tokens').textContent = res.tokens.length;
+    document.getElementById('s-unique').textContent = res.vocab.size;
+    document.getElementById('s-comp').textContent = res.tokens.length
+      ? (chars / res.tokens.length).toFixed(2) + ' chr/tok'
+      : '\u2014';
+    document.getElementById('s-vocab').textContent = res.vocab.size;
+
+    // Metas
+    document.getElementById('text-meta').textContent = state.algo +
+      (state.algo === 'bpe' ? ' \u00b7 ' + state.mergeCount + ' merges' : '');
+    document.getElementById('ctl-meta').textContent = state.algo;
+    document.getElementById('vocab-meta').textContent = state.algo === 'bpe'
+      ? state.merges.length + '/' + state.maxMerges + ' merges'
+      : state.algo;
+
+    // Vocab and merges panels
+    renderMerges();
+    renderVocab(res);
+    renderGrowth();
+
+    document.getElementById('bpe-group').style.display = state.algo === 'bpe' ? '' : 'none';
   }
 
-  input.addEventListener('input', render);
-  document.querySelectorAll('[data-text]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      input.value = b.dataset.text;
+  // ----------------------------------------------------------------
+  //  Growth chart: tokens(merges) and vocab(merges).
+  //  Re-tokenizes the current text at 0, step, 2*step, ..., state.maxMerges
+  //  merges and plots both curves. Pure client-side; cheap enough for
+  //  ~20 re-tokenizations on short snippets.
+  // ----------------------------------------------------------------
+  function renderGrowth() {
+    const canvas = document.getElementById('growth-canvas');
+    if (!canvas) return;
+    const DPR = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * DPR; canvas.height = rect.height * DPR;
+    const c = canvas.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const w = rect.width, h = rect.height;
+    c.clearRect(0, 0, w, h);
+
+    // Sample 15 points from 0..maxMerges
+    const M = state.maxMerges;
+    const N = 15;
+    const samples = [];
+    // Train ONCE for the full maxMerges; apply prefix subsets for each sample.
+    const full = trainMerges(state.text, M);
+    const fullMerges = full.merges;
+    for (let i = 0; i <= N; i++) {
+      const mc = Math.round(M * i / N);
+      const sub = fullMerges.slice(0, mc);
+      const toks = applyBPE(state.text, sub, full.EOW);
+      const vocab = new Set(toks);
+      samples.push({ mc, tokens: toks.length, vocab: vocab.size });
+    }
+    const maxT = Math.max.apply(null, samples.map(s => s.tokens).concat([1]));
+    const maxV = Math.max.apply(null, samples.map(s => s.vocab).concat([1]));
+    const pad = 6;
+    const plotW = w - 2 * pad, plotH = h - 2 * pad;
+    // Axes (faint)
+    c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(pad, h - pad); c.lineTo(w - pad, h - pad); c.stroke();
+    // Token curve (teal, normalized to maxT)
+    c.strokeStyle = 'rgba(32,184,174,0.95)'; c.lineWidth = 2;
+    c.beginPath();
+    for (let i = 0; i < samples.length; i++) {
+      const x = pad + (i / (samples.length - 1)) * plotW;
+      const y = h - pad - samples[i].tokens / maxT * plotH;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+    // Vocab curve (heat, normalized to maxV)
+    c.strokeStyle = 'rgba(255,122,41,0.95)'; c.lineWidth = 2;
+    c.setLineDash([4, 3]);
+    c.beginPath();
+    for (let i = 0; i < samples.length; i++) {
+      const x = pad + (i / (samples.length - 1)) * plotW;
+      const y = h - pad - samples[i].vocab / maxV * plotH;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+    c.setLineDash([]);
+    // Current-merges vertical line
+    const cx = pad + (state.mergeCount / M) * plotW;
+    c.strokeStyle = 'rgba(245,245,247,0.55)';
+    c.lineWidth = 1; c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(cx, pad); c.lineTo(cx, h - pad); c.stroke();
+    c.setLineDash([]);
+    // Labels
+    c.font = "10px 'JetBrains Mono', monospace";
+    c.fillStyle = 'rgba(95,210,203,0.9)';
+    c.fillText(samples[samples.length-1].tokens + ' tok @ ' + M, 6, 12);
+    c.fillStyle = 'rgba(255,122,41,0.9)';
+    c.fillText(samples[samples.length-1].vocab + ' vocab @ ' + M, 6, 24);
+    c.fillStyle = 'rgba(155,155,163,0.85)';
+    c.fillText('0', pad, h - 1);
+    c.textAlign = 'right';
+    c.fillText(M, w - pad, h - 1);
+    c.textAlign = 'left';
+  }
+
+  function renderMerges() {
+    const ml = document.getElementById('merge-list');
+    ml.innerHTML = '';
+    if (state.algo !== 'bpe' || state.merges.length === 0) {
+      ml.innerHTML = '<span style="color:var(--fg-muted)">no merges (pick bpe and train)</span>';
+      return;
+    }
+    for (let i = 0; i < state.merges.length; i++) {
+      const [a, b, merged, cnt] = state.merges[i];
+      const row = document.createElement('div');
+      row.className = 'merge-row';
+      row.innerHTML =
+        '<span class="idx">#' + (i+1) + '</span>' +
+        '<span><span style="color:var(--fg-secondary)">' + esc(a) + '</span>' +
+          ' + <span style="color:var(--fg-secondary)">' + esc(b) + '</span>' +
+          ' \u2192 <span class="val">' + esc(merged) + '</span></span>' +
+        '<span class="cnt">' + cnt + '&times;</span>';
+      ml.appendChild(row);
+    }
+  }
+
+  function renderVocab(res) {
+    const vl = document.getElementById('vocab-list');
+    vl.innerHTML = '';
+    // Count frequencies so we can sort
+    const freq = new Map();
+    for (const t of res.tokens) freq.set(t, (freq.get(t) || 0) + 1);
+    const sorted = Array.from(res.vocab.entries()).sort((a, b) => (freq.get(b[0]) || 0) - (freq.get(a[0]) || 0));
+    const take = Math.min(30, sorted.length);
+    for (let i = 0; i < take; i++) {
+      const [sym, id] = sorted[i];
+      const row = document.createElement('div');
+      row.className = 'vocab-row';
+      row.innerHTML =
+        '<span class="idx">' + id + '</span>' +
+        '<span class="val">' + esc(sym) + '</span>' +
+        '<span class="cnt">' + (freq.get(sym) || 0) + '&times;</span>';
+      vl.appendChild(row);
+    }
+    if (sorted.length > take) {
+      const row = document.createElement('div');
+      row.style.cssText = 'color: var(--fg-muted); font-size: 10.5px; padding-top: 4px;';
+      row.textContent = '... ' + (sorted.length - take) + ' more';
+      vl.appendChild(row);
+    }
+  }
+
+  function esc(s) {
+    return s.replace(/[&<>\"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]))
+            .replace(/\u2581/g, '\u2022')     // EOW marker
+            .replace(/\n/g, '\u21b5')
+            .replace(/\t/g, '\u21e5')
+            .replace(/ /g, '\u00b7');         // raised dot
+  }
+
+  // ----------------------------------------------------------------
+  // 10) WIRING.
+  // ----------------------------------------------------------------
+  const inputEl = document.getElementById('input-text');
+  function setText(s) { inputEl.value = s; state.text = s; render(); }
+  inputEl.addEventListener('input', () => {
+    state.text = inputEl.value;
+    render();
+  });
+
+  document.querySelectorAll('#algo-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#algo-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.algo = p.dataset.algo;
       render();
     });
   });
+  document.querySelectorAll('#disp-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      p.classList.toggle('active');
+      state.display[p.dataset.disp] = p.classList.contains('active');
+      render();
+    });
+  });
+
+  document.getElementById('merges-slider').addEventListener('input', (ev) => {
+    state.mergeCount = parseInt(ev.target.value, 10);
+    document.getElementById('merges-val').textContent = state.mergeCount;
+    render();
+  });
+
+  document.getElementById('btn-train-one').addEventListener('click', () => {
+    state.mergeCount = Math.min(state.maxMerges, state.mergeCount + 1);
+    document.getElementById('merges-slider').value = state.mergeCount;
+    document.getElementById('merges-val').textContent = state.mergeCount;
+    state.algo = 'bpe';
+    syncAlgoPills();
+    render();
+  });
+  document.getElementById('btn-train-ten').addEventListener('click', () => {
+    state.mergeCount = Math.min(state.maxMerges, state.mergeCount + 10);
+    document.getElementById('merges-slider').value = state.mergeCount;
+    document.getElementById('merges-val').textContent = state.mergeCount;
+    state.algo = 'bpe';
+    syncAlgoPills();
+    render();
+  });
+  document.getElementById('btn-reset-bpe').addEventListener('click', () => {
+    state.mergeCount = 0;
+    document.getElementById('merges-slider').value = 0;
+    document.getElementById('merges-val').textContent = 0;
+    render();
+  });
+  document.getElementById('btn-retrain').addEventListener('click', () => {
+    // Same as setting merges to maxMerges (learns up to as many merges as possible)
+    state.mergeCount = state.maxMerges;
+    document.getElementById('merges-slider').value = state.mergeCount;
+    document.getElementById('merges-val').textContent = state.mergeCount;
+    state.algo = 'bpe';
+    syncAlgoPills();
+    render();
+  });
+  function syncAlgoPills() {
+    document.querySelectorAll('#algo-pills .pill').forEach(q => {
+      q.classList.toggle('active', q.dataset.algo === state.algo);
+    });
+  }
+
+  // Preset chips
+  const prow = document.getElementById('preset-row');
+  for (const p of PRESETS) {
+    const el = document.createElement('span');
+    el.className = 'preset-chip';
+    el.textContent = p.label;
+    el.addEventListener('click', () => setText(p.text));
+    prow.appendChild(el);
+  }
+
+  // ----------------------------------------------------------------
+  // 11) INIT.
+  // ----------------------------------------------------------------
+  state.text = inputEl.value;
   render();
+
 })();
 </script>
 </body>
