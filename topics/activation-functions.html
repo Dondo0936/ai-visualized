@@ -3,526 +3,1217 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Activation Functions - AI Visualized</title>
+  <title>Activation functions — AI Visualized</title>
+  <meta name="description" content="Every activation function side by side. Live f(x) and f′(x) plots, a neural signal stack, a dead-neuron monitor, gradient-saturation warnings — all interactive.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* Page-local layout on top of the shared design system. */
+    .af-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 2.2fr 1fr;
+      grid-template-rows: 1.3fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .af-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .af-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+    .af-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin: 0;
+    }
+    .af-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .af-panel-body {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+    }
+    .af-panel-body canvas { display: block; width: 100%; height: 100%; }
+
+    /* Grid */
+    .af-plot  { grid-column: 1; grid-row: 1 / span 2; }
+    .af-ctrls { grid-column: 2; grid-row: 1; overflow-y: auto; }
+    .af-side  { grid-column: 2; grid-row: 2; overflow-y: auto; }
+
+    .af-plot-canvas { background: var(--bg-sunken); cursor: crosshair; }
+
+    /* Bottom stats row */
+    .af-stats {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--s-3);
+    }
+    .af-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-height: 66px;
+    }
+    .af-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .af-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .af-stat.accent .value { color: var(--teal-300); }
+    .af-stat.heat .value   { color: var(--heat-400); }
+
+    /* Controls */
+    .af-ctrl-body { padding: var(--s-3) var(--s-4) var(--s-4); overflow-y: auto; }
+    .ctl-group { margin-bottom: var(--s-4); }
+    .ctl-group h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    /* Activation grid — thumbnails */
+    .act-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .act-thumb {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      padding: 6px 6px 4px;
+      cursor: pointer;
+      transition: all 120ms ease;
+      position: relative;
+    }
+    .act-thumb:hover { border-color: var(--border-strong); }
+    .act-thumb.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+    }
+    .act-thumb.compare { border-color: rgba(255,122,41,0.55); }
+    .act-thumb .name {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-primary);
+      text-align: center;
+      margin-bottom: 3px;
+    }
+    .act-thumb canvas {
+      width: 100%; height: 34px; display: block;
+    }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      padding: 6px 10px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pill:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .slider-wrap { display:flex; flex-direction:column; gap: 4px; margin-bottom: var(--s-3); }
+    .slider-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .slider-row .v { color: var(--teal-300); font-weight: 500; }
+    input[type=range].af-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; background: var(--border-default);
+      border-radius: 2px; outline: none;
+    }
+    input[type=range].af-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    input[type=range].af-slider::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    .btn-row { display:flex; gap: 6px; }
+    .af-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .af-btn:hover { border-color: var(--border-strong); }
+    .af-btn.primary {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+
+    /* Side panel */
+    .af-side-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+    .prop-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      margin-bottom: var(--s-3);
+    }
+    .prop-grid .k { color: var(--fg-muted); text-align: right; }
+    .prop-grid .v { color: var(--fg-primary); }
+    .prop-grid .v.tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 1px 6px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      font-size: 10.5px;
+    }
+    .prop-grid .v.ok  { color: var(--teal-300); }
+    .prop-grid .v.warn { color: var(--heat-400); }
+
+    .formula {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 8px 10px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      color: var(--teal-200);
+      white-space: nowrap;
+      overflow-x: auto;
+      margin-bottom: var(--s-3);
+    }
+    .formula + .formula { margin-top: 0; }
+    .formula .muted { color: var(--fg-muted); }
+
+    .af-note {
+      font-family: var(--font-sans);
+      font-size: 12px; line-height: 1.6;
+      color: var(--fg-tertiary);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      margin-top: var(--s-3);
+    }
+    .af-note strong { color: var(--teal-200); font-weight: 600; }
+    .af-note code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-raised);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--teal-300);
+    }
+
+    .af-legend {
+      position: absolute; top: 12px; left: 12px;
+      padding: 8px 10px;
+      background: rgba(10,10,11,0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-tertiary);
+      z-index: 2; pointer-events: none;
+      line-height: 1.55;
+    }
+    .af-legend .key { display: flex; align-items: center; gap: 6px; }
+    .af-legend .key .sw { width: 14px; height: 2px; border-radius: 2px; }
+
+    .af-hud {
+      position: absolute; top: 12px; right: 12px;
+      padding: 8px 10px;
+      background: rgba(10,10,11,0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-tertiary);
+      z-index: 2;
+      max-width: 240px;
+      line-height: 1.55;
+    }
+    .af-hud .hud-title {
+      font-family: var(--font-display); font-size: 11.5px; font-weight: 500;
+      color: var(--teal-300); margin-bottom: 2px;
+    }
+
+    /* Signal stack — a small diagram showing a signal going through 5 layers */
+    .stack-wrap {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+      margin-top: var(--s-3);
+    }
+    .stack-wrap h6 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .stack-wrap canvas { display:block; width:100%; height: 130px; }
+
+    @media (max-width: 1000px) {
+      .af-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 0.9fr auto auto auto;
+      }
+      .af-plot  { grid-column: 1; grid-row: 1; }
+      .af-ctrls { grid-column: 1; grid-row: 2; }
+      .af-side  { grid-column: 1; grid-row: 3; }
+      .af-stats { grid-row: 4; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
-
-  <div class="topic-page">
-
-    <!-- Header -->
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Activation Functions</h1>
-      <span class="topic-desc">Hover over the plot to probe function values. Toggle derivatives on/off.</span>
-    </div>
-
-    <!-- Canvas Area -->
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">
-        Move your mouse over the plot
-      </div>
-    </div>
-
-    <!-- Control Panel -->
-    <div class="control-panel">
-
-      <div class="control-section">
-        <h3>Functions</h3>
-        <div class="toggle-chips" id="fn-chips">
-          <!-- chips generated by JS -->
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Display</h3>
-        <div class="toggle-chips">
-          <div class="chip active" id="toggle-deriv">Derivatives</div>
-          <div class="chip active" id="toggle-grid">Grid</div>
-          <div class="chip" id="toggle-fill">Fill Area</div>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Parameters</h3>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Leaky ReLU &alpha;</span>
-            <span class="slider-value" id="leaky-value">0.10</span>
-          </div>
-          <input type="range" id="leaky-slider" min="0.01" max="0.5" step="0.01" value="0.10">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>ELU &alpha;</span>
-            <span class="slider-value" id="elu-value">1.00</span>
-          </div>
-          <input type="range" id="elu-slider" min="0.1" max="3.0" step="0.1" value="1.00">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Swish &beta;</span>
-            <span class="slider-value" id="swish-value">1.00</span>
-          </div>
-          <input type="range" id="swish-slider" min="0.1" max="3.0" step="0.1" value="1.00">
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Function Values at x = <span id="probe-x">0.00</span></h3>
-        <div id="value-table" class="info-box" style="font-family: var(--font-mono); font-size: 0.78rem; line-height: 2;">
-          <!-- filled by JS -->
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Key Insight</h3>
-        <div class="info-box">
-          Activation functions introduce <strong>non-linearity</strong> into neural networks. Without them, stacking layers would just compute a linear function regardless of depth.<br><br>
-          The <strong>derivative</strong> matters for training: if it's zero (vanishing gradient), the network can't learn through that neuron.
-        </div>
-      </div>
-
-    </div>
+<div class="topic-page">
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Activation functions</h1>
+    <span class="topic-desc">The tiny shape-changers between linear layers &mdash; every curve, every derivative, every quirk.</span>
   </div>
 
+  <div class="af-main">
+
+    <!-- Main plot -->
+    <section class="af-panel af-plot">
+      <header class="af-panel-head">
+        <h4>f(x) and f&prime;(x)</h4>
+        <span class="meta" id="plot-meta">tanh</span>
+      </header>
+      <div class="af-panel-body">
+        <canvas id="plot-canvas" class="af-plot-canvas"></canvas>
+        <div class="af-legend">
+          <div class="key"><span class="sw" style="background: var(--teal-300)"></span>f(x)</div>
+          <div class="key"><span class="sw" style="background: var(--heat-400)"></span>f&prime;(x) = derivative</div>
+          <div class="key"><span class="sw" style="background: rgba(255,255,255,0.35)"></span>compare function</div>
+          <div style="margin-top:4px; color: var(--fg-muted)">drag to probe x &middot; scroll to zoom</div>
+        </div>
+        <div class="af-hud" id="hud">
+          <span class="hud-title">tanh</span>
+          <div id="hud-body">Drag the plot to probe values of x. The vertical line shows where you are; readout below.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: controls -->
+    <section class="af-panel af-ctrls">
+      <header class="af-panel-head">
+        <h4>Controls</h4>
+        <span class="meta" id="ctl-meta">primary</span>
+      </header>
+      <div class="af-ctrl-body">
+
+        <div class="ctl-group">
+          <h5>Activations</h5>
+          <div class="act-grid" id="act-grid"></div>
+          <div style="display:flex; gap: 6px; margin-top: 8px;">
+            <button class="af-btn" id="btn-compare">Compare mode</button>
+            <button class="af-btn" id="btn-clear-cmp">Clear</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Parameters</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>leaky-relu &alpha;</span><span class="v" id="leaky-val">0.10</span></div>
+            <input type="range" class="af-slider" id="leaky-slider" min="0.01" max="0.5" step="0.01" value="0.10">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>elu / selu &alpha;</span><span class="v" id="elu-val">1.00</span></div>
+            <input type="range" class="af-slider" id="elu-slider" min="0.1" max="3" step="0.05" value="1.00">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>swish &beta;</span><span class="v" id="swish-val">1.00</span></div>
+            <input type="range" class="af-slider" id="swish-slider" min="0.1" max="5" step="0.1" value="1.0">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>probe x</span><span class="v" id="x-val">0.00</span></div>
+            <input type="range" class="af-slider" id="x-slider" min="-6" max="6" step="0.01" value="0">
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Display</h5>
+          <div class="pill-row" id="disp-pills">
+            <span class="pill active" data-disp="deriv">show f&prime;</span>
+            <span class="pill" data-disp="fill">fill f</span>
+            <span class="pill active" data-disp="grid">grid</span>
+            <span class="pill active" data-disp="probe">probe line</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>X range</h5>
+          <div class="pill-row" id="range-pills">
+            <span class="pill" data-range="3">&plusmn;3</span>
+            <span class="pill active" data-range="6">&plusmn;6</span>
+            <span class="pill" data-range="10">&plusmn;10</span>
+            <span class="pill" data-range="20">&plusmn;20</span>
+          </div>
+        </div>
+
+        <div class="af-note">
+          <strong>What an activation does.</strong> Linear layers by themselves can only represent straight-line relationships. Activations are the <em>only</em> source of non-linearity in a network — they bend the signal so stacks of linear layers can approximate curved, complex functions. Pick the right one and training is smooth; pick the wrong one and gradients vanish or neurons go dead.
+        </div>
+      </div>
+    </section>
+
+    <!-- Right-bottom: properties + stack -->
+    <section class="af-panel af-side">
+      <header class="af-panel-head">
+        <h4>Properties</h4>
+        <span class="meta" id="side-meta">at x = 0</span>
+      </header>
+      <div class="af-side-body" id="side-body">
+        <div class="formula" id="formula-f">&mdash;</div>
+        <div class="formula" id="formula-df">&mdash;</div>
+        <div class="prop-grid" id="prop-grid"></div>
+
+        <div class="stack-wrap">
+          <h6>Signal through 5 stacked layers</h6>
+          <canvas id="stack-canvas"></canvas>
+          <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-muted); margin-top: 4px;">
+            We push 500 samples through 5 of these activations back to back. The histograms show how the distribution morphs — look for <span style="color:var(--heat-400)">dead neurons</span> (spike at 0) and <span style="color:var(--teal-300)">saturation</span> (bars piled at the extremes).
+          </div>
+        </div>
+
+        <div class="af-note" id="tip-note">&mdash;</div>
+      </div>
+    </section>
+
+    <!-- Bottom stats -->
+    <section class="af-stats">
+      <div class="af-stat"><div class="label">activation</div><div class="value" id="s-act">tanh</div></div>
+      <div class="af-stat accent"><div class="label">f(x)</div><div class="value" id="s-fx">&mdash;</div></div>
+      <div class="af-stat"><div class="label">f&prime;(x)</div><div class="value" id="s-dfx">&mdash;</div></div>
+      <div class="af-stat"><div class="label">range</div><div class="value" id="s-range">&mdash;</div></div>
+      <div class="af-stat heat"><div class="label">max f&prime;</div><div class="value" id="s-maxd">&mdash;</div></div>
+      <div class="af-stat"><div class="label">dead ratio @ stack</div><div class="value" id="s-dead">&mdash;</div></div>
+    </section>
+
+  </div>
+</div>
+
 <script>
-(function() {
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const overlay = document.getElementById('overlay');
+"use strict";
+/* ------------------------------------------------------------------
+   ACTIVATION FUNCTIONS — every curve, every derivative.
 
-  let W, H, dpr;
-  let mouseX = null, mouseY = null;
-  let showDerivatives = true;
-  let showGrid = true;
-  let showFill = false;
+   Each activation is defined once as a small object:
+     { name, f, df, theory:{range, mono, smooth, zeroMean}, tip }
+   The UI then plots f and df on a shared canvas, runs a 5-layer
+   forward stack to estimate dead-neuron ratio and saturation,
+   and shows a properties panel with formulas.
 
-  // Parameters
-  let leakyAlpha = 0.1;
-  let eluAlpha = 1.0;
-  let swishBeta = 1.0;
+   Compare-mode adds a second activation drawn in ghost-white.
+   ------------------------------------------------------------------ */
 
-  // Domain
-  const xRange = [-6, 6];
-  const yRange = [-2, 4];
+(function(){
 
-  // Activation functions
-  const functions = [
+  // ----------------------------------------------------------------
+  // 1) ACTIVATION CATALOG. Keep formulas readable.
+  //    "range" is a string for display; "mono" true/false; "smooth"
+  //    true/false; "zeroMean" "yes"/"no"/"≈yes"; "family" for color.
+  //    tip is a short paragraph that explains the practical take.
+  // ----------------------------------------------------------------
+  const ACT = [
     {
-      name: 'ReLU',
-      color: '#6366f1',
-      fn: x => Math.max(0, x),
-      deriv: x => x > 0 ? 1 : 0,
-      active: true
+      key: 'step', name: 'step',
+      f:  (x) => x > 0 ? 1 : 0,
+      df: (x) => 0, // derivative is 0 almost everywhere, a Dirac at 0
+      family: 'legacy',
+      f_expr:  'H(x) = 1 if x &gt; 0 else 0',
+      df_expr: 'd/dx = 0 (Dirac spike at x=0)',
+      theory: { range: '{0, 1}', mono: true, smooth: false, zeroMean: 'no' },
+      tip: 'Rosenblatt\u2019s original 1958 perceptron used this. Cannot be trained with gradient descent because the derivative is 0 almost everywhere. Mostly of historical interest.',
     },
     {
-      name: 'Sigmoid',
-      color: '#22d3ee',
-      fn: x => 1 / (1 + Math.exp(-x)),
-      deriv: x => { const s = 1 / (1 + Math.exp(-x)); return s * (1 - s); },
-      active: true
+      key: 'linear', name: 'linear',
+      f:  (x) => x,
+      df: (x) => 1,
+      family: 'legacy',
+      f_expr:  'f(x) = x',
+      df_expr: 'd/dx = 1',
+      theory: { range: '(\u2212\u221e, \u221e)', mono: true, smooth: true, zeroMean: 'yes' },
+      tip: 'Also called \u201cidentity\u201d. Stacking linear activations gives you one big linear function, no matter how many layers. Use it only at the output of a regression network.',
     },
     {
-      name: 'Tanh',
-      color: '#34d399',
-      fn: x => Math.tanh(x),
-      deriv: x => 1 - Math.tanh(x) * Math.tanh(x),
-      active: true
+      key: 'sigmoid', name: 'sigmoid',
+      f:  (x) => 1 / (1 + Math.exp(-x)),
+      df: (x) => { const s = 1/(1+Math.exp(-x)); return s*(1-s); },
+      family: 'saturating',
+      f_expr:  '\u03c3(x) = 1 / (1 + e\u207b\u02e3)',
+      df_expr: '\u03c3\u2032(x) = \u03c3(x) \u00b7 (1 \u2212 \u03c3(x))',
+      theory: { range: '(0, 1)', mono: true, smooth: true, zeroMean: 'no' },
+      tip: 'Output between 0 and 1 — great for probabilities at the output layer. Max derivative is only <strong>0.25</strong> (at x=0), so stacking many sigmoids causes <strong>vanishing gradients</strong>. The outputs aren\u2019t zero-centered, which slows learning in deep nets.',
     },
     {
-      name: 'Leaky ReLU',
-      color: '#fb923c',
-      fn: x => x > 0 ? x : leakyAlpha * x,
-      deriv: x => x > 0 ? 1 : leakyAlpha,
-      active: false
+      key: 'tanh', name: 'tanh',
+      f:  (x) => Math.tanh(x),
+      df: (x) => { const t = Math.tanh(x); return 1 - t*t; },
+      family: 'saturating',
+      f_expr:  'tanh(x) = (e\u02e3 \u2212 e\u207b\u02e3) / (e\u02e3 + e\u207b\u02e3)',
+      df_expr: 'tanh\u2032(x) = 1 \u2212 tanh\u00b2(x)',
+      theory: { range: '(\u22121, 1)', mono: true, smooth: true, zeroMean: 'yes' },
+      tip: 'A shifted, scaled sigmoid. Zero-centered, which helps, so it trains faster than plain sigmoid on deep MLPs. Max derivative <strong>1</strong> at x=0. Still saturates at the tails though.',
     },
     {
-      name: 'ELU',
-      color: '#f472b6',
-      fn: x => x > 0 ? x : eluAlpha * (Math.exp(x) - 1),
-      deriv: x => x > 0 ? 1 : eluAlpha * Math.exp(x),
-      active: false
+      key: 'relu', name: 'relu',
+      f:  (x) => x > 0 ? x : 0,
+      df: (x) => x > 0 ? 1 : 0,
+      family: 'rectified',
+      f_expr:  'ReLU(x) = max(0, x)',
+      df_expr: 'd/dx = 1 if x &gt; 0 else 0',
+      theory: { range: '[0, \u221e)', mono: true, smooth: false, zeroMean: 'no' },
+      tip: 'The workhorse. Cheap to compute, preserves gradients on the positive side, and sparsity helps. The catch: if a neuron\u2019s input goes persistently negative (bad init or big update), its gradient is zero and it <strong>dies</strong>.',
     },
     {
-      name: 'Swish',
-      color: '#fbbf24',
-      fn: x => x / (1 + Math.exp(-swishBeta * x)),
-      deriv: x => {
-        const sig = 1 / (1 + Math.exp(-swishBeta * x));
-        return sig + x * swishBeta * sig * (1 - sig);
+      key: 'leakyRelu', name: 'leaky',
+      f:  (x, p) => x > 0 ? x : (p.leaky) * x,
+      df: (x, p) => x > 0 ? 1 : (p.leaky),
+      family: 'rectified',
+      f_expr:  'LReLU(x) = x if x &gt; 0 else \u03b1x   <span class="muted">(\u03b1 slider)</span>',
+      df_expr: 'd/dx = 1 if x &gt; 0 else \u03b1',
+      theory: { range: '(\u2212\u221e, \u221e)', mono: true, smooth: false, zeroMean: '\u2248yes' },
+      tip: 'ReLU with a small negative-side slope (set by the \u03b1 slider). Fixes dying ReLU: a dead neuron still gets <em>some</em> gradient. Typical \u03b1 is 0.01.',
+    },
+    {
+      key: 'prelu', name: 'prelu',
+      f:  (x, p) => x > 0 ? x : 0.25 * x,   // "learned" alpha fixed at 0.25 for display
+      df: (x, p) => x > 0 ? 1 : 0.25,
+      family: 'rectified',
+      f_expr:  'PReLU(x) = x if x &gt; 0 else \u03b1x   <span class="muted">(\u03b1 learnable)</span>',
+      df_expr: 'd/dx = 1 if x &gt; 0 else \u03b1',
+      theory: { range: '(\u2212\u221e, \u221e)', mono: true, smooth: false, zeroMean: '\u2248yes' },
+      tip: 'Like leaky ReLU, but \u03b1 itself is a trainable parameter (per-channel). He et al. 2015 — used in the first ImageNet result to beat humans on 5-crop top-5 error.',
+    },
+    {
+      key: 'elu', name: 'elu',
+      f:  (x, p) => x > 0 ? x : p.elu * (Math.exp(x) - 1),
+      df: (x, p) => x > 0 ? 1 : p.elu * Math.exp(x),
+      family: 'smooth-rectified',
+      f_expr:  'ELU(x) = x if x &gt; 0 else \u03b1(e\u02e3 \u2212 1)   <span class="muted">(\u03b1 slider)</span>',
+      df_expr: 'd/dx = 1 if x &gt; 0 else \u03b1 \u00b7 e\u02e3',
+      theory: { range: '(\u2212\u03b1, \u221e)', mono: true, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'Smooth version of leaky ReLU — no corner at 0, saturates at \u2212\u03b1 on the negative side. Pushes mean activation closer to 0, which helps training. Slightly pricier than ReLU because of the exp().',
+    },
+    {
+      key: 'selu', name: 'selu',
+      f:  (x, p) => {
+        const a = 1.6732632423543772, l = 1.0507009873554805;
+        return l * (x > 0 ? x : a * (Math.exp(x) - 1));
       },
-      active: false
-    },
-    {
-      name: 'GELU',
-      color: '#a78bfa',
-      fn: x => 0.5 * x * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x))),
-      deriv: x => {
-        const c = Math.sqrt(2 / Math.PI);
-        const inner = c * (x + 0.044715 * x * x * x);
-        const th = Math.tanh(inner);
-        const sech2 = 1 - th * th;
-        return 0.5 * (1 + th) + 0.5 * x * sech2 * c * (1 + 3 * 0.044715 * x * x);
+      df: (x, p) => {
+        const a = 1.6732632423543772, l = 1.0507009873554805;
+        return l * (x > 0 ? 1 : a * Math.exp(x));
       },
-      active: false
+      family: 'smooth-rectified',
+      f_expr:  'SELU(x) = \u03bb \u00b7 ELU(x)   <span class="muted">\u03bb=1.0507, \u03b1=1.6733</span>',
+      df_expr: 'd/dx = \u03bb if x &gt; 0 else \u03bb\u00b7\u03b1\u00b7e\u02e3',
+      theory: { range: '(\u2212\u03bb\u03b1, \u221e)', mono: true, smooth: true, zeroMean: 'yes (self-normalizing)' },
+      tip: 'Scaled ELU with specific \u03bb and \u03b1 that keep outputs at zero mean / unit variance across layers — so you can drop batch-norm. Klambauer et al. 2017. Works best with lecun-normal init and fully-connected nets.',
     },
     {
-      name: 'Softplus',
-      color: '#f87171',
-      fn: x => Math.log(1 + Math.exp(x)),
-      deriv: x => 1 / (1 + Math.exp(-x)),
-      active: false
-    }
+      key: 'swish', name: 'swish',
+      f:  (x, p) => x / (1 + Math.exp(-p.swish * x)),
+      df: (x, p) => {
+        const s = 1 / (1 + Math.exp(-p.swish * x));
+        return s + p.swish * x * s * (1 - s);
+      },
+      family: 'smooth-rectified',
+      f_expr:  'Swish(x) = x \u00b7 \u03c3(\u03b2x)   <span class="muted">(aka SiLU when \u03b2=1)</span>',
+      df_expr: 'd/dx = \u03c3(\u03b2x) + \u03b2 \u00b7 x \u00b7 \u03c3(\u03b2x)(1\u2212\u03c3(\u03b2x))',
+      theory: { range: '(\u22480.28, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'Found by Google Brain via neural-architecture search (Ramachandran et al. 2017). Non-monotonic — small dip below 0 — which lets it model richer features. The default in many modern transformer MLP blocks.',
+    },
+    {
+      key: 'gelu', name: 'gelu',
+      f: (x) => 0.5 * x * (1 + Math.tanh(Math.sqrt(2/Math.PI) * (x + 0.044715 * x*x*x))),
+      df: (x) => {
+        const k = Math.sqrt(2/Math.PI);
+        const u = k * (x + 0.044715 * x*x*x);
+        const t = Math.tanh(u);
+        const du = k * (1 + 3 * 0.044715 * x*x);
+        return 0.5 * (1 + t) + 0.5 * x * (1 - t*t) * du;
+      },
+      family: 'smooth-rectified',
+      f_expr:  'GELU(x) = x \u00b7 \u03a6(x)   <span class="muted">(tanh approx)</span>',
+      df_expr: 'closed form; see code',
+      theory: { range: '(\u22480.17, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'The activation used in <strong>GPT-2/3/4, BERT, ViT, LLaMA</strong>. Weighs its input by the probability that a standard Normal would be below that input — so negatives get softly dropped rather than hard-clipped. Small non-monotonic dip.',
+    },
+    {
+      key: 'mish', name: 'mish',
+      f:  (x) => x * Math.tanh(Math.log(1 + Math.exp(x))),
+      df: (x) => {
+        const ex = Math.exp(x);
+        const sp = Math.log(1 + ex);     // softplus(x)
+        const t  = Math.tanh(sp);
+        const dsp = ex / (1 + ex);       // sigmoid(x)
+        return t + x * (1 - t*t) * dsp;
+      },
+      family: 'smooth-rectified',
+      f_expr:  'Mish(x) = x \u00b7 tanh(softplus(x))',
+      df_expr: 'tanh(sp) + x\u00b7(1\u2212tanh\u00b2(sp))\u00b7\u03c3(x)',
+      theory: { range: '(\u22480.31, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'Misra 2019. Slightly smoother than swish, often wins a little on vision benchmarks. A tad more expensive to compute.',
+    },
+    {
+      key: 'softplus', name: 'softplus',
+      f:  (x) => Math.log(1 + Math.exp(x)),
+      df: (x) => 1 / (1 + Math.exp(-x)),
+      family: 'smooth-rectified',
+      f_expr:  'Softplus(x) = ln(1 + e\u02e3)',
+      df_expr: 'd/dx = \u03c3(x)',
+      theory: { range: '(0, \u221e)', mono: true, smooth: true, zeroMean: 'no' },
+      tip: 'A smooth approximation of ReLU. Always positive; its derivative is just the sigmoid. Rarely used for hidden layers now — swish / gelu smoother choices — but handy as a "positive + differentiable" building block.',
+    },
+    {
+      key: 'softsign', name: 'softsign',
+      f:  (x) => x / (1 + Math.abs(x)),
+      df: (x) => { const d = 1 + Math.abs(x); return 1 / (d*d); },
+      family: 'saturating',
+      f_expr:  'Softsign(x) = x / (1 + |x|)',
+      df_expr: 'd/dx = 1 / (1 + |x|)\u00b2',
+      theory: { range: '(\u22121, 1)', mono: true, smooth: true, zeroMean: 'yes' },
+      tip: 'A cheaper-to-compute tanh-like function. Saturates polynomially rather than exponentially, so tails fade slower.',
+    },
+    {
+      key: 'hardTanh', name: 'h-tanh',
+      f:  (x) => x < -1 ? -1 : (x > 1 ? 1 : x),
+      df: (x) => (x > -1 && x < 1) ? 1 : 0,
+      family: 'saturating',
+      f_expr:  'HardTanh(x) = clamp(x, \u22121, 1)',
+      df_expr: 'd/dx = 1 if \u22121 &lt; x &lt; 1 else 0',
+      theory: { range: '[\u22121, 1]', mono: true, smooth: false, zeroMean: 'yes' },
+      tip: 'Piecewise-linear tanh. Very cheap. Used in quantized / on-device inference where exp() is expensive.',
+    },
+    {
+      key: 'hardSig', name: 'h-sigmoid',
+      f:  (x) => Math.max(0, Math.min(1, 0.2 * x + 0.5)),
+      df: (x) => (x > -2.5 && x < 2.5) ? 0.2 : 0,
+      family: 'saturating',
+      f_expr:  'HardSigmoid(x) = clamp(0.2x + 0.5, 0, 1)',
+      df_expr: 'd/dx = 0.2 if \u22122.5 &lt; x &lt; 2.5 else 0',
+      theory: { range: '[0, 1]', mono: true, smooth: false, zeroMean: 'no' },
+      tip: 'Piecewise-linear sigmoid. Used in TF Lite and MobileNet-V3 for the same speed reasons as h-tanh.',
+    },
   ];
 
-  // Build chips
-  const chipsContainer = document.getElementById('fn-chips');
-  functions.forEach((f, i) => {
-    const chip = document.createElement('div');
-    chip.className = 'chip' + (f.active ? ' active' : '');
-    chip.style.borderColor = f.active ? f.color : '';
-    chip.style.color = f.active ? f.color : '';
-    chip.textContent = f.name;
-    chip.addEventListener('click', () => {
-      f.active = !f.active;
-      chip.classList.toggle('active');
-      chip.style.borderColor = f.active ? f.color : '';
-      chip.style.color = f.active ? f.color : '';
-      drawFrame();
-    });
-    chipsContainer.appendChild(chip);
-  });
+  function findAct(key) { return ACT.find(a => a.key === key); }
 
-  function resize() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    dpr = window.devicePixelRatio || 1;
-    W = rect.width;
-    H = rect.height;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawFrame();
+  // ----------------------------------------------------------------
+  // 2) STATE.
+  // ----------------------------------------------------------------
+  const state = {
+    primary: 'tanh',
+    compare: null,        // second activation key or null
+    compareMode: false,
+    xRange: 6,
+    probeX: 0,
+    params: { leaky: 0.1, elu: 1.0, swish: 1.0 },
+    show: { deriv: true, fill: false, grid: true, probe: true },
+  };
+
+  // ----------------------------------------------------------------
+  // 3) CANVAS SETUP.
+  // ----------------------------------------------------------------
+  const plotCanvas  = document.getElementById('plot-canvas');
+  const stackCanvas = document.getElementById('stack-canvas');
+  const pctx = plotCanvas.getContext('2d');
+  const stx = stackCanvas.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+  let PW = 0, PH = 0, SW = 0, SH = 0;
+
+  function resizePlot() {
+    const r = plotCanvas.getBoundingClientRect();
+    PW = r.width; PH = r.height;
+    plotCanvas.width = PW * DPR; plotCanvas.height = PH * DPR;
+    pctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  function resizeStack() {
+    const r = stackCanvas.getBoundingClientRect();
+    SW = r.width; SH = r.height;
+    stackCanvas.width = SW * DPR; stackCanvas.height = SH * DPR;
+    stx.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
 
-  function toCanvas(x, y) {
-    const px = ((x - xRange[0]) / (xRange[1] - xRange[0])) * W;
-    const py = H - ((y - yRange[0]) / (yRange[1] - yRange[0])) * H;
-    return [px, py];
+  // ----------------------------------------------------------------
+  // 4) PLOT LAYOUT. xRange is in math units; yRange adapts.
+  // ----------------------------------------------------------------
+  function yRangeFor(act) {
+    // Choose a sensible y-axis window based on known range
+    if (['sigmoid','hardSig','softplus'].includes(act.key)) return { lo: -0.2, hi: 1.4 };
+    if (['tanh','softsign','hardTanh'].includes(act.key))   return { lo: -1.4, hi: 1.4 };
+    if (['step'].includes(act.key))                         return { lo: -0.2, hi: 1.4 };
+    if (['relu','leakyRelu','prelu','elu','selu','swish','gelu','mish','linear'].includes(act.key))
+      return { lo: -3, hi: 5 };
+    return { lo: -3, hi: 3 };
   }
 
-  function toDomain(px, py) {
-    const x = xRange[0] + (px / W) * (xRange[1] - xRange[0]);
-    const y = yRange[0] + ((H - py) / H) * (yRange[1] - yRange[0]);
-    return [x, y];
+  function xToPx(x) {
+    return 52 + (x - (-state.xRange)) / (state.xRange * 2) * (PW - 72);
+  }
+  function yToPx(y, yLo, yHi) {
+    return 24 + (yHi - y) / (yHi - yLo) * (PH - 48);
+  }
+  function pxToX(px) {
+    return ((px - 52) / (PW - 72)) * state.xRange * 2 - state.xRange;
   }
 
-  function drawGrid() {
-    if (!showGrid) return;
+  // ----------------------------------------------------------------
+  // 5) MAIN PLOT DRAW.
+  // ----------------------------------------------------------------
+  function drawPlot() {
+    resizePlot();
+    const act = findAct(state.primary);
+    const yR = yRangeFor(act);
+    pctx.clearRect(0, 0, PW, PH);
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-
-    // Vertical lines
-    for (let x = Math.ceil(xRange[0]); x <= xRange[1]; x++) {
-      const [px] = toCanvas(x, 0);
-      ctx.beginPath();
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, H);
-      ctx.stroke();
+    // Subtle grid
+    if (state.show.grid) {
+      pctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      pctx.lineWidth = 1;
+      for (let i = -state.xRange; i <= state.xRange; i++) {
+        const px = xToPx(i);
+        pctx.beginPath(); pctx.moveTo(px, 0); pctx.lineTo(px, PH); pctx.stroke();
+      }
+      const yStep = (yR.hi - yR.lo) > 4 ? 1 : 0.5;
+      for (let y = Math.ceil(yR.lo); y <= yR.hi; y += yStep) {
+        const py = yToPx(y, yR.lo, yR.hi);
+        pctx.beginPath(); pctx.moveTo(0, py); pctx.lineTo(PW, py); pctx.stroke();
+      }
     }
 
-    // Horizontal lines
-    for (let y = Math.ceil(yRange[0]); y <= yRange[1]; y++) {
-      const [, py] = toCanvas(0, y);
-      ctx.beginPath();
-      ctx.moveTo(0, py);
-      ctx.lineTo(W, py);
-      ctx.stroke();
-    }
-
-    // Axes (stronger)
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 1.5;
-
-    const [ox, oy] = toCanvas(0, 0);
-    ctx.beginPath();
-    ctx.moveTo(0, oy);
-    ctx.lineTo(W, oy);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(ox, 0);
-    ctx.lineTo(ox, H);
-    ctx.stroke();
+    // Axes
+    pctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    pctx.lineWidth = 1.2;
+    // y = 0
+    const y0 = yToPx(0, yR.lo, yR.hi);
+    pctx.beginPath(); pctx.moveTo(32, y0); pctx.lineTo(PW - 12, y0); pctx.stroke();
+    // x = 0
+    const x0 = xToPx(0);
+    pctx.beginPath(); pctx.moveTo(x0, 12); pctx.lineTo(x0, PH - 24); pctx.stroke();
 
     // Axis labels
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.textAlign = 'center';
-
-    for (let x = Math.ceil(xRange[0]); x <= xRange[1]; x++) {
-      if (x === 0) continue;
-      const [px] = toCanvas(x, 0);
-      ctx.fillText(x.toString(), px, oy + 14);
+    pctx.fillStyle = 'rgba(155,155,163,0.9)';
+    pctx.font = "10.5px 'JetBrains Mono', monospace";
+    pctx.textAlign = 'center';
+    for (let i = -state.xRange; i <= state.xRange; i += (state.xRange >= 10 ? 2 : 1)) {
+      if (i === 0) continue;
+      const px = xToPx(i);
+      pctx.fillText(String(i), px, PH - 8);
+    }
+    pctx.textAlign = 'right';
+    const yStep = (yR.hi - yR.lo) > 4 ? 1 : 0.5;
+    for (let y = Math.ceil(yR.lo); y <= yR.hi; y += yStep) {
+      if (Math.abs(y) < 1e-9) continue;
+      const py = yToPx(y, yR.lo, yR.hi);
+      pctx.fillText((yStep < 1 ? y.toFixed(1) : y.toFixed(0)), 46, py + 3);
     }
 
-    ctx.textAlign = 'right';
-    for (let y = Math.ceil(yRange[0]); y <= yRange[1]; y++) {
-      if (y === 0) continue;
-      const [, py] = toCanvas(0, y);
-      ctx.fillText(y.toString(), ox - 6, py + 4);
+    // Fill area under f
+    if (state.show.fill) {
+      pctx.fillStyle = 'rgba(32,184,174,0.10)';
+      pctx.beginPath();
+      const xStart = -state.xRange, xEnd = state.xRange;
+      const N = 400, dx = (xEnd - xStart) / N;
+      pctx.moveTo(xToPx(xStart), y0);
+      for (let i = 0; i <= N; i++) {
+        const xv = xStart + i * dx;
+        const yv = act.f(xv, state.params);
+        pctx.lineTo(xToPx(xv), yToPx(yv, yR.lo, yR.hi));
+      }
+      pctx.lineTo(xToPx(xEnd), y0);
+      pctx.closePath();
+      pctx.fill();
+    }
+
+    // Plot compare function first (background ghost)
+    if (state.compareMode && state.compare) {
+      const cmpAct = findAct(state.compare);
+      plotCurve(cmpAct, 'f', 'rgba(255,255,255,0.55)', 2, yR);
+      if (state.show.deriv) plotCurve(cmpAct, 'df', 'rgba(255,255,255,0.25)', 1.5, yR, true);
+    }
+
+    // Primary f
+    plotCurve(act, 'f', 'rgba(95,210,203,0.95)', 2.6, yR);
+    // Primary f'
+    if (state.show.deriv) plotCurve(act, 'df', 'rgba(255,122,41,0.95)', 1.8, yR, true);
+
+    // Probe line
+    if (state.show.probe) {
+      const px = xToPx(state.probeX);
+      pctx.strokeStyle = 'rgba(95,210,203,0.35)';
+      pctx.lineWidth = 1;
+      pctx.setLineDash([4, 4]);
+      pctx.beginPath(); pctx.moveTo(px, 8); pctx.lineTo(px, PH - 24); pctx.stroke();
+      pctx.setLineDash([]);
+
+      // Probe dots
+      const fx = act.f(state.probeX, state.params);
+      const dfx = act.df(state.probeX, state.params);
+      pctx.fillStyle = 'rgba(95,210,203,1)';
+      pctx.beginPath(); pctx.arc(px, yToPx(fx, yR.lo, yR.hi), 5, 0, Math.PI*2); pctx.fill();
+      if (state.show.deriv) {
+        pctx.fillStyle = 'rgba(255,122,41,1)';
+        pctx.beginPath(); pctx.arc(px, yToPx(dfx, yR.lo, yR.hi), 4, 0, Math.PI*2); pctx.fill();
+      }
+
+      // Labels near probe
+      pctx.font = "11px 'JetBrains Mono', monospace";
+      pctx.fillStyle = 'rgba(95,210,203,1)';
+      pctx.textAlign = 'left';
+      pctx.fillText('f = ' + fmt(fx), px + 8, yToPx(fx, yR.lo, yR.hi) - 8);
+      if (state.show.deriv) {
+        pctx.fillStyle = 'rgba(255,122,41,1)';
+        pctx.fillText("f' = " + fmt(dfx), px + 8, yToPx(dfx, yR.lo, yR.hi) - 8);
+      }
+    }
+
+    // Title label in top-right of plot
+    pctx.textAlign = 'right';
+    pctx.font = "14px 'Space Grotesk', sans-serif";
+    pctx.fillStyle = 'rgba(245,245,247,0.9)';
+    pctx.fillText(act.name, PW - 18, 26);
+    if (state.compareMode && state.compare) {
+      pctx.font = "11px 'JetBrains Mono', monospace";
+      pctx.fillStyle = 'rgba(255,255,255,0.55)';
+      pctx.fillText('vs ' + findAct(state.compare).name, PW - 18, 42);
     }
   }
 
-  function drawFunction(fn, color, isDeriv) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = isDeriv ? 1.5 : 2.5;
-    ctx.globalAlpha = isDeriv ? 0.5 : 1;
-
-    if (isDeriv) {
-      ctx.setLineDash([6, 4]);
-    }
-
-    ctx.beginPath();
+  function plotCurve(act, which, stroke, width, yR, dashed) {
+    pctx.strokeStyle = stroke; pctx.lineWidth = width;
+    if (dashed) pctx.setLineDash([4, 3]); else pctx.setLineDash([]);
+    pctx.beginPath();
+    const xStart = -state.xRange, xEnd = state.xRange;
+    const N = 500, dx = (xEnd - xStart) / N;
     let started = false;
-
-    const step = (xRange[1] - xRange[0]) / (W * 0.5);
-    for (let x = xRange[0]; x <= xRange[1]; x += step) {
-      const y = fn(x);
-      if (!isFinite(y) || Math.abs(y) > 100) {
-        started = false;
+    for (let i = 0; i <= N; i++) {
+      const xv = xStart + i * dx;
+      const yv = which === 'f' ? act.f(xv, state.params) : act.df(xv, state.params);
+      const py = yToPx(clamp(yv, yR.lo - 4, yR.hi + 4), yR.lo, yR.hi);
+      const px = xToPx(xv);
+      // Skip if value is outside visible band — avoids wild swings
+      if (yv < yR.lo - 0.5 || yv > yR.hi + 0.5) {
+        if (started) { pctx.stroke(); pctx.beginPath(); started = false; }
         continue;
       }
-      const [px, py] = toCanvas(x, y);
-      if (!started) {
-        ctx.moveTo(px, py);
-        started = true;
-      } else {
-        ctx.lineTo(px, py);
-      }
+      if (!started) { pctx.moveTo(px, py); started = true; }
+      else pctx.lineTo(px, py);
     }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-
-    // Fill under curve
-    if (showFill && !isDeriv) {
-      ctx.globalAlpha = 0.06;
-      ctx.fillStyle = color;
-      const [, zeroY] = toCanvas(0, 0);
-      ctx.lineTo(toCanvas(xRange[1], 0)[0], zeroY);
-      ctx.lineTo(toCanvas(xRange[0], 0)[0], zeroY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
+    pctx.stroke();
+    pctx.setLineDash([]);
   }
 
-  function drawProbe() {
-    if (mouseX === null) return;
-
-    const [domX] = toDomain(mouseX, 0);
-
-    // Vertical probe line
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(mouseX, 0);
-    ctx.lineTo(mouseX, H);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Dots on each function
-    const activeFns = functions.filter(f => f.active);
-    activeFns.forEach(f => {
-      const y = f.fn(domX);
-      const [px, py] = toCanvas(domX, y);
-
-      ctx.fillStyle = f.color;
-      ctx.beginPath();
-      ctx.arc(px, py, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(px, py, 2, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (showDerivatives) {
-        const dy = f.deriv(domX);
-        const [dpx, dpy] = toCanvas(domX, dy);
-        ctx.fillStyle = f.color;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        ctx.arc(dpx, dpy, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-    });
-
-    // Update value table
-    document.getElementById('probe-x').textContent = domX.toFixed(2);
-    const table = document.getElementById('value-table');
-    let html = '';
-    activeFns.forEach(f => {
-      const y = f.fn(domX);
-      const dy = f.deriv(domX);
-      html += `<span style="color:${f.color}">${f.name}</span>: ${y.toFixed(4)}`;
-      if (showDerivatives) {
-        html += ` <span style="color:var(--text-muted)">(d: ${dy.toFixed(4)})</span>`;
-      }
-      html += '<br>';
-    });
-    table.innerHTML = html || '<span style="color:var(--text-muted)">Enable functions above</span>';
-  }
-
-  function drawLegend() {
-    const activeFns = functions.filter(f => f.active);
-    if (activeFns.length === 0) return;
-
-    const x0 = 16, y0 = 16;
-    const lineH = 22;
-    const padX = 14, padY = 10;
-    const boxW = 130;
-    const boxH = activeFns.length * lineH + padY * 2;
-
-    ctx.fillStyle = 'rgba(14, 14, 26, 0.85)';
-    ctx.strokeStyle = 'rgba(30, 30, 53, 0.8)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(x0, y0, boxW, boxH, 8);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.font = '12px JetBrains Mono, monospace';
-    activeFns.forEach((f, i) => {
-      const ly = y0 + padY + i * lineH + 14;
-
-      // Color swatch
-      ctx.fillStyle = f.color;
-      ctx.beginPath();
-      ctx.roundRect(x0 + padX, ly - 8, 12, 12, 2);
-      ctx.fill();
-
-      // Function name
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.fillText(f.name, x0 + padX + 18, ly + 2);
-    });
-  }
-
-  function drawFrame() {
-    ctx.clearRect(0, 0, W, H);
-
-    // Background
-    ctx.fillStyle = '#08080f';
-    ctx.fillRect(0, 0, W, H);
-
-    drawGrid();
-
-    // Draw functions
-    const activeFns = functions.filter(f => f.active);
-    activeFns.forEach(f => {
-      drawFunction(f.fn, f.color, false);
-      if (showDerivatives) {
-        drawFunction(f.deriv, f.color, true);
-      }
-    });
-
-    drawProbe();
-    drawLegend();
-  }
-
-  // Mouse tracking
-  canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
-
-    const [domX] = toDomain(mouseX, 0);
-    const activeFns = functions.filter(f => f.active);
-
-    if (activeFns.length > 0) {
-      const vals = activeFns.map(f =>
-        `<span style="color:${f.color}">${f.name}</span>: ${f.fn(domX).toFixed(3)}`
-      ).join(' &nbsp; ');
-      overlay.innerHTML = `x = <span class="value">${domX.toFixed(2)}</span> &mdash; ${vals}`;
-    }
-
-    drawFrame();
-  });
-
-  canvas.addEventListener('mouseleave', () => {
-    mouseX = null;
-    mouseY = null;
-    overlay.innerHTML = 'Move your mouse over the plot';
-    drawFrame();
-  });
-
-  // Toggle buttons
-  document.getElementById('toggle-deriv').addEventListener('click', function() {
-    showDerivatives = !showDerivatives;
-    this.classList.toggle('active');
-    drawFrame();
-  });
-
-  document.getElementById('toggle-grid').addEventListener('click', function() {
-    showGrid = !showGrid;
-    this.classList.toggle('active');
-    drawFrame();
-  });
-
-  document.getElementById('toggle-fill').addEventListener('click', function() {
-    showFill = !showFill;
-    this.classList.toggle('active');
-    drawFrame();
-  });
-
-  // Parameter sliders
-  document.getElementById('leaky-slider').addEventListener('input', (e) => {
-    leakyAlpha = parseFloat(e.target.value);
-    document.getElementById('leaky-value').textContent = leakyAlpha.toFixed(2);
-    // Update the Leaky ReLU function closure
-    functions[3].fn = x => x > 0 ? x : leakyAlpha * x;
-    functions[3].deriv = x => x > 0 ? 1 : leakyAlpha;
-    drawFrame();
-  });
-
-  document.getElementById('elu-slider').addEventListener('input', (e) => {
-    eluAlpha = parseFloat(e.target.value);
-    document.getElementById('elu-value').textContent = eluAlpha.toFixed(2);
-    functions[4].fn = x => x > 0 ? x : eluAlpha * (Math.exp(x) - 1);
-    functions[4].deriv = x => x > 0 ? 1 : eluAlpha * Math.exp(x);
-    drawFrame();
-  });
-
-  document.getElementById('swish-slider').addEventListener('input', (e) => {
-    swishBeta = parseFloat(e.target.value);
-    document.getElementById('swish-value').textContent = swishBeta.toFixed(2);
-    functions[5].fn = x => x / (1 + Math.exp(-swishBeta * x));
-    functions[5].deriv = x => {
-      const sig = 1 / (1 + Math.exp(-swishBeta * x));
-      return sig + x * swishBeta * sig * (1 - sig);
+  // ----------------------------------------------------------------
+  // 6) STACK VISUALIZATION.
+  //    Start from 500 samples ~ N(0, 1), push through 5 activations of
+  //    the primary type. For ReLU-family, insert a small random affine
+  //    layer between activations to simulate a real net — not required
+  //    but more educational.
+  // ----------------------------------------------------------------
+  function drawStack() {
+    resizeStack();
+    stx.clearRect(0, 0, SW, SH);
+    const act = findAct(state.primary);
+    const N = 500, L = 5;
+    // mulberry32 seed so bars are stable across frames
+    let seed = 0x12345678;
+    const rnd = () => {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    drawFrame();
+    // start with N(0, 1)
+    let samples = [];
+    for (let i = 0; i < N; i++) {
+      // box-muller
+      const u = rnd() || 1e-9, v = rnd() || 1e-9;
+      samples.push(Math.sqrt(-2 * Math.log(u)) * Math.cos(2*Math.PI*v));
+    }
+    const layerStats = [];
+    for (let l = 0; l < L; l++) {
+      // pre-act: mix with small weight-like transform
+      if (l > 0) {
+        const scale = 0.9 + rnd() * 0.4; // tweak signal
+        const shift = (rnd() - 0.5) * 0.4;
+        samples = samples.map(v => v * scale + shift);
+      }
+      samples = samples.map(x => act.f(x, state.params));
+      // stats
+      let s = 0, s2 = 0, dead = 0, min = Infinity, max = -Infinity;
+      for (const v of samples) {
+        s += v; s2 += v*v;
+        if (Math.abs(v) < 0.002) dead++;
+        if (v < min) min = v; if (v > max) max = v;
+      }
+      const mean = s / N, vv = s2/N - mean*mean, sd = Math.sqrt(Math.max(0, vv));
+      layerStats.push({ mean, sd, dead: dead / N, min, max, snapshot: samples.slice() });
+    }
+
+    // Draw: L columns of histograms
+    const cw = (SW - 20) / L, pad = 10;
+    for (let l = 0; l < L; l++) {
+      const st = layerStats[l];
+      const xL = pad + l * cw;
+      // Bucket
+      const bins = 20;
+      const lo = Math.min(-3, st.min), hi = Math.max(3, st.max);
+      const bucket = new Array(bins).fill(0);
+      for (const v of st.snapshot) {
+        const b = Math.floor((v - lo) / (hi - lo) * bins);
+        const bb = Math.max(0, Math.min(bins - 1, b));
+        bucket[bb]++;
+      }
+      const maxCount = Math.max.apply(null, bucket);
+      const bw = (cw - 10) / bins;
+      for (let b = 0; b < bins; b++) {
+        const h = (bucket[b] / (maxCount || 1)) * (SH - 36);
+        const x = xL + b * bw;
+        stx.fillStyle = b === 0 || b === bins - 1
+          ? 'rgba(255,122,41,0.85)'     // saturation bucket: orange
+          : 'rgba(95,210,203,0.65)';    // else teal
+        stx.fillRect(x, SH - 16 - h, Math.max(1, bw - 1), h);
+      }
+      // Layer label
+      stx.font = "10.5px 'JetBrains Mono', monospace";
+      stx.fillStyle = 'rgba(155,155,163,0.9)';
+      stx.textAlign = 'center';
+      stx.fillText('L' + (l+1), xL + cw/2, SH - 2);
+      stx.fillText('μ=' + st.mean.toFixed(2), xL + cw/2, 12);
+      stx.fillStyle = st.dead > 0.25 ? 'rgba(255,122,41,0.95)' : 'rgba(95,210,203,0.85)';
+      stx.fillText('dead=' + Math.round(st.dead*100) + '%', xL + cw/2, 24);
+    }
+
+    // Update dead-ratio stat in bottom strip
+    const deadAvg = layerStats.reduce((s, l) => s + l.dead, 0) / L;
+    document.getElementById('s-dead').textContent = (deadAvg * 100).toFixed(1) + '%';
+  }
+
+  // ----------------------------------------------------------------
+  // 7) MINI THUMBNAILS for activation picker.
+  // ----------------------------------------------------------------
+  function drawThumb(canvas, act) {
+    const DPR_ = DPR;
+    const r = canvas.getBoundingClientRect();
+    const w = r.width, h = r.height;
+    canvas.width = w * DPR_; canvas.height = h * DPR_;
+    const c = canvas.getContext('2d');
+    c.setTransform(DPR_, 0, 0, DPR_, 0, 0);
+    c.clearRect(0, 0, w, h);
+    const xR = 5, yR = yRangeFor(act);
+    const x0 = 0, y0 = (yR.hi / (yR.hi - yR.lo)) * h;
+    // baseline
+    c.strokeStyle = 'rgba(255,255,255,0.12)'; c.lineWidth = 0.8;
+    c.beginPath(); c.moveTo(0, y0); c.lineTo(w, y0); c.stroke();
+    // curve
+    c.strokeStyle = 'rgba(95,210,203,0.95)'; c.lineWidth = 1.4;
+    c.beginPath();
+    const N = 60, dx = (xR * 2) / N;
+    for (let i = 0; i <= N; i++) {
+      const xv = -xR + i * dx;
+      const yv = act.f(xv, state.params);
+      const clamped = Math.max(yR.lo, Math.min(yR.hi, yv));
+      const px = (i / N) * w;
+      const py = ((yR.hi - clamped) / (yR.hi - yR.lo)) * h;
+      if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.stroke();
+  }
+
+  // ----------------------------------------------------------------
+  // 8) THE ACTIVATION PICKER GRID.
+  // ----------------------------------------------------------------
+  const grid = document.getElementById('act-grid');
+  function buildActGrid() {
+    grid.innerHTML = '';
+    for (const a of ACT) {
+      const thumb = document.createElement('div');
+      thumb.className = 'act-thumb';
+      if (a.key === state.primary) thumb.classList.add('active');
+      if (state.compareMode && a.key === state.compare) thumb.classList.add('compare');
+      thumb.innerHTML = '<div class="name">' + a.name + '</div><canvas></canvas>';
+      thumb.addEventListener('click', () => {
+        if (state.compareMode && a.key !== state.primary) {
+          state.compare = a.key;
+        } else {
+          state.primary = a.key;
+        }
+        buildActGrid();
+        drawAll();
+      });
+      grid.appendChild(thumb);
+    }
+    // Draw all thumbnails once inserted
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.act-thumb').forEach((el, i) => {
+        drawThumb(el.querySelector('canvas'), ACT[i]);
+      });
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // 9) PROPERTIES PANEL.
+  // ----------------------------------------------------------------
+  function renderProps() {
+    const act = findAct(state.primary);
+    document.getElementById('plot-meta').textContent = act.name;
+    document.getElementById('hud').querySelector('.hud-title').textContent = act.name;
+    document.getElementById('formula-f').innerHTML  = '<span class="muted">f(x) =</span> ' + act.f_expr;
+    document.getElementById('formula-df').innerHTML = '<span class="muted">f\u2032(x) =</span> ' + act.df_expr;
+    document.getElementById('tip-note').innerHTML = act.tip;
+
+    // Sample a dense grid to measure max |f| and max |f'|
+    const N = 400, xR = 6, dx = (2*xR)/N;
+    let mx = 0, md = 0;
+    for (let i = 0; i <= N; i++) {
+      const x = -xR + i*dx;
+      mx = Math.max(mx, Math.abs(act.f(x, state.params)));
+      md = Math.max(md, Math.abs(act.df(x, state.params)));
+    }
+
+    const g = document.getElementById('prop-grid');
+    g.innerHTML = '';
+    const rows = [
+      ['family', act.family],
+      ['range',  act.theory.range],
+      ['monotonic', act.theory.mono ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'],
+      ['smooth',    act.theory.smooth ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'],
+      ['zero-mean', act.theory.zeroMean],
+      ['max &#124;f&prime;&#124;', md.toFixed(3)],
+      ['max &#124;f&#124;', mx > 100 ? '\u221e' : mx.toFixed(2)],
+    ];
+    for (const [k, v] of rows) {
+      const kd = document.createElement('div'); kd.className = 'k'; kd.innerHTML = k;
+      const vd = document.createElement('div'); vd.className = 'v'; vd.innerHTML = v;
+      g.appendChild(kd); g.appendChild(vd);
+    }
+
+    // Stats row
+    document.getElementById('s-act').textContent  = act.name;
+    const fx  = act.f(state.probeX, state.params);
+    const dfx = act.df(state.probeX, state.params);
+    document.getElementById('s-fx').textContent  = fmt(fx);
+    document.getElementById('s-dfx').textContent = fmt(dfx);
+    document.getElementById('s-range').textContent = act.theory.range;
+    document.getElementById('s-maxd').textContent  = md.toFixed(3);
+    document.getElementById('side-meta').textContent = 'at x = ' + state.probeX.toFixed(2);
+    document.getElementById('ctl-meta').textContent =
+      state.compareMode ? 'compare' : 'primary';
+  }
+
+  // ----------------------------------------------------------------
+  // 10) HUD + COMPARE MODE.
+  // ----------------------------------------------------------------
+  function setHudBody(html) {
+    document.getElementById('hud-body').innerHTML = html;
+  }
+  function hudForProbe() {
+    const act = findAct(state.primary);
+    const fx = act.f(state.probeX, state.params), dfx = act.df(state.probeX, state.params);
+    let txt = 'x = ' + state.probeX.toFixed(3) + '<br>';
+    txt += '<span style="color:var(--teal-300)">f = ' + fmt(fx) + '</span> &nbsp; ';
+    txt += '<span style="color:var(--heat-400)">f\u2032 = ' + fmt(dfx) + '</span>';
+    if (state.compareMode && state.compare) {
+      const c = findAct(state.compare);
+      txt += '<br><span style="color: rgba(255,255,255,0.55)">' + c.name + ': f=' + fmt(c.f(state.probeX, state.params)) + '</span>';
+    }
+    setHudBody(txt);
+  }
+
+  function toggleCompare() {
+    state.compareMode = !state.compareMode;
+    if (!state.compareMode) state.compare = null;
+    else if (!state.compare) {
+      // pick something different as default compare
+      state.compare = state.primary === 'relu' ? 'gelu' : 'relu';
+    }
+    document.getElementById('btn-compare').textContent = state.compareMode ? 'Exit compare' : 'Compare mode';
+    buildActGrid();
+    drawAll();
+  }
+
+  // ----------------------------------------------------------------
+  // 11) POINTER EVENTS on main plot.
+  // ----------------------------------------------------------------
+  let dragging = false;
+  plotCanvas.addEventListener('mousedown', (ev) => {
+    dragging = true;
+    setProbeFromEvent(ev);
+  });
+  window.addEventListener('mousemove', (ev) => {
+    if (!dragging) return;
+    setProbeFromEvent(ev);
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+  plotCanvas.addEventListener('mousemove', (ev) => {
+    if (dragging) return;
+    setProbeFromEvent(ev);
+  });
+  function setProbeFromEvent(ev) {
+    const rect = plotCanvas.getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    state.probeX = clamp(pxToX(mx), -state.xRange, state.xRange);
+    document.getElementById('x-slider').value = state.probeX;
+    document.getElementById('x-val').textContent = state.probeX.toFixed(2);
+    drawAll();
+  }
+  plotCanvas.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    const f = ev.deltaY < 0 ? 0.85 : 1.15;
+    state.xRange = Math.max(1, Math.min(30, state.xRange * f));
+    // Sync pill to nearest defined value
+    document.querySelectorAll('#range-pills .pill').forEach(p => {
+      p.classList.toggle('active', Math.abs(Number(p.dataset.range) - state.xRange) < 0.5);
+    });
+    drawAll();
+  }, { passive: false });
+
+  // ----------------------------------------------------------------
+  // 12) WIRING: sliders + pills.
+  // ----------------------------------------------------------------
+  document.getElementById('leaky-slider').addEventListener('input', (ev) => {
+    state.params.leaky = parseFloat(ev.target.value);
+    document.getElementById('leaky-val').textContent = state.params.leaky.toFixed(2);
+    drawAll();
+  });
+  document.getElementById('elu-slider').addEventListener('input', (ev) => {
+    state.params.elu = parseFloat(ev.target.value);
+    document.getElementById('elu-val').textContent = state.params.elu.toFixed(2);
+    drawAll();
+  });
+  document.getElementById('swish-slider').addEventListener('input', (ev) => {
+    state.params.swish = parseFloat(ev.target.value);
+    document.getElementById('swish-val').textContent = state.params.swish.toFixed(2);
+    drawAll();
+  });
+  document.getElementById('x-slider').addEventListener('input', (ev) => {
+    state.probeX = parseFloat(ev.target.value);
+    document.getElementById('x-val').textContent = state.probeX.toFixed(2);
+    drawAll();
+  });
+  document.getElementById('btn-compare').addEventListener('click', toggleCompare);
+  document.getElementById('btn-clear-cmp').addEventListener('click', () => {
+    state.compare = null; buildActGrid(); drawAll();
   });
 
-  // Init
-  resize();
-  window.addEventListener('resize', resize);
+  document.querySelectorAll('#disp-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      p.classList.toggle('active');
+      const which = p.dataset.disp;
+      state.show[which] = p.classList.contains('active');
+      drawAll();
+    });
+  });
+  document.querySelectorAll('#range-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#range-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.xRange = parseFloat(p.dataset.range);
+      drawAll();
+    });
+  });
+
+  window.addEventListener('resize', drawAll);
+
+  // Keyboard: arrows nudge probeX, c toggles compare
+  document.addEventListener('keydown', (ev) => {
+    if (ev.target.tagName === 'INPUT') return;
+    if (ev.key === 'ArrowLeft')  { state.probeX = clamp(state.probeX - 0.1, -state.xRange, state.xRange); drawAll(); }
+    if (ev.key === 'ArrowRight') { state.probeX = clamp(state.probeX + 0.1, -state.xRange, state.xRange); drawAll(); }
+    if (ev.key === 'c' || ev.key === 'C') toggleCompare();
+  });
+
+  // ----------------------------------------------------------------
+  // 13) UTIL.
+  // ----------------------------------------------------------------
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function fmt(v) {
+    if (!isFinite(v)) return '—';
+    const a = Math.abs(v);
+    if (a === 0) return '0';
+    if (a < 0.001 || a >= 1000) return v.toExponential(2);
+    if (a < 0.1) return v.toFixed(4);
+    if (a < 10) return v.toFixed(3);
+    return v.toFixed(2);
+  }
+
+  function drawAll() {
+    drawPlot();
+    drawStack();
+    renderProps();
+    hudForProbe();
+  }
+
+  // ----------------------------------------------------------------
+  // 14) INIT.
+  // ----------------------------------------------------------------
+  buildActGrid();
+  drawAll();
+  // re-draw thumbnails on resize (they depend on canvas size)
+  window.addEventListener('resize', () => { buildActGrid(); });
+
 })();
 </script>
-
 </body>
 </html>
