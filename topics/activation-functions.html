@@ -539,10 +539,10 @@
       f:  (x, p) => x > 0 ? x : 0.25 * x,   // "learned" alpha fixed at 0.25 for display
       df: (x, p) => x > 0 ? 1 : 0.25,
       family: 'rectified',
-      f_expr:  'PReLU(x) = x if x &gt; 0 else \u03b1x   <span class="muted">(\u03b1 learnable)</span>',
+      f_expr:  'PReLU(x) = x if x &gt; 0 else \u03b1x   <span class="muted">(\u03b1 learnable, demo \u03b1=0.25)</span>',
       df_expr: 'd/dx = 1 if x &gt; 0 else \u03b1',
       theory: { range: '(\u2212\u221e, \u221e)', mono: true, smooth: false, zeroMean: '\u2248yes' },
-      tip: 'Like leaky ReLU, but \u03b1 itself is a trainable parameter (per-channel). He et al. 2015 — used in the first ImageNet result to beat humans on 5-crop top-5 error.',
+      tip: 'Like leaky ReLU, but \u03b1 itself is a trainable parameter (per-channel) &mdash; in a real network it is updated by gradient descent alongside the weights. For this visualization \u03b1 is fixed at 0.25 for clarity; use the leaky slider to probe other small-\u03b1 shapes. He et al. 2015 &mdash; first ImageNet result to beat humans on 5-crop top-5 error.',
     },
     {
       key: 'elu', name: 'elu',
@@ -580,8 +580,8 @@
       family: 'smooth-rectified',
       f_expr:  'Swish(x) = x \u00b7 \u03c3(\u03b2x)   <span class="muted">(aka SiLU when \u03b2=1)</span>',
       df_expr: 'd/dx = \u03c3(\u03b2x) + \u03b2 \u00b7 x \u00b7 \u03c3(\u03b2x)(1\u2212\u03c3(\u03b2x))',
-      theory: { range: '(\u22480.28, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
-      tip: 'Found by Google Brain via neural-architecture search (Ramachandran et al. 2017). Non-monotonic — small dip below 0 — which lets it model richer features. The default in many modern transformer MLP blocks.',
+      theory: { range: '(\u2248\u22120.28, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'Found by Google Brain via neural-architecture search (Ramachandran et al. 2017). Non-monotonic &mdash; minimum &asymp; \u22120.278 near x &asymp; \u22121.28 &mdash; which lets it model richer features. The default in many modern transformer MLP blocks.',
     },
     {
       key: 'gelu', name: 'gelu',
@@ -596,8 +596,8 @@
       family: 'smooth-rectified',
       f_expr:  'GELU(x) = x \u00b7 \u03a6(x)   <span class="muted">(tanh approx)</span>',
       df_expr: 'closed form; see code',
-      theory: { range: '(\u22480.17, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
-      tip: 'The activation used in <strong>GPT-2/3/4, BERT, ViT, LLaMA</strong>. Weighs its input by the probability that a standard Normal would be below that input — so negatives get softly dropped rather than hard-clipped. Small non-monotonic dip.',
+      theory: { range: '(\u2248\u22120.17, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'The activation used in <strong>GPT-2/3/4, BERT, ViT, LLaMA</strong>. Weighs its input by the probability that a standard Normal would be below that input &mdash; so negatives get softly dropped rather than hard-clipped. Non-monotonic: minimum &asymp; \u22120.170 near x &asymp; \u22120.75.',
     },
     {
       key: 'mish', name: 'mish',
@@ -612,8 +612,8 @@
       family: 'smooth-rectified',
       f_expr:  'Mish(x) = x \u00b7 tanh(softplus(x))',
       df_expr: 'tanh(sp) + x\u00b7(1\u2212tanh\u00b2(sp))\u00b7\u03c3(x)',
-      theory: { range: '(\u22480.31, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
-      tip: 'Misra 2019. Slightly smoother than swish, often wins a little on vision benchmarks. A tad more expensive to compute.',
+      theory: { range: '(\u2248\u22120.31, \u221e)', mono: false, smooth: true, zeroMean: '\u2248yes' },
+      tip: 'Misra 2019. Slightly smoother than swish &mdash; non-monotonic minimum &asymp; \u22120.309 near x &asymp; \u22121.19 &mdash; often wins a little on vision benchmarks. A tad more expensive to compute.',
     },
     {
       key: 'softplus', name: 'softplus',
