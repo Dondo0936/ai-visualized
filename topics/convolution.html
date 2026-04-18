@@ -3,312 +3,1367 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Convolution Filters - AI Visualized</title>
+  <title>Convolution filters — AI Visualized</title>
+  <meta name="description" content="The 3×3 kernel slides over an image and spits out something new. See every multiply-and-add step, edit your own kernel, stack filters, watch ReLU clip negatives, and compare CNN vs traditional image processing.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .cv-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 2.1fr 1fr;
+      grid-template-rows: 1.4fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .cv-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .cv-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+    .cv-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin: 0;
+    }
+    .cv-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .cv-panel-body {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+    }
+
+    /* Grid layout */
+    .cv-canvas { grid-column: 1; grid-row: 1 / span 2; }
+    .cv-ctrls  { grid-column: 2; grid-row: 1; overflow-y: auto; }
+    .cv-kern   { grid-column: 2; grid-row: 2; overflow-y: auto; }
+
+    .cv-canvas-body {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 0.25fr;
+      gap: var(--s-2);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+    }
+    .cv-stage {
+      background: var(--bg-app);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      position: relative;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .cv-stage h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin: 0;
+    }
+    .cv-stage canvas {
+      width: 100%; flex: 1;
+      display: block; image-rendering: pixelated;
+      background: #0a0a0b;
+    }
+    .cv-readouts {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: var(--s-2);
+    }
+    .cv-readout {
+      background: var(--bg-app);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-tertiary);
+      line-height: 1.55;
+      min-height: 80px;
+      overflow-y: auto;
+    }
+    .cv-readout .rlabel {
+      font-size: 10.5px; text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted); margin-bottom: 2px;
+    }
+    .cv-readout code { color: var(--teal-300); }
+    .cv-readout .sum { color: var(--heat-400); font-weight: 500; }
+
+    /* Stats strip */
+    .cv-stats {
+      grid-column: 1 / -1; grid-row: 3;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--s-3);
+    }
+    .cv-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-height: 66px;
+    }
+    .cv-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .cv-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cv-stat.accent .value { color: var(--teal-300); }
+    .cv-stat.heat .value   { color: var(--heat-400); }
+
+    /* Controls */
+    .cv-ctrl-body { padding: var(--s-3) var(--s-4) var(--s-4); overflow-y: auto; }
+    .ctl-group { margin-bottom: var(--s-4); }
+    .ctl-group h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      padding: 6px 10px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pill:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .btn-row { display: flex; gap: 6px; }
+    .cv-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .cv-btn:hover { border-color: var(--border-strong); }
+    .cv-btn.primary {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .slider-wrap { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--s-3); }
+    .slider-row {
+      display: flex; align-items: baseline; justify-content: space-between;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .slider-row .v { color: var(--teal-300); font-weight: 500; }
+    input[type=range].cv-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; background: var(--border-default);
+      border-radius: 2px; outline: none;
+    }
+    input[type=range].cv-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    input[type=range].cv-slider::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+
+    /* Image chooser thumbnails */
+    .img-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .img-thumb {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      padding: 4px;
+      cursor: pointer;
+      transition: all 120ms ease;
+      text-align: center;
+    }
+    .img-thumb:hover { border-color: var(--border-strong); }
+    .img-thumb.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+    }
+    .img-thumb .name {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-primary);
+      margin-top: 2px;
+    }
+    .img-thumb canvas {
+      width: 100%; height: 42px;
+      display: block;
+      image-rendering: pixelated;
+      background: #0a0a0b;
+      border-radius: 2px;
+    }
+
+    /* Kernel editor */
+    .cv-kern-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+    .kernel-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--kn, 3), 1fr);
+      gap: 4px;
+      max-width: 260px;
+      margin: 0 auto var(--s-3);
+    }
+    .kcell {
+      aspect-ratio: 1;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--fg-primary);
+      cursor: pointer;
+      transition: all 120ms ease;
+      position: relative;
+      user-select: none;
+    }
+    .kcell:hover { border-color: var(--border-strong); }
+    .kcell.center {
+      border-color: var(--accent-ring);
+      background: var(--accent-soft);
+    }
+    .kcell.pos { color: var(--teal-300); }
+    .kcell.neg { color: var(--heat-400); }
+    .kcell input {
+      width: 100%; height: 100%;
+      background: transparent; border: none; outline: none;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: inherit;
+    }
+
+    .kernel-preset-row {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-bottom: var(--s-3);
+    }
+
+    .pipeline-row {
+      display: flex; align-items: center; gap: 4px;
+      padding: 6px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-tertiary);
+      flex-wrap: wrap;
+    }
+    .pipe-pill {
+      padding: 4px 8px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-primary);
+      cursor: default;
+    }
+    .pipe-pill .x {
+      margin-left: 4px; color: var(--fg-muted); cursor: pointer;
+    }
+    .pipe-pill .x:hover { color: var(--heat-400); }
+
+    .cv-note {
+      font-family: var(--font-sans);
+      font-size: 12px; line-height: 1.6;
+      color: var(--fg-tertiary);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      margin-top: var(--s-3);
+    }
+    .cv-note strong { color: var(--teal-200); font-weight: 600; }
+    .cv-note code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-raised);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--teal-300);
+    }
+
+    .cv-legend {
+      position: absolute; top: 12px; left: 12px;
+      padding: 8px 10px;
+      background: rgba(10,10,11,0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-tertiary);
+      z-index: 2; pointer-events: none;
+      line-height: 1.55;
+    }
+    .cv-hud {
+      position: absolute; top: 12px; right: 12px;
+      padding: 8px 10px;
+      background: rgba(10,10,11,0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-tertiary);
+      z-index: 2;
+      max-width: 260px;
+      line-height: 1.55;
+    }
+    .cv-hud .hud-title {
+      font-family: var(--font-display); font-size: 11.5px; font-weight: 500;
+      color: var(--teal-300); margin-bottom: 2px;
+    }
+
+    @media (max-width: 1000px) {
+      .cv-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+      }
+      .cv-canvas { grid-column: 1; grid-row: 1; }
+      .cv-ctrls  { grid-column: 1; grid-row: 2; }
+      .cv-kern   { grid-column: 1; grid-row: 3; }
+      .cv-stats  { grid-row: 4; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Convolution Filters</h1>
-      <span class="topic-desc">How CNNs see: a tiny matrix slides over pixels, extracting features</span>
-    </div>
-
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">Hover over the input image to see the kernel move</div>
-    </div>
-
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">A small matrix scans the image</div>
-        <div class="guide-text">
-          A <strong>kernel</strong> (3&times;3 matrix) slides across the image. At each position, it multiplies its values by the pixels underneath, sums them up, and writes the result. Different kernels detect different features: edges, blur, sharpen, patterns.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Kernel (Filter)</h3>
-        <div class="btn-group" style="flex-wrap:wrap">
-          <button class="btn btn-secondary active" data-kernel="edge-x">Edge &horbar;</button>
-          <button class="btn btn-secondary" data-kernel="edge-y">Edge &vert;</button>
-          <button class="btn btn-secondary" data-kernel="sobel">Sobel</button>
-        </div>
-        <div class="btn-group" style="flex-wrap:wrap;margin-top:6px">
-          <button class="btn btn-secondary" data-kernel="blur">Blur</button>
-          <button class="btn btn-secondary" data-kernel="sharpen">Sharpen</button>
-          <button class="btn btn-secondary" data-kernel="emboss">Emboss</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-top:8px;">
-          <div id="k00" class="kernel-cell"></div><div id="k01" class="kernel-cell"></div><div id="k02" class="kernel-cell"></div>
-          <div id="k10" class="kernel-cell"></div><div id="k11" class="kernel-cell"></div><div id="k12" class="kernel-cell"></div>
-          <div id="k20" class="kernel-cell"></div><div id="k21" class="kernel-cell"></div><div id="k22" class="kernel-cell"></div>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Image</h3>
-        <div class="btn-group" style="flex-wrap:wrap">
-          <button class="btn btn-secondary active" data-img="circle">Circle</button>
-          <button class="btn btn-secondary" data-img="lines">Stripes</button>
-          <button class="btn btn-secondary" data-img="letter">Letter</button>
-          <button class="btn btn-secondary" data-img="checker">Checker</button>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Current Calculation</h3>
-        <div class="info-box" style="font-family:var(--font-mono);font-size:0.78rem" id="calc-info">
-          Hover the input to see the math.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Why Convolution?</h3>
-        <div class="info-box">
-          A convolutional layer is a <strong>learnable feature detector</strong>. Instead of hand-designing edge detectors, a CNN learns thousands of kernels from data. Early layers learn edges, later layers learn textures, then parts (eyes, ears), then whole objects. The same kernel slides everywhere &mdash; so a "cat feature" in the top-left is detected the same way as one in the bottom-right.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Modern Usage</h3>
-        <div class="info-box">
-          CNNs power image classification, medical imaging, and self-driving cars. Even diffusion models (DALL-E, Stable Diffusion) use convolutional U-Nets. Vision Transformers (ViT) replace CNNs with <a href="self-attention.html">attention</a>, but conv layers are still everywhere.
-        </div>
-      </div>
-    </div>
+<div class="topic-page">
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Convolution filters</h1>
+    <span class="topic-desc">A tiny kernel slides across an image. Multiply, sum, repeat &mdash; and suddenly you can find edges.</span>
   </div>
 
-<style>
-  .kernel-cell {
-    aspect-ratio: 1; display:flex; align-items:center; justify-content:center;
-    font-family:var(--font-mono); font-size:0.8rem; font-weight:600;
-    color:var(--text-primary); background:var(--bg-secondary); border-radius:4px;
-  }
-</style>
+  <div class="cv-main">
+
+    <!-- Main canvas area: input | output, with receptive-field readout and equation -->
+    <section class="cv-panel cv-canvas">
+      <header class="cv-panel-head">
+        <h4>Input &rarr; Kernel &rarr; Output</h4>
+        <span class="meta" id="canvas-meta">3&times;3 edge-detect &middot; hover input</span>
+      </header>
+      <div class="cv-canvas-body">
+        <div class="cv-stage">
+          <h5>Input</h5>
+          <canvas id="in-canvas"></canvas>
+        </div>
+        <div class="cv-stage">
+          <h5 id="out-head">Output (raw)</h5>
+          <canvas id="out-canvas"></canvas>
+        </div>
+        <div class="cv-readouts">
+          <div class="cv-readout" id="patch-readout">
+            <div class="rlabel">Receptive field (input values under kernel)</div>
+            <div id="patch-body">hover the input to see the 3&times;3 patch under the kernel</div>
+          </div>
+          <div class="cv-readout" id="calc-readout">
+            <div class="rlabel">Multiply &amp; add</div>
+            <div id="calc-body">&mdash;</div>
+          </div>
+          <div class="cv-readout" id="pixel-readout">
+            <div class="rlabel">Output pixel</div>
+            <div id="pixel-body">&mdash;</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="cv-panel cv-ctrls">
+      <header class="cv-panel-head">
+        <h4>Controls</h4>
+        <span class="meta" id="ctl-meta">size 3&middot;stride 1</span>
+      </header>
+      <div class="cv-ctrl-body">
+
+        <div class="ctl-group">
+          <h5>Image</h5>
+          <div class="img-grid" id="img-grid"></div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Kernel size</h5>
+          <div class="pill-row" id="size-pills">
+            <span class="pill active" data-k="3">3 &times; 3</span>
+            <span class="pill" data-k="5">5 &times; 5</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Stride &amp; padding</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>stride</span><span class="v" id="stride-val">1</span></div>
+            <input type="range" class="cv-slider" id="stride" min="1" max="4" step="1" value="1">
+          </div>
+          <div class="pill-row" id="pad-pills">
+            <span class="pill active" data-pad="same">padding: same</span>
+            <span class="pill" data-pad="valid">valid</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>After conv (activation / pool)</h5>
+          <div class="pill-row" id="act-pills">
+            <span class="pill active" data-act="none">none</span>
+            <span class="pill" data-act="relu">relu</span>
+            <span class="pill" data-act="abs">|&middot;|</span>
+            <span class="pill" data-act="tanh">tanh</span>
+          </div>
+          <div class="pill-row" style="margin-top: 4px" id="pool-pills">
+            <span class="pill active" data-pool="none">no pool</span>
+            <span class="pill" data-pool="max">max-pool 2&times;2</span>
+            <span class="pill" data-pool="avg">avg-pool 2&times;2</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Display</h5>
+          <div class="pill-row" id="disp-pills">
+            <span class="pill active" data-disp="highlight">show receptive field</span>
+            <span class="pill active" data-disp="grid">pixel grid</span>
+            <span class="pill" data-disp="signed">signed color map</span>
+          </div>
+          <div style="margin-top:6px">
+            <div class="slider-row"><span>output gain</span><span class="v" id="gain-val">1.0</span></div>
+            <input type="range" class="cv-slider" id="gain" min="0.2" max="5" step="0.1" value="1.0">
+          </div>
+        </div>
+
+        <div class="cv-note">
+          <strong>What a convolution is.</strong> Slide a small weight grid (the <em>kernel</em>) across the image. At every position, multiply overlapping pixels by the kernel weights and sum. Sharp weights (big positive, big negative) give the output a big magnitude &mdash; that's how a CNN "lights up" when the kernel's pattern matches the image patch underneath.
+        </div>
+      </div>
+    </section>
+
+    <!-- Right-bottom: kernel editor + pipeline -->
+    <section class="cv-panel cv-kern">
+      <header class="cv-panel-head">
+        <h4>Kernel editor</h4>
+        <span class="meta" id="kern-meta">identity</span>
+      </header>
+      <div class="cv-kern-body">
+        <div class="kernel-preset-row" id="preset-pills"></div>
+        <div class="kernel-grid" id="kernel-grid"></div>
+        <div class="btn-row" style="margin-bottom: var(--s-3);">
+          <button class="cv-btn" id="btn-zero">Zero</button>
+          <button class="cv-btn" id="btn-ident">Identity</button>
+          <button class="cv-btn" id="btn-norm">Normalize</button>
+          <button class="cv-btn" id="btn-random">Random</button>
+        </div>
+
+        <h5 style="font-family: var(--font-mono); font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--fg-muted); margin: 0 0 var(--s-2);">Filter pipeline</h5>
+        <div class="pipeline-row" id="pipeline">
+          <span style="color:var(--fg-muted)">empty &mdash; add a filter below:</span>
+        </div>
+        <div class="btn-row" style="margin-top: var(--s-2)">
+          <button class="cv-btn primary" id="btn-pipe-add">Add current &rarr; pipeline</button>
+          <button class="cv-btn" id="btn-pipe-clear">Clear</button>
+        </div>
+
+        <div class="cv-note" id="tip-note">
+          The first layer of a CNN often looks a lot like these hand-crafted edge / blur / sharpen kernels. Deeper layers combine them into textures, parts, objects. The magic: those deeper kernels are <strong>learned by gradient descent</strong>, not designed by hand.
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom stats strip -->
+    <section class="cv-stats">
+      <div class="cv-stat"><div class="label">image</div><div class="value" id="s-img">cat 64x64</div></div>
+      <div class="cv-stat accent"><div class="label">kernel</div><div class="value" id="s-kn">3&times;3</div></div>
+      <div class="cv-stat"><div class="label">output size</div><div class="value" id="s-out">64&times;64</div></div>
+      <div class="cv-stat heat"><div class="label">output &plusmn;max</div><div class="value" id="s-max">&mdash;</div></div>
+      <div class="cv-stat"><div class="label">multiplies (final layer)</div><div class="value" id="s-mul">&mdash;</div></div>
+      <div class="cv-stat"><div class="label">pipeline depth</div><div class="value" id="s-depth">0</div></div>
+    </section>
+
+  </div>
+</div>
 
 <script>
+"use strict";
+/* ------------------------------------------------------------------
+   CONVOLUTION FILTERS
+
+   A 3×3 (or 5×5) kernel slides over a grayscale image. For each
+   output location (ox, oy), we compute:
+
+     out[ox, oy] = Σ_{i,j} in[ox + i - C, oy + j - C] · k[i, j]
+
+   where C = kernel_radius. "same" padding pads the input with zeros
+   so the output has the same size; "valid" crops. Then we optionally
+   apply an activation (relu / abs / tanh) and/or pooling (max/avg 2×2).
+
+   The user can:
+     - pick from built-in images (cat, edges, gradient, noise, cross)
+     - choose from kernel presets (identity, edge, sharpen, blur,
+       emboss, sobel-x/y, laplacian, gaussian, motion-blur)
+     - edit each kernel cell by hand
+     - stack multiple filters in a pipeline
+     - hover to inspect a single receptive field and its math
+   ------------------------------------------------------------------ */
+
 (function(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  let W, H;
 
-  const SIZE = 32; // input image size
-  let image = null; // 2D array [SIZE][SIZE], 0-1
-  let output = null;
-  let kernel = null;
-  let hoverX = -1, hoverY = -1;
+  // ----------------------------------------------------------------
+  // 1) IMAGES. Each is a grayscale [0, 1] array of size N×N.
+  //    We craft them in JS so the page has no external assets.
+  // ----------------------------------------------------------------
+  const N = 64;
 
-  const kernels = {
-    'edge-x':  [[-1,-1,-1],[ 0, 0, 0],[ 1, 1, 1]],
-    'edge-y':  [[-1, 0, 1],[-1, 0, 1],[-1, 0, 1]],
-    'sobel':   [[-1, 0, 1],[-2, 0, 2],[-1, 0, 1]],
-    'blur':    [[1/9,1/9,1/9],[1/9,1/9,1/9],[1/9,1/9,1/9]],
-    'sharpen': [[ 0,-1, 0],[-1, 5,-1],[ 0,-1, 0]],
-    'emboss':  [[-2,-1, 0],[-1, 1, 1],[ 0, 1, 2]],
-  };
-
-  function genImage(type){
-    const img = Array.from({length:SIZE},()=>new Array(SIZE).fill(0));
-    if(type==='circle'){
-      const cx=SIZE/2, cy=SIZE/2, r=SIZE/3;
-      for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-        const d = Math.hypot(x-cx, y-cy);
-        img[y][x] = d < r ? 1 : 0;
-      }
-    } else if(type==='lines'){
-      for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-        img[y][x] = Math.floor(x/4)%2 === 0 ? 1 : 0;
-      }
-    } else if(type==='letter'){
-      // Draw letter "A"
-      const letterStr = [
-        '    XX    ',
-        '   XXXX   ',
-        '  XX  XX  ',
-        ' XX    XX ',
-        'XXXXXXXXXX',
-        'XX      XX',
-        'XX      XX',
-      ];
-      for(let ly=0;ly<letterStr.length;ly++){
-        const row = letterStr[ly];
-        for(let lx=0;lx<row.length;lx++){
-          if(row[lx]==='X'){
-            // Scale up to 32x32
-            const xStart = 6 + lx*2;
-            const yStart = 6 + ly*3;
-            for(let dy=0;dy<3;dy++)for(let dx=0;dx<2;dx++){
-              if(yStart+dy<SIZE && xStart+dx<SIZE) img[yStart+dy][xStart+dx] = 1;
-            }
-          }
-        }
-      }
-    } else if(type==='checker'){
-      for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-        img[y][x] = ((Math.floor(x/4)+Math.floor(y/4))%2) === 0 ? 1 : 0;
-      }
+  function zeros() {
+    const a = new Float32Array(N * N);
+    return a;
+  }
+  function makeGradient() {
+    const a = zeros();
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) a[y*N+x] = x / (N-1);
+    return a;
+  }
+  function makeCross() {
+    const a = zeros();
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x - N/2, dy = y - N/2;
+      a[y*N+x] = (Math.abs(dx) < 4 || Math.abs(dy) < 4) ? 1 : 0.12;
     }
-    return img;
+    return a;
+  }
+  function makeEdges() {
+    const a = zeros();
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      // diagonal gradient with sharp threshold
+      a[y*N+x] = (x + y) > N ? 0.9 : 0.12;
+      // add a disk
+      const dx = x - N*0.32, dy = y - N*0.68;
+      if (dx*dx + dy*dy < 60) a[y*N+x] = 0.98;
+    }
+    return a;
+  }
+  function makeNoise() {
+    const a = zeros();
+    // deterministic mulberry32
+    let s = 0xdeadbeef >>> 0;
+    const rnd = () => {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let i = 0; i < a.length; i++) a[i] = rnd();
+    return a;
+  }
+  function makeCheckers() {
+    const a = zeros();
+    const sz = 8;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      a[y*N+x] = (((x / sz) | 0) + ((y / sz) | 0)) % 2 === 0 ? 0.95 : 0.1;
+    }
+    return a;
+  }
+  function makeCat() {
+    // Hand-composed "cat" silhouette so students see edges from curves.
+    const a = zeros();
+    const cx = N/2, cy = N*0.55;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      // background
+      let v = 0.14 + 0.04 * Math.sin(y * 0.3);
+      // body: ellipse
+      const ex = (x - cx) / (N*0.3);
+      const ey = (y - cy) / (N*0.25);
+      if (ex*ex + ey*ey < 1) v = 0.78;
+      // head: ellipse above
+      const hx = (x - cx) / (N*0.17);
+      const hy = (y - (cy - N*0.23)) / (N*0.17);
+      if (hx*hx + hy*hy < 1) v = 0.88;
+      // ears: two triangles at the top
+      const earL = y < cy - N*0.27 && y > cy - N*0.4 && x > cx - N*0.2 - (y - (cy - N*0.4)) * 0.6 && x < cx - N*0.06;
+      const earR = y < cy - N*0.27 && y > cy - N*0.4 && x < cx + N*0.2 + (y - (cy - N*0.4)) * 0.6 && x > cx + N*0.06;
+      if (earL || earR) v = 0.85;
+      // eyes
+      const e1 = (x - (cx - N*0.06))**2 + (y - (cy - N*0.22))**2 < 4;
+      const e2 = (x - (cx + N*0.06))**2 + (y - (cy - N*0.22))**2 < 4;
+      if (e1 || e2) v = 0.05;
+      // nose
+      if (Math.abs(x - cx) < 2 && Math.abs(y - (cy - N*0.16)) < 2) v = 0.08;
+      // whiskers
+      if (Math.abs(y - (cy - N*0.14)) < 1 && Math.abs(x - cx) > 5 && Math.abs(x - cx) < 14) v = 0.25;
+      a[y*N+x] = Math.max(0, Math.min(1, v));
+    }
+    return a;
   }
 
-  function applyKernel(img, k){
-    const out = Array.from({length:SIZE},()=>new Array(SIZE).fill(0));
-    for(let y=1;y<SIZE-1;y++){
-      for(let x=1;x<SIZE-1;x++){
+  const IMAGES = {
+    cat:       { label: 'cat',       build: makeCat },
+    edges:     { label: 'shapes',    build: makeEdges },
+    gradient:  { label: 'gradient',  build: makeGradient },
+    cross:     { label: 'cross',     build: makeCross },
+    checkers:  { label: 'checkers',  build: makeCheckers },
+    noise:     { label: 'noise',     build: makeNoise },
+  };
+
+  // ----------------------------------------------------------------
+  // 2) KERNEL PRESETS. All are 3×3; 5×5 versions auto-generated.
+  // ----------------------------------------------------------------
+  const PRESETS_3 = {
+    identity:  { label: 'identity', k: [[0,0,0],[0,1,0],[0,0,0]], norm: false },
+    edge:      { label: 'edge',     k: [[-1,-1,-1],[-1,8,-1],[-1,-1,-1]], norm: false },
+    sharpen:   { label: 'sharpen',  k: [[0,-1,0],[-1,5,-1],[0,-1,0]], norm: false },
+    blurBox:   { label: 'box blur', k: [[1,1,1],[1,1,1],[1,1,1]], norm: true },
+    gauss:     { label: 'gauss',    k: [[1,2,1],[2,4,2],[1,2,1]], norm: true },
+    emboss:    { label: 'emboss',   k: [[-2,-1,0],[-1,1,1],[0,1,2]], norm: false },
+    sobelX:    { label: 'sobel-x',  k: [[-1,0,1],[-2,0,2],[-1,0,1]], norm: false },
+    sobelY:    { label: 'sobel-y',  k: [[-1,-2,-1],[0,0,0],[1,2,1]], norm: false },
+    laplacian: { label: 'laplacian',k: [[0,1,0],[1,-4,1],[0,1,0]], norm: false },
+    motion:    { label: 'motion',   k: [[1,0,0],[0,1,0],[0,0,1]], norm: true },
+  };
+  const PRESETS_5 = {
+    identity:  { label: 'identity', k: ident5(), norm: false },
+    edge:      { label: 'edge',     k: lap5(), norm: false },
+    sharpen:   { label: 'sharpen',  k: sharpen5(), norm: false },
+    blurBox:   { label: 'box blur', k: mat5(1), norm: true },
+    gauss:     { label: 'gauss',    k: gauss5(), norm: true },
+    emboss:    { label: 'emboss',   k: emboss5(), norm: false },
+    sobelX:    { label: 'sobel-x',  k: sobel5X(), norm: false },
+    sobelY:    { label: 'sobel-y',  k: sobel5Y(), norm: false },
+    laplacian: { label: 'laplacian',k: lap5(), norm: false },
+    motion:    { label: 'motion',   k: motion5(), norm: true },
+  };
+  function ident5() { const m = mat5(0); m[2][2] = 1; return m; }
+  function mat5(v) { const m = []; for (let i=0;i<5;i++){const r=[];for(let j=0;j<5;j++)r.push(v);m.push(r);} return m; }
+  function gauss5() {
+    // discretized 2D Gaussian, σ ≈ 1
+    const m = mat5(0);
+    for (let i=0;i<5;i++) for (let j=0;j<5;j++) {
+      const dx = i - 2, dy = j - 2;
+      m[i][j] = Math.round(256 * Math.exp(-(dx*dx+dy*dy)/2));
+    }
+    return m;
+  }
+  function sharpen5() {
+    // a sharper 5×5: negative surround + strong center
+    const m = mat5(-1);
+    m[2][2] = 25;
+    return m;
+  }
+  function emboss5() {
+    // gradient-direction emboss
+    const m = mat5(0);
+    for (let i=0;i<5;i++) for (let j=0;j<5;j++) m[i][j] = Math.sign(i+j-4) * (Math.abs(i+j-4) > 1 ? 2 : 1);
+    m[2][2] = 1;
+    return m;
+  }
+  function sobel5X() {
+    // horizontal gradient, bigger footprint
+    return [
+      [-2, -1, 0, 1, 2],
+      [-3, -2, 0, 2, 3],
+      [-4, -3, 0, 3, 4],
+      [-3, -2, 0, 2, 3],
+      [-2, -1, 0, 1, 2],
+    ];
+  }
+  function sobel5Y() {
+    // just transpose X
+    const x = sobel5X();
+    const y = mat5(0);
+    for (let i=0;i<5;i++) for (let j=0;j<5;j++) y[i][j] = x[j][i];
+    return y;
+  }
+  function lap5() {
+    return [
+      [ 0, 0,-1, 0, 0],
+      [ 0,-1,-2,-1, 0],
+      [-1,-2,16,-2,-1],
+      [ 0,-1,-2,-1, 0],
+      [ 0, 0,-1, 0, 0],
+    ];
+  }
+  function motion5() {
+    const m = mat5(0);
+    for (let i=0;i<5;i++) m[i][i] = 1;
+    return m;
+  }
+
+  // ----------------------------------------------------------------
+  // 3) STATE.
+  // ----------------------------------------------------------------
+  const state = {
+    imgKey: 'cat',
+    input: null,           // Float32Array size N*N
+    K: 3,                  // kernel size
+    kernel: cloneMat(PRESETS_3.edge.k),
+    normalize: PRESETS_3.edge.norm,
+    stride: 1,
+    pad: 'same',
+    act: 'none',
+    pool: 'none',
+    presetKey: 'edge',
+    hover: null,           // {x, y} in input coords
+    output: null,          // Float32Array, size OW*OH
+    OW: 0, OH: 0,
+    display: { highlight: true, grid: true, signed: false },
+    gain: 1.0,
+    pipeline: [],          // array of { label, k, norm, act, pool }
+  };
+  function cloneMat(m) { return m.map(r => r.slice()); }
+
+  // ----------------------------------------------------------------
+  // 4) CONVOLUTION MATH.
+  //    For each output (ox, oy), sum over kernel indices i, j:
+  //      in[ox*stride + i - pad_x, oy*stride + j - pad_y] * k[i][j]
+  //    pad_x = pad_y = floor(K/2) for "same", 0 for "valid".
+  //    If "normalize" is set, we divide the kernel by its sum (or by
+  //    its absolute sum if the signed sum is 0).
+  // ----------------------------------------------------------------
+  function effectiveKernel() {
+    let k = cloneMat(state.kernel);
+    if (state.normalize) {
+      let s = 0, abs = 0;
+      for (const row of k) for (const v of row) { s += v; abs += Math.abs(v); }
+      const denom = Math.abs(s) > 1e-9 ? s : (abs > 1e-9 ? abs : 1);
+      for (let i = 0; i < k.length; i++) for (let j = 0; j < k.length; j++) k[i][j] /= denom;
+    }
+    return k;
+  }
+
+  function convolve(input, inW, inH, k, opts) {
+    const K = k.length, C = (K - 1) >> 1;
+    const stride = opts.stride || 1;
+    const pad = opts.pad === 'same' ? C : 0;
+    const OW = Math.floor((inW + 2*pad - K) / stride) + 1;
+    const OH = Math.floor((inH + 2*pad - K) / stride) + 1;
+    const out = new Float32Array(OW * OH);
+    for (let oy = 0; oy < OH; oy++) {
+      for (let ox = 0; ox < OW; ox++) {
         let s = 0;
-        for(let ky=0;ky<3;ky++)for(let kx=0;kx<3;kx++){
-          s += img[y-1+ky][x-1+kx] * k[ky][kx];
+        const ix0 = ox * stride - pad;
+        const iy0 = oy * stride - pad;
+        for (let j = 0; j < K; j++) {
+          for (let i = 0; i < K; i++) {
+            const ix = ix0 + i, iy = iy0 + j;
+            if (ix < 0 || iy < 0 || ix >= inW || iy >= inH) continue; // zero pad
+            s += input[iy * inW + ix] * k[j][i];
+          }
         }
-        out[y][x] = s;
+        out[oy * OW + ox] = s;
       }
+    }
+    return { out, OW, OH };
+  }
+
+  function applyAct(arr, act) {
+    if (act === 'none') return arr;
+    const out = new Float32Array(arr.length);
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (act === 'relu') out[i] = v > 0 ? v : 0;
+      else if (act === 'abs') out[i] = Math.abs(v);
+      else if (act === 'tanh') out[i] = Math.tanh(v);
     }
     return out;
   }
-
-  function resize(){
-    const r=canvas.parentElement.getBoundingClientRect();
-    W=r.width; H=r.height;
-    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-    canvas.style.width=W+'px'; canvas.style.height=H+'px';
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    draw();
-  }
-
-  function draw(){
-    if(!image || !output) return;
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
-
-    const margin = 40;
-    const headerH = 30;
-    const availW = W - margin*3;
-    const availH = H - headerH - 60;
-    const gridSize = Math.min(availW/2, availH);
-    const cellSize = gridSize / SIZE;
-
-    const leftX = margin;
-    const rightX = margin + gridSize + margin;
-    const topY = headerH + 10;
-
-    // Input image label
-    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='12px JetBrains Mono'; ctx.textAlign='center';
-    ctx.fillText('INPUT', leftX + gridSize/2, headerH);
-    ctx.fillText('OUTPUT', rightX + gridSize/2, headerH);
-
-    // Draw input
-    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-      const v = image[y][x];
-      const g = Math.floor(v * 235);
-      ctx.fillStyle = `rgb(${g},${g},${g})`;
-      ctx.fillRect(leftX + x*cellSize, topY + y*cellSize, cellSize+0.5, cellSize+0.5);
-    }
-
-    // Draw output (normalized)
-    let mn = Infinity, mx = -Infinity;
-    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-      if(output[y][x]<mn)mn=output[y][x]; if(output[y][x]>mx)mx=output[y][x];
-    }
-    const range = mx-mn || 1;
-    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
-      const v = (output[y][x]-mn)/range;
-      const g = Math.floor(v * 235);
-      ctx.fillStyle = `rgb(${g},${g},${g})`;
-      ctx.fillRect(rightX + x*cellSize, topY + y*cellSize, cellSize+0.5, cellSize+0.5);
-    }
-
-    // Borders
-    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
-    ctx.strokeRect(leftX, topY, gridSize, gridSize);
-    ctx.strokeRect(rightX, topY, gridSize, gridSize);
-
-    // Hover kernel window
-    if(hoverX>=1 && hoverX<SIZE-1 && hoverY>=1 && hoverY<SIZE-1){
-      ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2.5;
-      ctx.strokeRect(leftX + (hoverX-1)*cellSize, topY + (hoverY-1)*cellSize, cellSize*3, cellSize*3);
-      // Highlight corresponding output pixel
-      ctx.strokeRect(rightX + hoverX*cellSize-1, topY + hoverY*cellSize-1, cellSize+2, cellSize+2);
-
-      // Arrow between them
-      ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
-      const x1 = leftX + (hoverX-1)*cellSize + cellSize*1.5;
-      const y1 = topY + (hoverY-1)*cellSize + cellSize*1.5;
-      const x2 = rightX + hoverX*cellSize + cellSize/2;
-      const y2 = topY + hoverY*cellSize + cellSize/2;
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Compute and show value
-      let s = 0, parts = [];
-      for(let ky=0;ky<3;ky++)for(let kx=0;kx<3;kx++){
-        const iv = image[hoverY-1+ky][hoverX-1+kx];
-        const kv = kernel[ky][kx];
-        s += iv * kv;
-        if(Math.abs(iv*kv) > 0.01) parts.push(`${iv.toFixed(1)}\u00D7${kv.toFixed(1)}`);
+  function applyPool(arr, W, H, kind) {
+    if (kind === 'none') return { out: arr, W, H };
+    const P = 2;
+    const OW = Math.floor(W / P), OH = Math.floor(H / P);
+    const out = new Float32Array(OW * OH);
+    for (let oy = 0; oy < OH; oy++) {
+      for (let ox = 0; ox < OW; ox++) {
+        let agg = kind === 'max' ? -Infinity : 0, cnt = 0;
+        for (let j = 0; j < P; j++) for (let i = 0; i < P; i++) {
+          const ix = ox * P + i, iy = oy * P + j;
+          if (ix >= W || iy >= H) continue;
+          const v = arr[iy * W + ix];
+          if (kind === 'max') agg = Math.max(agg, v); else { agg += v; cnt++; }
+        }
+        out[oy * OW + ox] = kind === 'max' ? agg : (cnt ? agg / cnt : 0);
       }
-      document.getElementById('calc-info').innerHTML =
-        `Position (${hoverX}, ${hoverY})<br>` +
-        `output = &sum;(pixel &times; kernel)<br>` +
-        `<strong style="color:var(--yellow)">= ${s.toFixed(2)}</strong>`;
-      document.getElementById('overlay').innerHTML =
-        `Kernel at (<span class="value">${hoverX}</span>, <span class="value">${hoverY}</span>) &rarr; output = <span class="value">${s.toFixed(2)}</span>`;
     }
-
-    canvas._layout = { leftX, rightX, topY, cellSize };
+    return { out, W: OW, H: OH };
   }
 
-  function updateKernelDisplay(){
-    for(let y=0;y<3;y++)for(let x=0;x<3;x++){
-      const el = document.getElementById(`k${y}${x}`);
-      const v = kernel[y][x];
-      el.textContent = Math.abs(v) < 0.2 ? v.toFixed(2).replace(/\.?0+$/,'') : v.toFixed(1);
-      if(v > 0) el.style.background = `rgba(99,102,241,${Math.min(1, Math.abs(v)/2.5)*0.5})`;
-      else if(v < 0) el.style.background = `rgba(248,113,113,${Math.min(1, Math.abs(v)/2.5)*0.5})`;
-      else el.style.background = 'var(--bg-secondary)';
+  function recompute() {
+    // Apply the pipeline first (if any), then the current kernel as the last stage.
+    let buf = state.input;
+    let W = N, H = N;
+    for (const stage of state.pipeline) {
+      const conv = convolve(buf, W, H, stage.norm ? normalizeKernel(stage.k) : stage.k, { stride: 1, pad: 'same' });
+      buf = applyAct(conv.out, stage.act);
+      const p = applyPool(buf, conv.OW, conv.OH, stage.pool);
+      buf = p.out; W = p.W; H = p.H;
+    }
+    const k = effectiveKernel();
+    const conv = convolve(buf, W, H, k, { stride: state.stride, pad: state.pad });
+    let afterAct = applyAct(conv.out, state.act);
+    const p = applyPool(afterAct, conv.OW, conv.OH, state.pool);
+    state.output = p.out;
+    state.OW = p.W; state.OH = p.H;
+    state.midOutput = afterAct;        // before pool, after activation
+    state.midOW = conv.OW; state.midOH = conv.OH;
+    state.rawOutput = conv.out;        // before activation
+    state.rawOW = conv.OW; state.rawOH = conv.OH;
+  }
+  function normalizeKernel(k) {
+    const out = cloneMat(k);
+    let s = 0, abs = 0;
+    for (const row of out) for (const v of row) { s += v; abs += Math.abs(v); }
+    const denom = Math.abs(s) > 1e-9 ? s : (abs > 1e-9 ? abs : 1);
+    for (let i = 0; i < out.length; i++) for (let j = 0; j < out.length; j++) out[i][j] /= denom;
+    return out;
+  }
+
+  // ----------------------------------------------------------------
+  // 5) RENDERING.
+  // ----------------------------------------------------------------
+  const inC  = document.getElementById('in-canvas');
+  const outC = document.getElementById('out-canvas');
+  const inCtx = inC.getContext('2d');
+  const outCtx = outC.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+  let iW = 0, iH = 0, oW = 0, oH = 0;
+
+  function resizeCanvas(c, ctx) {
+    const r = c.getBoundingClientRect();
+    c.width = r.width * DPR; c.height = r.height * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    return { w: r.width, h: r.height };
+  }
+
+  function drawInput() {
+    const { w, h } = resizeCanvas(inC, inCtx);
+    iW = w; iH = h;
+    // Draw into an offscreen NxN canvas, then scale up pixelated
+    const off = document.createElement('canvas');
+    off.width = N; off.height = N;
+    const octx = off.getContext('2d');
+    const img = octx.createImageData(N, N);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const v = state.input[y * N + x];
+        const g = Math.round(clamp(v, 0, 1) * 255);
+        const p = (y * N + x) * 4;
+        img.data[p] = g; img.data[p+1] = g; img.data[p+2] = g; img.data[p+3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    inCtx.clearRect(0, 0, w, h);
+    inCtx.drawImage(off, 0, 0, w, h);
+
+    // Grid overlay
+    if (state.display.grid) {
+      inCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+      inCtx.lineWidth = 1;
+      const cellW = w / N;
+      for (let i = 0; i <= N; i += 4) {
+        inCtx.beginPath();
+        inCtx.moveTo(i * cellW, 0); inCtx.lineTo(i * cellW, h); inCtx.stroke();
+        inCtx.beginPath();
+        inCtx.moveTo(0, i * cellW); inCtx.lineTo(w, i * cellW); inCtx.stroke();
+      }
+    }
+
+    // Receptive field highlight
+    if (state.display.highlight && state.hover) {
+      const { x, y } = state.hover;
+      const cellW = w / N;
+      const C = (state.K - 1) >> 1;
+      inCtx.strokeStyle = 'rgba(255,122,41,0.95)';
+      inCtx.lineWidth = 2;
+      inCtx.strokeRect((x - C) * cellW, (y - C) * cellW, state.K * cellW, state.K * cellW);
+      // center cell
+      inCtx.strokeStyle = 'rgba(95,210,203,0.95)';
+      inCtx.strokeRect(x * cellW, y * cellW, cellW, cellW);
     }
   }
 
-  canvas.addEventListener('mousemove', e=>{
-    const L = canvas._layout; if(!L) return;
-    const r=canvas.getBoundingClientRect();
-    const mx=e.clientX-r.left, my=e.clientY-r.top;
-    if(mx >= L.leftX && mx < L.leftX+L.cellSize*SIZE && my >= L.topY && my < L.topY+L.cellSize*SIZE){
-      hoverX = Math.floor((mx-L.leftX)/L.cellSize);
-      hoverY = Math.floor((my-L.topY)/L.cellSize);
-      draw();
+  function drawOutput() {
+    const { w, h } = resizeCanvas(outC, outCtx);
+    oW = w; oH = h;
+    const OW = state.OW, OH = state.OH;
+    if (!OW || !OH) return;
+
+    // Scan min/max for dynamic range
+    let mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < state.output.length; i++) {
+      const v = state.output[i];
+      if (v < mn) mn = v; if (v > mx) mx = v;
+    }
+    const absMax = Math.max(Math.abs(mn), Math.abs(mx));
+
+    // Render to offscreen OWxOH canvas
+    const off = document.createElement('canvas');
+    off.width = OW; off.height = OH;
+    const octx = off.getContext('2d');
+    const img = octx.createImageData(OW, OH);
+    for (let y = 0; y < OH; y++) {
+      for (let x = 0; x < OW; x++) {
+        const v = state.output[y * OW + x] * state.gain;
+        const p = (y * OW + x) * 4;
+        if (state.display.signed) {
+          // teal for positive, heat for negative
+          const t = absMax > 1e-9 ? Math.min(1, Math.abs(v) / absMax) : 0;
+          if (v >= 0) {
+            img.data[p]   = Math.round(32 + (95 - 32) * t);
+            img.data[p+1] = Math.round(32 + (210 - 32) * t);
+            img.data[p+2] = Math.round(32 + (203 - 32) * t);
+          } else {
+            img.data[p]   = Math.round(32 + (255 - 32) * t);
+            img.data[p+1] = Math.round(32 + (122 - 32) * t);
+            img.data[p+2] = Math.round(32 + (41  - 32) * t);
+          }
+          img.data[p+3] = 255;
+        } else {
+          // map [−absMax, absMax] to [0,1] grayscale
+          const gN = absMax > 1e-9 ? (v + absMax) / (2 * absMax) : 0.5;
+          const g = Math.round(clamp(gN, 0, 1) * 255);
+          img.data[p] = g; img.data[p+1] = g; img.data[p+2] = g; img.data[p+3] = 255;
+        }
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    outCtx.clearRect(0, 0, w, h);
+    outCtx.drawImage(off, 0, 0, w, h);
+
+    // Grid overlay
+    if (state.display.grid) {
+      outCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+      outCtx.lineWidth = 1;
+      const cellW = w / OW, cellH = h / OH;
+      for (let i = 0; i <= OW; i += 4) {
+        outCtx.beginPath(); outCtx.moveTo(i * cellW, 0); outCtx.lineTo(i * cellW, h); outCtx.stroke();
+      }
+      for (let i = 0; i <= OH; i += 4) {
+        outCtx.beginPath(); outCtx.moveTo(0, i * cellH); outCtx.lineTo(w, i * cellH); outCtx.stroke();
+      }
+    }
+
+    // Highlight output cell matching hover
+    if (state.display.highlight && state.hover) {
+      const { x, y } = state.hover;
+      // Map input (x, y) to output cell. For stride s and same padding, same cell index / s
+      const ox = Math.floor(x / state.stride);
+      const oy = Math.floor(y / state.stride);
+      if (state.pool === 'none') {
+        if (ox < OW && oy < OH) {
+          const cellW = w / OW, cellH = h / OH;
+          outCtx.strokeStyle = 'rgba(95,210,203,0.95)';
+          outCtx.lineWidth = 2;
+          outCtx.strokeRect(ox * cellW, oy * cellH, cellW, cellH);
+        }
+      } else {
+        // pooled: output grid is half; highlight the pooled 2×2 cell this input falls into
+        const px = Math.floor(ox / 2), py = Math.floor(oy / 2);
+        if (px < OW && py < OH) {
+          const cellW = w / OW, cellH = h / OH;
+          outCtx.strokeStyle = 'rgba(95,210,203,0.95)';
+          outCtx.lineWidth = 2;
+          outCtx.strokeRect(px * cellW, py * cellH, cellW, cellH);
+        }
+      }
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 6) KERNEL EDITOR.
+  // ----------------------------------------------------------------
+  const kernelGrid = document.getElementById('kernel-grid');
+  function renderKernelGrid() {
+    kernelGrid.innerHTML = '';
+    kernelGrid.style.setProperty('--kn', state.K);
+    for (let j = 0; j < state.K; j++) {
+      for (let i = 0; i < state.K; i++) {
+        const v = state.kernel[j][i];
+        const cell = document.createElement('div');
+        cell.className = 'kcell';
+        if (i === (state.K >> 1) && j === (state.K >> 1)) cell.classList.add('center');
+        if (v > 1e-9)  cell.classList.add('pos');
+        if (v < -1e-9) cell.classList.add('neg');
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = fmtK(v);
+        inp.addEventListener('change', (ev) => {
+          const nv = parseFloat(ev.target.value);
+          if (isFinite(nv)) {
+            state.kernel[j][i] = nv;
+            recompute(); drawAll();
+            renderKernelGrid(); // re-style pos/neg classes
+          } else {
+            ev.target.value = fmtK(v);
+          }
+        });
+        cell.appendChild(inp);
+        kernelGrid.appendChild(cell);
+      }
+    }
+    document.getElementById('s-kn').textContent = state.K + '\u00d7' + state.K;
+    document.getElementById('kern-meta').textContent = state.presetKey || 'custom';
+  }
+  function fmtK(v) {
+    if (Math.abs(v) < 1e-9) return '0';
+    if (Math.abs(v) < 0.001) return v.toExponential(1);
+    if (Math.abs(v) < 1)    return v.toFixed(3);
+    return v.toFixed(2);
+  }
+
+  // Preset pill row — re-build for current K
+  const presetRow = document.getElementById('preset-pills');
+  function renderPresets() {
+    const P = state.K === 5 ? PRESETS_5 : PRESETS_3;
+    presetRow.innerHTML = '';
+    for (const key of Object.keys(P)) {
+      const p = document.createElement('span');
+      p.className = 'pill' + (key === state.presetKey ? ' active' : '');
+      p.textContent = P[key].label;
+      p.addEventListener('click', () => {
+        state.presetKey = key;
+        state.kernel = cloneMat(P[key].k);
+        state.normalize = P[key].norm;
+        renderPresets(); renderKernelGrid(); recompute(); drawAll();
+      });
+      presetRow.appendChild(p);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 7) READOUTS: receptive field, multiplies, output pixel.
+  // ----------------------------------------------------------------
+  function renderReadouts() {
+    const patchEl = document.getElementById('patch-body');
+    const calcEl  = document.getElementById('calc-body');
+    const pixEl   = document.getElementById('pixel-body');
+    const outHead = document.getElementById('out-head');
+
+    const pipePrefix = state.pipeline.length ? '[pipeline x' + state.pipeline.length + '] \u2192 ' : '';
+    outHead.textContent = 'Output (' + pipePrefix +
+      (state.act === 'none' ? 'raw' : 'after ' + state.act) +
+      (state.pool === 'none' ? '' : ', then ' + state.pool + '-pool 2\u00d72') + ')';
+
+    if (!state.hover) {
+      patchEl.innerHTML = 'hover the input to see the 3\u00d73 patch under the kernel';
+      calcEl.textContent = '\u2014';
+      pixEl.textContent = '\u2014';
+      return;
+    }
+    const { x, y } = state.hover;
+    const C = (state.K - 1) >> 1;
+    const k = effectiveKernel();
+    let rows = [];
+    let calcParts = [];
+    let sum = 0;
+    for (let j = 0; j < state.K; j++) {
+      const vals = [];
+      for (let i = 0; i < state.K; i++) {
+        const ix = x + i - C, iy = y + j - C;
+        let iv = 0;
+        if (ix >= 0 && iy >= 0 && ix < N && iy < N) iv = state.input[iy * N + ix];
+        vals.push(iv.toFixed(2));
+        const kv = k[j][i];
+        sum += iv * kv;
+        if (Math.abs(kv) > 1e-9) {
+          const sign = calcParts.length === 0 ? '' : (kv >= 0 ? ' + ' : ' \u2212 ');
+          calcParts.push(sign + (kv < 0 ? Math.abs(kv).toFixed(2) : kv.toFixed(2)) + '\u00b7' + iv.toFixed(2));
+        }
+      }
+      rows.push(vals.join(' '));
+    }
+    patchEl.innerHTML = '<pre style="margin:0;font-family:var(--font-mono);font-size:11px;color:var(--teal-300);">' + rows.join('\n') + '</pre>';
+    calcEl.innerHTML = calcParts.length ? calcParts.join('') + ' <span class="sum">= ' + sum.toFixed(3) + '</span>'
+                                        : 'all kernel values are zero';
+
+    // Apply activation to get displayed pixel
+    let afterAct = sum;
+    if (state.act === 'relu') afterAct = Math.max(0, sum);
+    else if (state.act === 'abs')  afterAct = Math.abs(sum);
+    else if (state.act === 'tanh') afterAct = Math.tanh(sum);
+    pixEl.innerHTML = 'raw = <code>' + sum.toFixed(3) + '</code>' +
+      (state.act !== 'none' ? ', after ' + state.act + ' = <code>' + afterAct.toFixed(3) + '</code>' : '') +
+      '<br><span class="rlabel" style="display:inline">gain</span> \u00d7 ' + state.gain.toFixed(1) +
+      ' &rarr; this cell\u2019s value' +
+      (state.pool !== 'none' ? '<br><span style="color:var(--heat-400)">pool is on: displayed output cell is a 2\u00d72 aggregate of this and 3 neighbors</span>' : '');
+  }
+
+  // ----------------------------------------------------------------
+  // 8) STATS.
+  // ----------------------------------------------------------------
+  function updateStats() {
+    document.getElementById('s-img').textContent = IMAGES[state.imgKey].label + ' ' + N + 'x' + N;
+    document.getElementById('s-kn').textContent  = state.K + '\u00d7' + state.K;
+    document.getElementById('s-out').textContent = state.OW + '\u00d7' + state.OH;
+    let mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < state.output.length; i++) {
+      if (state.output[i] < mn) mn = state.output[i];
+      if (state.output[i] > mx) mx = state.output[i];
+    }
+    document.getElementById('s-max').textContent = '[' + mn.toFixed(2) + ', ' + mx.toFixed(2) + ']';
+    const mul = state.OW * state.OH * state.K * state.K;
+    document.getElementById('s-mul').textContent = mul.toLocaleString();
+    document.getElementById('s-depth').textContent = state.pipeline.length + (state.kernel ? 1 : 0);
+    document.getElementById('ctl-meta').textContent = 'size ' + state.K + ' \u00b7 stride ' + state.stride;
+  }
+
+  // ----------------------------------------------------------------
+  // 9) IMAGE GRID.
+  // ----------------------------------------------------------------
+  function buildImageGrid() {
+    const g = document.getElementById('img-grid');
+    g.innerHTML = '';
+    for (const key of Object.keys(IMAGES)) {
+      const def = IMAGES[key];
+      const el = document.createElement('div');
+      el.className = 'img-thumb' + (key === state.imgKey ? ' active' : '');
+      el.innerHTML = '<canvas></canvas><div class="name">' + def.label + '</div>';
+      el.addEventListener('click', () => {
+        state.imgKey = key;
+        state.input = def.build();
+        document.querySelectorAll('.img-thumb').forEach(e => e.classList.remove('active'));
+        el.classList.add('active');
+        recompute(); drawAll();
+      });
+      g.appendChild(el);
+    }
+    requestAnimationFrame(() => {
+      const keys = Object.keys(IMAGES);
+      document.querySelectorAll('.img-thumb canvas').forEach((c, i) => {
+        drawImageThumb(c, IMAGES[keys[i]].build());
+      });
+    });
+  }
+  function drawImageThumb(canvas, arr) {
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * DPR; canvas.height = r.height * DPR;
+    const c = canvas.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.imageSmoothingEnabled = false;
+    const off = document.createElement('canvas');
+    off.width = N; off.height = N;
+    const ox = off.getContext('2d');
+    const img = ox.createImageData(N, N);
+    for (let i = 0; i < arr.length; i++) {
+      const g = Math.round(clamp(arr[i], 0, 1) * 255);
+      const p = i * 4;
+      img.data[p] = g; img.data[p+1] = g; img.data[p+2] = g; img.data[p+3] = 255;
+    }
+    ox.putImageData(img, 0, 0);
+    c.drawImage(off, 0, 0, r.width, r.height);
+  }
+
+  // ----------------------------------------------------------------
+  // 10) PIPELINE.
+  // ----------------------------------------------------------------
+  function renderPipeline() {
+    const wrap = document.getElementById('pipeline');
+    wrap.innerHTML = '';
+    if (state.pipeline.length === 0) {
+      wrap.innerHTML = '<span style="color:var(--fg-muted)">empty &mdash; press add to stack a filter</span>';
+      return;
+    }
+    for (let i = 0; i < state.pipeline.length; i++) {
+      const p = state.pipeline[i];
+      const el = document.createElement('span');
+      el.className = 'pipe-pill';
+      el.innerHTML = p.label + ' <span class="x" data-i="' + i + '">&times;</span>';
+      el.querySelector('.x').addEventListener('click', () => {
+        state.pipeline.splice(i, 1);
+        renderPipeline(); recompute(); drawAll();
+      });
+      wrap.appendChild(el);
+      if (i < state.pipeline.length - 1) {
+        const arr = document.createElement('span');
+        arr.textContent = '\u2192';
+        arr.style.cssText = 'color: var(--fg-muted); margin: 0 4px;';
+        wrap.appendChild(arr);
+      }
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 11) EVENT WIRING.
+  // ----------------------------------------------------------------
+  inC.addEventListener('mousemove', (ev) => {
+    const r = inC.getBoundingClientRect();
+    const cellW = r.width / N;
+    const x = clamp(Math.floor((ev.clientX - r.left) / cellW), 0, N - 1);
+    const y = clamp(Math.floor((ev.clientY - r.top)  / cellW), 0, N - 1);
+    if (!state.hover || state.hover.x !== x || state.hover.y !== y) {
+      state.hover = { x, y };
+      drawInput(); drawOutput(); renderReadouts();
     }
   });
-  canvas.addEventListener('mouseleave', ()=>{hoverX=-1;hoverY=-1;draw();});
-
-  document.querySelectorAll('[data-kernel]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('[data-kernel]').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      kernel = kernels[b.dataset.kernel];
-      output = applyKernel(image, kernel);
-      updateKernelDisplay(); draw();
-    });
+  inC.addEventListener('mouseleave', () => {
+    state.hover = null;
+    drawInput(); drawOutput(); renderReadouts();
   });
-  document.querySelectorAll('[data-img]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('[data-img]').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      image = genImage(b.dataset.img);
-      output = applyKernel(image, kernel);
-      draw();
+
+  document.querySelectorAll('#size-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#size-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.K = parseInt(p.dataset.k, 10);
+      const P = state.K === 5 ? PRESETS_5 : PRESETS_3;
+      state.kernel = cloneMat((P[state.presetKey] || P.edge).k);
+      state.normalize = (P[state.presetKey] || P.edge).norm;
+      if (!P[state.presetKey]) state.presetKey = 'edge';
+      renderPresets(); renderKernelGrid(); recompute(); drawAll();
     });
   });
 
-  image = genImage('circle');
-  kernel = kernels['edge-x'];
-  output = applyKernel(image, kernel);
-  updateKernelDisplay();
-  resize(); window.addEventListener('resize',resize);
+  document.getElementById('stride').addEventListener('input', (ev) => {
+    state.stride = parseInt(ev.target.value, 10);
+    document.getElementById('stride-val').textContent = state.stride;
+    recompute(); drawAll();
+  });
+  document.getElementById('gain').addEventListener('input', (ev) => {
+    state.gain = parseFloat(ev.target.value);
+    document.getElementById('gain-val').textContent = state.gain.toFixed(1);
+    drawOutput();
+  });
+
+  function bindPills(groupId, field, onChange) {
+    document.querySelectorAll('#' + groupId + ' .pill').forEach(p => {
+      p.addEventListener('click', () => {
+        document.querySelectorAll('#' + groupId + ' .pill').forEach(q => q.classList.remove('active'));
+        p.classList.add('active');
+        state[field] = p.dataset[Object.keys(p.dataset)[0]];
+        onChange && onChange();
+      });
+    });
+  }
+  bindPills('pad-pills',  'pad',  () => { recompute(); drawAll(); });
+  bindPills('act-pills',  'act',  () => { recompute(); drawAll(); });
+  bindPills('pool-pills', 'pool', () => { recompute(); drawAll(); });
+
+  document.querySelectorAll('#disp-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      p.classList.toggle('active');
+      state.display[p.dataset.disp] = p.classList.contains('active');
+      drawAll();
+    });
+  });
+
+  document.getElementById('btn-zero').addEventListener('click', () => {
+    for (let j = 0; j < state.K; j++) for (let i = 0; i < state.K; i++) state.kernel[j][i] = 0;
+    state.normalize = false; state.presetKey = 'custom';
+    renderKernelGrid(); renderPresets(); recompute(); drawAll();
+  });
+  document.getElementById('btn-ident').addEventListener('click', () => {
+    for (let j = 0; j < state.K; j++) for (let i = 0; i < state.K; i++) state.kernel[j][i] = 0;
+    const c = state.K >> 1; state.kernel[c][c] = 1;
+    state.normalize = false; state.presetKey = 'identity';
+    renderKernelGrid(); renderPresets(); recompute(); drawAll();
+  });
+  document.getElementById('btn-norm').addEventListener('click', () => {
+    state.normalize = !state.normalize;
+    recompute(); drawAll();
+  });
+  document.getElementById('btn-random').addEventListener('click', () => {
+    for (let j = 0; j < state.K; j++) for (let i = 0; i < state.K; i++) {
+      state.kernel[j][i] = Math.round((Math.random()*2 - 1) * 6) / 3;
+    }
+    state.normalize = false; state.presetKey = 'random';
+    renderKernelGrid(); renderPresets(); recompute(); drawAll();
+  });
+
+  document.getElementById('btn-pipe-add').addEventListener('click', () => {
+    state.pipeline.push({
+      label: (state.presetKey || 'custom') + (state.act === 'none' ? '' : '·' + state.act) + (state.pool === 'none' ? '' : '·' + state.pool),
+      k: cloneMat(state.kernel),
+      norm: state.normalize,
+      act: state.act,
+      pool: state.pool,
+    });
+    renderPipeline(); recompute(); drawAll();
+  });
+  document.getElementById('btn-pipe-clear').addEventListener('click', () => {
+    state.pipeline = [];
+    renderPipeline(); recompute(); drawAll();
+  });
+
+  window.addEventListener('resize', () => { drawAll(); buildImageGrid(); });
+
+  // ----------------------------------------------------------------
+  // 12) UTIL.
+  // ----------------------------------------------------------------
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function drawAll() {
+    drawInput();
+    drawOutput();
+    renderReadouts();
+    updateStats();
+    renderPipeline();
+  }
+
+  // ----------------------------------------------------------------
+  // 13) INIT.
+  // ----------------------------------------------------------------
+  state.input = IMAGES.cat.build();
+  buildImageGrid();
+  renderPresets();
+  renderKernelGrid();
+  recompute();
+  drawAll();
+
 })();
 </script>
 </body>
