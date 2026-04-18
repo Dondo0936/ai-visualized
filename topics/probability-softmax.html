@@ -3,270 +3,1077 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Probability & Softmax - AI Visualized</title>
+  <title>Probability &amp; softmax — AI Visualized</title>
+  <meta name="description" content="Drag logit bars, watch softmax turn scores into probabilities. Entropy, perplexity, cross-entropy, top-k and top-p — all live in the browser.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .ps-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1.1fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .ps-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .ps-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+    }
+    .ps-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+    }
+    .ps-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .ps-panel-body {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+    }
+    .ps-panel-body canvas {
+      display: block; width: 100%; height: 100%;
+    }
+
+    /* Stats strip */
+    .ps-stats {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--s-3);
+    }
+    .ps-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 0;
+    }
+    .ps-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .ps-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.25rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      overflow-wrap: anywhere;
+    }
+    .ps-stat.accent .value { color: var(--teal-300); }
+    .ps-stat.warn   .value { color: var(--heat-400); }
+
+    /* Logit bar SVG-ish look: cursor drag */
+    #c-logits { cursor: ns-resize; }
+    #c-probs  { cursor: default; }
+    #c-ent    { cursor: default; }
+    #c-cdf    { cursor: default; }
+
+    /* Truth-class pill */
+    .truth-row {
+      display: flex; gap: var(--s-2); flex-wrap: wrap;
+    }
+    .truth-chip {
+      padding: 4px 10px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-raised);
+      color: var(--fg-muted);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      user-select: none;
+      transition: all var(--dur-fast) var(--ease-standard);
+    }
+    .truth-chip:hover { border-color: var(--border-strong); color: var(--fg-secondary); }
+    .truth-chip.on {
+      border-color: var(--accent-ring);
+      background: var(--accent-soft);
+      color: var(--teal-300);
+    }
+
+    @media (max-width: 1100px) {
+      .ps-main { grid-template-columns: 1fr; grid-template-rows: repeat(5, auto); }
+      .ps-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Probability &amp; Softmax</h1>
-      <span class="topic-desc">Drag the logit bars &mdash; watch softmax turn scores into probabilities</span>
-    </div>
 
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">Drag any logit bar up/down to change its score</div>
-    </div>
+<div class="topic-page has-guide">
 
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">From raw scores to probabilities</div>
-        <div class="guide-text">
-          Neural networks output raw numbers called <strong>logits</strong>. They can be positive, negative, anything. <strong>Softmax</strong> turns them into valid probabilities: all positive, all summing to 1. The class with the highest logit gets the highest probability.
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Probability &amp; softmax</h1>
+    <span class="topic-desc">Drag the logit bars. Watch softmax turn scores into a probability distribution — with entropy, perplexity, KL, cross-entropy, and top-k / top-p truncation live.</span>
+  </div>
+
+  <!-- =====================================================
+       Main workspace: four panels
+       ===================================================== -->
+  <div class="canvas-area" style="padding:0">
+    <div class="ps-main">
+
+      <!-- Top-left: logits (draggable) -->
+      <div class="ps-panel" id="panel-logits">
+        <div class="ps-panel-head">
+          <h4>Logits z</h4>
+          <span class="meta" id="logits-meta">drag a bar</span>
+        </div>
+        <div class="ps-panel-body">
+          <canvas id="c-logits"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Classes</h3>
-        <div class="slider-group">
-          <div class="slider-label"><span>Number of classes</span><span class="slider-value" id="n-val">5</span></div>
-          <input type="range" id="n-slider" min="2" max="10" step="1" value="5">
+      <!-- Top-right: softmax probabilities -->
+      <div class="ps-panel" id="panel-probs">
+        <div class="ps-panel-head">
+          <h4>Softmax p = σ(z / τ)</h4>
+          <span class="meta" id="probs-meta">τ = 1.00</span>
         </div>
-        <button class="btn btn-secondary" id="btn-randomize" style="width:100%;margin-top:6px">Randomize Logits</button>
-      </div>
-
-      <div class="control-section">
-        <h3>Temperature</h3>
-        <div class="slider-group">
-          <div class="slider-label"><span>&tau;</span><span class="slider-value" id="tau-val">1.00</span></div>
-          <input type="range" id="tau-slider" min="0.1" max="3" step="0.05" value="1">
-        </div>
-        <div class="info-box" style="margin-top:6px;font-size:0.76rem">
-          Low &tau; = sharp (winner takes all). High &tau; = flat (even chances). See <a href="temperature.html">Softmax Temperature</a> for deep dive.
+        <div class="ps-panel-body">
+          <canvas id="c-probs"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Softmax Properties</h3>
-        <div class="info-box">
-          &bull; All outputs are <strong>positive</strong> (exp always positive)<br>
-          &bull; All outputs <strong>sum to 1</strong> (valid probability distribution)<br>
-          &bull; <strong>Translation-invariant</strong> &mdash; adding 100 to every logit gives the same result<br>
-          &bull; Winner-takes-all as &tau; &rarr; 0; uniform as &tau; &rarr; &infin;
+      <!-- Bottom-left: entropy / sample histogram -->
+      <div class="ps-panel" id="panel-ent">
+        <div class="ps-panel-head">
+          <h4>Empirical vs. theoretical (sampling)</h4>
+          <span class="meta" id="ent-meta">0 samples drawn</span>
+        </div>
+        <div class="ps-panel-body">
+          <canvas id="c-ent"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Why exp()?</h3>
-        <div class="info-box">
-          Exp makes everything positive AND <strong>amplifies differences</strong>. A logit 2 larger becomes ~7.4&times; more likely. This encourages the model to commit to an answer. The "soft" in softmax = a smooth approximation of argmax (which would just pick one).
+      <!-- Bottom-right: sorted CDF + top-k/top-p cut -->
+      <div class="ps-panel" id="panel-cdf">
+        <div class="ps-panel-head">
+          <h4>Sorted CDF · top-k and top-p</h4>
+          <span class="meta" id="cdf-meta">k = n, p = 1.00</span>
+        </div>
+        <div class="ps-panel-body">
+          <canvas id="c-cdf"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Used Everywhere</h3>
-        <div class="info-box">
-          Softmax is the final layer of almost every classifier. In LLMs, it turns per-token logits into the next-word probability distribution &mdash; and then <a href="temperature.html">temperature</a> controls how "creative" the sampling is.
+      <!-- Stats strip -->
+      <div class="ps-stats">
+        <div class="ps-stat accent">
+          <div class="label">H(p) · bits</div>
+          <div class="value" id="stat-H">—</div>
+        </div>
+        <div class="ps-stat">
+          <div class="label">perplexity 2^H</div>
+          <div class="value" id="stat-PPL">—</div>
+        </div>
+        <div class="ps-stat">
+          <div class="label">KL(p ‖ Unif<sub>n</sub>) · bits</div>
+          <div class="value" id="stat-KL">—</div>
+        </div>
+        <div class="ps-stat warn">
+          <div class="label">CE vs. true · bits</div>
+          <div class="value" id="stat-CE">—</div>
+        </div>
+        <div class="ps-stat">
+          <div class="label">top-1 p(argmax)</div>
+          <div class="value" id="stat-TOP">—</div>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Formula</h3>
-        <div class="formula">
-          softmax(z)<sub>i</sub> = e<sup>z<sub>i</sub>/&tau;</sup> / &Sigma; e<sup>z<sub>j</sub>/&tau;</sup>
-        </div>
-      </div>
     </div>
   </div>
 
+  <!-- =====================================================
+       Control panel
+       ===================================================== -->
+  <div class="control-panel">
+
+    <div class="guide-banner" id="guide">
+      <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+      <div class="guide-step-counter">The big idea</div>
+      <div class="guide-title">Softmax makes valid probabilities out of raw scores.</div>
+      <div class="guide-text">
+        A network emits unnormalised <em>logits</em> z<sub>i</sub> ∈ ℝ. Softmax exponentiates (making every value positive) and divides by the total (making them sum to 1). Temperature τ rescales the logits before the exp — small τ sharpens, big τ flattens.
+      </div>
+    </div>
+
+    <!-- Classes + randomize -->
+    <div class="control-section">
+      <h3>Distribution</h3>
+      <div class="slider-group">
+        <div class="slider-label"><span>Number of classes n</span><span class="slider-value" id="n-val">5</span></div>
+        <input type="range" id="n-slider" min="2" max="16" step="1" value="5">
+      </div>
+      <div style="display:flex;gap:var(--s-2);margin-top:var(--s-2)">
+        <button class="btn btn-secondary" id="btn-rand" style="flex:1">randomize logits</button>
+        <button class="btn btn-secondary" id="btn-uniform">uniform</button>
+        <button class="btn btn-secondary" id="btn-peaked">peaked</button>
+      </div>
+    </div>
+
+    <!-- Temperature -->
+    <div class="control-section">
+      <h3>Temperature</h3>
+      <div class="slider-group">
+        <div class="slider-label"><span>τ</span><span class="slider-value" id="tau-val">1.00</span></div>
+        <input type="range" id="tau-slider" min="0.10" max="3.00" step="0.01" value="1.00">
+      </div>
+      <div class="info-box" style="font-size: var(--fs-small); margin-top: var(--s-2);">
+        τ → 0 collapses to argmax (a delta). τ → ∞ flattens to the uniform. At τ = 1 softmax just exponentiates the logits as-is.
+      </div>
+    </div>
+
+    <!-- Top-k / top-p truncation -->
+    <div class="control-section">
+      <h3>Truncation</h3>
+      <div class="slider-group">
+        <div class="slider-label"><span>top-k (keep k highest)</span><span class="slider-value" id="k-val">5</span></div>
+        <input type="range" id="k-slider" min="1" max="16" step="1" value="5">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>top-p (nucleus)</span><span class="slider-value" id="p-val">1.00</span></div>
+        <input type="range" id="p-slider" min="0.05" max="1.00" step="0.01" value="1.00">
+      </div>
+      <div class="info-box" style="font-size: var(--fs-small); margin-top: var(--s-2);">
+        Top-k keeps the k highest-probability classes; top-p keeps the smallest prefix whose cumulative probability is at least p. The kept set is the intersection of the two, then renormalised. This is how most LLMs sample.
+      </div>
+    </div>
+
+    <!-- True class (for cross-entropy) -->
+    <div class="control-section">
+      <h3>True class (for cross-entropy)</h3>
+      <div class="truth-row" id="truth-row">
+        <!-- populated by JS -->
+      </div>
+      <div class="info-box" style="font-size: var(--fs-small); margin-top: var(--s-2);">
+        Cross-entropy against a one-hot target y is just <code>−log₂ p<sub>y</sub></code>. When the model is confidently correct it approaches 0; when it's confidently wrong it blows up to ∞.
+      </div>
+    </div>
+
+    <!-- Sampling -->
+    <div class="control-section">
+      <h3>Sampling</h3>
+      <div style="display:flex;gap:var(--s-2)">
+        <button class="btn btn-primary" id="btn-sample" style="flex:1">draw 50</button>
+        <button class="btn btn-secondary" id="btn-sample1">draw 1</button>
+        <button class="btn btn-secondary" id="btn-sample-clear">reset</button>
+      </div>
+      <div class="info-box" style="font-size: var(--fs-small); margin-top: var(--s-2);">
+        Each draw picks a class with probability equal to the (post-truncation, post-temperature) softmax. Bars in the bottom-left panel are empirical frequencies; the teal outline is the theoretical distribution — they converge as you keep drawing.
+      </div>
+    </div>
+
+    <!-- Learn more -->
+    <div class="control-section">
+      <h3>Why softmax?</h3>
+
+      <div class="learn-more" style="margin:0">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Exp normalises and amplifies
+        </button>
+        <div class="learn-more-content">
+          <code>exp</code> is the unique (positive, differentiable, monotone) function whose ratios depend only on <em>differences</em>: <code>exp(z<sub>i</sub>)/exp(z<sub>j</sub>) = exp(z<sub>i</sub>−z<sub>j</sub>)</code>. That's why softmax is <strong>translation-invariant</strong> — adding 1000 to every logit changes nothing. It's also why subtracting <code>max(z)</code> before the exp is the canonical numerical-stability trick (see the code).
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Entropy, perplexity, KL
+        </button>
+        <div class="learn-more-content">
+          <strong>Entropy</strong> <code>H(p) = −Σ pᵢ log₂ pᵢ</code> measures uncertainty in bits. <strong>Perplexity</strong> <code>2<sup>H</sup></code> is the "effective number of equally-likely choices." <strong>KL divergence</strong> from uniform is <code>log₂ n − H(p)</code> — zero for uniform, maxes out when p is a point mass. All three move in lockstep as you drag logits.
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Why top-k and top-p together
+        </button>
+        <div class="learn-more-content">
+          Top-k caps tail length; top-p caps tail <em>mass</em>. On a flat distribution (many plausible classes) top-p keeps more than k. On a peaked distribution top-k keeps more than p. Most LLMs use both: take the intersection, renormalise, sample. This page shows the cut lines on the sorted CDF so you can see the kept nucleus.
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Sigmoid is just softmax with two classes
+        </button>
+        <div class="learn-more-content">
+          With logits (z₁, 0), softmax gives <code>(e^z₁, 1)/(e^z₁ + 1)</code>, which is exactly the sigmoid of z₁ for the first class. Binary classifiers use this shortcut because the second class is redundant: its probability is always <code>1 − p₁</code>.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========================================================
+     MAIN SCRIPT
+     ======================================================== -->
 <script>
-(function(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  let W, H;
-  let logits = [2, 1, 0.5, -1, 0];
-  let tau = 1;
-  let dragging = -1;
+(function() {
+'use strict';
 
-  const classColors = ['#6366f1','#22d3ee','#34d399','#fbbf24','#f472b6','#fb923c','#a78bfa','#f87171','#60a5fa','#4ade80'];
+/* =============================================================
+   State
+   ============================================================= */
+const state = {
+  logits: [2.0, 1.2, 0.4, -0.3, -1.1],
+  n: 5,
+  tau: 1.00,
+  topK: 5,
+  topP: 1.00,
+  trueClass: 0,
+  sampleCounts: [0, 0, 0, 0, 0],
+  totalSamples: 0,
+  draggingIdx: -1,
+  seed: 1337,
+};
 
-  function resize(){
-    const r=canvas.parentElement.getBoundingClientRect();
-    W=r.width; H=r.height;
-    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-    canvas.style.width=W+'px'; canvas.style.height=H+'px';
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    draw();
+/* ---- Class palette (cycled) ---- */
+const CLASS_COLOURS = [
+  '#5FD2CB', '#F25C54', '#A78BFA', '#FBBF24', '#34D399',
+  '#60A5FA', '#F472B6', '#FB923C', '#4ADE80', '#818CF8',
+  '#FACC15', '#FB7185', '#38BDF8', '#C084FC', '#F97316', '#84CC16'
+];
+
+/* =============================================================
+   Palette (read CSS vars)
+   ============================================================= */
+const pal = {};
+function readVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function loadPalette() {
+  pal.teal300 = readVar('--teal-300');
+  pal.teal400 = readVar('--teal-400');
+  pal.teal500 = readVar('--teal-500');
+  pal.heat400 = readVar('--heat-400');
+  pal.ink300  = readVar('--ink-300');
+  pal.ink500  = readVar('--ink-500');
+  pal.bgSunken = readVar('--bg-sunken') || '#060607';
+  pal.fgPrim = readVar('--fg-primary');
+}
+
+/* =============================================================
+   Math
+   ============================================================= */
+
+/* Numerically-stable softmax with temperature. If some classes
+   are 'masked' (belong to mask array with 0/1 entries), their
+   logits are treated as −∞ and the distribution is renormalised
+   over the remaining classes. */
+function softmaxTau(z, tau, mask) {
+  const n = z.length;
+  const scaled = new Array(n);
+  let mx = -Infinity;
+  for (let i = 0; i < n; i++) {
+    if (mask && !mask[i]) { scaled[i] = -Infinity; continue; }
+    scaled[i] = z[i] / tau;
+    if (scaled[i] > mx) mx = scaled[i];
+  }
+  if (!isFinite(mx)) {
+    /* All masked → uniform over none; return zeros. */
+    return new Array(n).fill(0);
+  }
+  const out = new Array(n);
+  let s = 0;
+  for (let i = 0; i < n; i++) {
+    if (!isFinite(scaled[i])) { out[i] = 0; continue; }
+    out[i] = Math.exp(scaled[i] - mx);
+    s += out[i];
+  }
+  for (let i = 0; i < n; i++) out[i] /= (s || 1);
+  return out;
+}
+
+/* Entropy in bits. Treats 0·log 0 = 0. */
+function entropyBits(p) {
+  let H = 0;
+  for (const v of p) {
+    if (v > 0) H -= v * Math.log2(v);
+  }
+  return H;
+}
+
+/* KL from uniform, in bits.  KL(p || u) = log2(n) - H(p). */
+function klFromUniformBits(p) {
+  const nEff = p.length;
+  return Math.log2(nEff) - entropyBits(p);
+}
+
+/* Top-k mask: 1 for indices in the k highest probs, else 0. */
+function topKMask(p, k) {
+  const n = p.length;
+  if (k >= n) return new Array(n).fill(1);
+  const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+  const keep = new Array(n).fill(0);
+  for (let i = 0; i < k; i++) keep[idx[i][1]] = 1;
+  return keep;
+}
+/* Top-p mask: the smallest-prefix set whose cumulative prob ≥ p_threshold.
+   Ties broken by sorted order. If p_threshold ≥ 1 returns all ones. */
+function topPMask(p, pThresh) {
+  const n = p.length;
+  if (pThresh >= 1) return new Array(n).fill(1);
+  const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+  const keep = new Array(n).fill(0);
+  let cum = 0;
+  for (let i = 0; i < n; i++) {
+    keep[idx[i][1]] = 1;
+    cum += idx[i][0];
+    if (cum >= pThresh - 1e-12) break;   /* include the one that crosses */
+  }
+  return keep;
+}
+function andMask(a, b) {
+  const out = new Array(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = a[i] && b[i] ? 1 : 0;
+  return out;
+}
+
+/* =============================================================
+   PRNG (mulberry32) for reproducible sampling
+   ============================================================= */
+function mulberry32(seed) {
+  return function() {
+    let t = seed = (seed + 0x6D2B79F5) | 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rng = mulberry32(state.seed);
+
+function sampleCategorical(p) {
+  /* Inverse-CDF with a guard: when fp error causes Σp < u by ε, fall back
+     to the last class with non-zero mass instead of blindly returning the
+     last index (which may be 0 after top-k/top-p masking). */
+  const u = rng();
+  let cum = 0;
+  for (let i = 0; i < p.length; i++) {
+    cum += p[i];
+    if (u < cum) return i;
+  }
+  for (let i = p.length - 1; i >= 0; i--) if (p[i] > 0) return i;
+  return 0;
+}
+
+/* =============================================================
+   Canvas fit
+   ============================================================= */
+function fit(cv) {
+  const r = cv.getBoundingClientRect();
+  cv.width  = Math.max(1, Math.round(r.width  * devicePixelRatio));
+  cv.height = Math.max(1, Math.round(r.height * devicePixelRatio));
+  const cx = cv.getContext('2d');
+  cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  return { cx, W: r.width, H: r.height };
+}
+
+/* =============================================================
+   Panel 1: logit bars (draggable)
+   ============================================================= */
+const cvLogits = document.getElementById('c-logits');
+
+function logitsLayout(W, H) {
+  const mTop = 18, mBot = 28, mL = 34, mR = 14;
+  const plotH = H - mTop - mBot;
+  const plotW = W - mL - mR;
+  const n = state.n;
+  const slot = plotW / n;
+  const barW = Math.min(50, slot - 10);
+  const zeroY = mTop + plotH * 0.55;   /* zero line slightly below centre */
+  const maxAbs = 4;   /* logit range ±4 */
+  return { mTop, mBot, mL, mR, plotH, plotW, n, slot, barW, zeroY, maxAbs };
+}
+function logitYToVal(y, lay) {
+  const { zeroY } = lay;
+  const dy = zeroY - y;
+  /* Above zero line is positive. */
+  /* Scale: maxAbs at distance (plotH * 0.55 - mTop) ≈ full top region. */
+  const topDist  = lay.zeroY - lay.mTop;
+  const botDist  = (lay.mTop + lay.plotH) - lay.zeroY;
+  if (dy >= 0) return Math.min(lay.maxAbs,  dy / topDist * lay.maxAbs);
+  return Math.max(-lay.maxAbs, dy / botDist * lay.maxAbs);
+}
+function logitValToY(v, lay) {
+  if (v >= 0) return lay.zeroY - (v / lay.maxAbs) * (lay.zeroY - lay.mTop);
+  return lay.zeroY + (-v / lay.maxAbs) * ((lay.mTop + lay.plotH) - lay.zeroY);
+}
+function renderLogits() {
+  const { cx, W, H } = fit(cvLogits);
+  const lay = logitsLayout(W, H);
+  cx.fillStyle = pal.bgSunken;
+  cx.fillRect(0, 0, W, H);
+
+  /* Grid lines at integer logit values */
+  cx.strokeStyle = 'rgba(255,255,255,0.05)';
+  cx.lineWidth = 1;
+  for (let v = -lay.maxAbs; v <= lay.maxAbs; v++) {
+    const y = logitValToY(v, lay);
+    cx.beginPath(); cx.moveTo(lay.mL, y); cx.lineTo(W - lay.mR, y); cx.stroke();
+  }
+  /* Zero line (brighter) */
+  cx.strokeStyle = 'rgba(255,255,255,0.25)';
+  cx.lineWidth = 1;
+  cx.beginPath(); cx.moveTo(lay.mL, lay.zeroY); cx.lineTo(W - lay.mR, lay.zeroY); cx.stroke();
+
+  cx.fillStyle = 'rgba(255,255,255,0.45)';
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'right';
+  for (let v = -lay.maxAbs; v <= lay.maxAbs; v += 2) {
+    cx.fillText(String(v), lay.mL - 4, logitValToY(v, lay) + 3);
   }
 
-  function softmax(z, t){
-    const m = Math.max(...z);
-    const e = z.map(v => Math.exp((v-m)/t));
-    const s = e.reduce((a,b)=>a+b,0);
-    return e.map(v=>v/s);
-  }
+  for (let i = 0; i < lay.n; i++) {
+    const cxp = lay.mL + lay.slot * (i + 0.5);
+    const barX = cxp - lay.barW / 2;
+    const z = state.logits[i];
+    const tipY = logitValToY(z, lay);
+    const yA = Math.min(lay.zeroY, tipY);
+    const yB = Math.max(lay.zeroY, tipY);
 
-  function draw(){
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
-
-    const n = logits.length;
-    const margin = 40;
-    const gap = 20;
-    const colW = (W - margin*2 - gap) / 2;
-    const barWidth = Math.min(60, (colW - 40) / n);
-    const barSpace = colW / n;
-
-    const topY = 70;
-    const botY = H - 80;
-    const midY = (topY + botY) / 2;
-    const maxH = (botY - topY) / 2 - 20;
-
-    // Title headers
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='12px JetBrains Mono'; ctx.textAlign='center';
-    ctx.fillText('LOGITS (raw scores)', margin + colW/2, 32);
-    ctx.fillText('SOFTMAX (probabilities)', margin + colW + gap + colW/2, 32);
-
-    // Left: logits bars (draggable)
-    const leftX0 = margin;
-    const zeroLineY = midY;
-    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-    ctx.beginPath(); ctx.moveTo(leftX0, zeroLineY); ctx.lineTo(leftX0+colW, zeroLineY); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
-    ctx.fillText('0', leftX0-4, zeroLineY+3);
-
-    for(let i=0;i<n;i++){
-      const cx = leftX0 + barSpace*(i+0.5);
-      const h = (logits[i]/4) * maxH; // 4 is max scale
-      const y0 = zeroLineY;
-      const y1 = zeroLineY - h;
-
-      // Bar
-      ctx.fillStyle = classColors[i % classColors.length];
-      ctx.globalAlpha = dragging===i ? 1 : 0.85;
-      const barX = cx - barWidth/2;
-      const barY = Math.min(y0, y1);
-      const barH = Math.abs(h);
-      ctx.beginPath(); ctx.roundRect(barX, barY, barWidth, barH, 4); ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Handle at top of bar
-      ctx.fillStyle='#fff';
-      ctx.beginPath(); ctx.arc(cx, y1, 6, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = classColors[i % classColors.length];
-      ctx.beginPath(); ctx.arc(cx, y1, 4, 0, Math.PI*2); ctx.fill();
-
-      // Label
-      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Inter,sans-serif'; ctx.textAlign='center';
-      ctx.fillText('class '+i, cx, botY+14);
-      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 11px JetBrains Mono';
-      ctx.fillText(logits[i].toFixed(2), cx, botY+28);
+    cx.fillStyle = CLASS_COLOURS[i % CLASS_COLOURS.length];
+    cx.globalAlpha = state.draggingIdx === i ? 1 : 0.88;
+    if (cx.roundRect) {
+      cx.beginPath();
+      cx.roundRect(barX, yA, lay.barW, yB - yA, 4);
+      cx.fill();
+    } else {
+      cx.fillRect(barX, yA, lay.barW, yB - yA);
     }
+    cx.globalAlpha = 1;
 
-    // Right: softmax probabilities
-    const rightX0 = margin + colW + gap;
-    const probs = softmax(logits, tau);
-    const baseY = botY;
+    /* Tip handle */
+    cx.fillStyle = '#fff';
+    cx.beginPath(); cx.arc(cxp, tipY, 5, 0, Math.PI * 2); cx.fill();
+    cx.fillStyle = CLASS_COLOURS[i % CLASS_COLOURS.length];
+    cx.beginPath(); cx.arc(cxp, tipY, 3, 0, Math.PI * 2); cx.fill();
 
-    for(let i=0;i<n;i++){
-      const cx = rightX0 + barSpace*(i+0.5);
-      const h = probs[i] * (botY - topY - 20);
-      const y = baseY - h;
-
-      ctx.fillStyle = classColors[i % classColors.length];
-      const barX = cx - barWidth/2;
-      ctx.beginPath(); ctx.roundRect(barX, y, barWidth, h, 4); ctx.fill();
-
-      // Percentage on bar
-      ctx.fillStyle='#fff'; ctx.font='bold 10px JetBrains Mono'; ctx.textAlign='center';
-      if(h > 20) ctx.fillText((probs[i]*100).toFixed(0)+'%', cx, y+14);
-
-      ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Inter,sans-serif';
-      ctx.fillText('p='+probs[i].toFixed(3), cx, botY+14);
-    }
-
-    // Axis for right
-    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(rightX0, baseY); ctx.lineTo(rightX0+colW, baseY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(rightX0, topY+20); ctx.lineTo(rightX0+colW, topY+20); ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
-    ctx.fillText('1.0', rightX0-4, topY+24);
-    ctx.fillText('0.0', rightX0-4, baseY+3);
-
-    // Arrow between
-    ctx.strokeStyle='rgba(251,191,36,0.3)'; ctx.lineWidth=2;
-    const arrowY = midY;
-    const ax1 = leftX0+colW+4, ax2 = rightX0-4;
-    ctx.beginPath(); ctx.moveTo(ax1, arrowY); ctx.lineTo(ax2, arrowY); ctx.stroke();
-    ctx.fillStyle='rgba(251,191,36,0.6)';
-    ctx.beginPath(); ctx.moveTo(ax2, arrowY); ctx.lineTo(ax2-10, arrowY-5); ctx.lineTo(ax2-10, arrowY+5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='rgba(251,191,36,0.8)'; ctx.font='bold 11px JetBrains Mono'; ctx.textAlign='center';
-    ctx.fillText('softmax(&tau;='+tau.toFixed(2)+')', (ax1+ax2)/2, arrowY-8);
-
-    // Save layout for drag
-    canvas._layout = { leftX0, rightX0, barSpace, barWidth, zeroLineY, maxH, n, topY, botY };
-
-    // Sum check
-    const sum = probs.reduce((a,b)=>a+b,0);
-    document.getElementById('overlay').innerHTML =
-      `Sum of probabilities = <span class="value">${sum.toFixed(4)}</span> (always 1!) &middot; Max prob: <span class="value">class ${probs.indexOf(Math.max(...probs))}</span>`;
+    /* Label + value */
+    cx.fillStyle = 'rgba(255,255,255,0.6)';
+    cx.font = "500 10px 'Inter Tight', sans-serif";
+    cx.textAlign = 'center';
+    cx.fillText(`class ${i}`, cxp, H - 14);
+    cx.fillStyle = pal.fgPrim;
+    cx.font = "500 11px 'JetBrains Mono', monospace";
+    cx.fillText(z.toFixed(2), cxp, H - 2);
   }
 
-  canvas.addEventListener('pointerdown', e=>{
-    const L = canvas._layout; if(!L) return;
-    const r=canvas.getBoundingClientRect();
-    const mx=e.clientX-r.left, my=e.clientY-r.top;
-    for(let i=0;i<L.n;i++){
-      const cx = L.leftX0 + L.barSpace*(i+0.5);
-      if(Math.abs(mx-cx) < L.barWidth/2+8 && my > L.topY-20 && my < L.botY){
-        dragging = i;
-        updateLogitFromMouse(my, L);
-        return;
+  /* Save layout for drag */
+  cvLogits._lay = lay;
+}
+
+/* =============================================================
+   Panel 2: softmax bars
+   ============================================================= */
+const cvProbs = document.getElementById('c-probs');
+
+function probsLayout(W, H) {
+  const mTop = 18, mBot = 28, mL = 36, mR = 14;
+  const plotH = H - mTop - mBot;
+  const plotW = W - mL - mR;
+  const n = state.n;
+  const slot = plotW / n;
+  const barW = Math.min(50, slot - 10);
+  return { mTop, mBot, mL, mR, plotH, plotW, n, slot, barW };
+}
+function renderProbs() {
+  const { cx, W, H } = fit(cvProbs);
+  const lay = probsLayout(W, H);
+  cx.fillStyle = pal.bgSunken;
+  cx.fillRect(0, 0, W, H);
+
+  /* Horizontal gridlines at 0.25, 0.5, 0.75, 1.0 */
+  cx.strokeStyle = 'rgba(255,255,255,0.05)';
+  cx.lineWidth = 1;
+  cx.fillStyle = 'rgba(255,255,255,0.45)';
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'right';
+  for (const v of [0, 0.25, 0.5, 0.75, 1.0]) {
+    const y = lay.mTop + lay.plotH * (1 - v);
+    cx.beginPath(); cx.moveTo(lay.mL, y); cx.lineTo(W - lay.mR, y); cx.stroke();
+    cx.fillText(v.toFixed(2), lay.mL - 4, y + 3);
+  }
+
+  /* Probabilities — full softmax (pre-truncation), plus truncated */
+  const pFull = softmaxTau(state.logits, state.tau, null);
+  const kMask = topKMask(pFull, state.topK);
+  const pMask = topPMask(pFull, state.topP);
+  const mask  = andMask(kMask, pMask);
+  const pTrunc = softmaxTau(state.logits, state.tau, mask);
+
+  /* Bars: full (faint outline) + truncated (filled) */
+  for (let i = 0; i < lay.n; i++) {
+    const cxp = lay.mL + lay.slot * (i + 0.5);
+    const barX = cxp - lay.barW / 2;
+
+    /* Faint outline = pFull */
+    const yTop = lay.mTop + lay.plotH * (1 - pFull[i]);
+    cx.strokeStyle = 'rgba(255,255,255,0.25)';
+    cx.setLineDash([2, 3]);
+    cx.lineWidth = 1;
+    cx.beginPath();
+    cx.rect(barX, yTop, lay.barW, lay.mTop + lay.plotH - yTop);
+    cx.stroke();
+    cx.setLineDash([]);
+
+    /* Filled bar = pTrunc (if in mask) */
+    if (mask[i]) {
+      const yTopT = lay.mTop + lay.plotH * (1 - pTrunc[i]);
+      const col = CLASS_COLOURS[i % CLASS_COLOURS.length];
+      cx.fillStyle = col;
+      cx.globalAlpha = state.trueClass === i ? 1 : 0.85;
+      if (cx.roundRect) {
+        cx.beginPath();
+        cx.roundRect(barX, yTopT, lay.barW, lay.mTop + lay.plotH - yTopT, 4);
+        cx.fill();
+      } else {
+        cx.fillRect(barX, yTopT, lay.barW, lay.mTop + lay.plotH - yTopT);
+      }
+      cx.globalAlpha = 1;
+      /* Percent on top */
+      if (pTrunc[i] > 0.03) {
+        cx.fillStyle = '#fff';
+        cx.font = "500 10px 'JetBrains Mono', monospace";
+        cx.textAlign = 'center';
+        cx.fillText((pTrunc[i] * 100).toFixed(0) + '%', cxp, yTopT - 4);
       }
     }
-  });
-  canvas.addEventListener('pointermove', e=>{
-    if(dragging<0) return;
-    const r=canvas.getBoundingClientRect();
-    updateLogitFromMouse(e.clientY-r.top, canvas._layout);
-  });
-  canvas.addEventListener('pointerup', ()=>dragging=-1);
-  canvas.addEventListener('pointerleave', ()=>dragging=-1);
+    /* Ring + label when this is the true class */
+    if (state.trueClass === i) {
+      cx.strokeStyle = pal.teal300;
+      cx.lineWidth = 2;
+      cx.setLineDash([3, 3]);
+      cx.beginPath();
+      cx.rect(barX - 3, lay.mTop - 2, lay.barW + 6, lay.plotH + 4);
+      cx.stroke();
+      cx.setLineDash([]);
+    }
 
-  function updateLogitFromMouse(my, L){
-    const dy = L.zeroLineY - my;
-    const val = (dy / L.maxH) * 4;
-    logits[dragging] = Math.max(-4, Math.min(4, val));
-    draw();
+    /* Label */
+    cx.fillStyle = 'rgba(255,255,255,0.6)';
+    cx.font = "500 10px 'Inter Tight', sans-serif";
+    cx.textAlign = 'center';
+    cx.fillText('c' + i, cxp, H - 14);
+    cx.fillStyle = pal.fgPrim;
+    cx.font = "500 10px 'JetBrains Mono', monospace";
+    cx.fillText(pTrunc[i].toFixed(3), cxp, H - 2);
   }
 
-  document.getElementById('n-slider').addEventListener('input',e=>{
-    const n = parseInt(e.target.value);
-    document.getElementById('n-val').textContent = n;
-    if(n > logits.length){
-      while(logits.length < n) logits.push(Math.random()*4-2);
-    } else {
-      logits = logits.slice(0, n);
-    }
-    draw();
-  });
-  document.getElementById('tau-slider').addEventListener('input',e=>{
-    tau=parseFloat(e.target.value); document.getElementById('tau-val').textContent=tau.toFixed(2); draw();
-  });
-  document.getElementById('btn-randomize').addEventListener('click',()=>{
-    logits = logits.map(()=>Math.random()*6-3);
-    draw();
-  });
+  /* Sum check (upper-right corner overlay) */
+  const sumP = pTrunc.reduce((a, b) => a + b, 0);
+  cx.fillStyle = 'rgba(255,255,255,0.6)';
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'right';
+  cx.fillText(`Σ p = ${sumP.toFixed(4)}`, W - lay.mR, 14);
+}
 
-  resize(); window.addEventListener('resize',resize);
+/* =============================================================
+   Panel 3: empirical histogram vs theoretical
+   ============================================================= */
+const cvEnt = document.getElementById('c-ent');
+function renderEnt() {
+  const { cx, W, H } = fit(cvEnt);
+  const lay = probsLayout(W, H);
+  cx.fillStyle = pal.bgSunken;
+  cx.fillRect(0, 0, W, H);
+
+  const pFull  = softmaxTau(state.logits, state.tau, null);
+  const kMask = topKMask(pFull, state.topK);
+  const pMask = topPMask(pFull, state.topP);
+  const mask  = andMask(kMask, pMask);
+  const pTrunc = softmaxTau(state.logits, state.tau, mask);
+
+  /* Empirical */
+  const emp = new Array(lay.n).fill(0);
+  const tot = state.totalSamples || 1;
+  for (let i = 0; i < lay.n; i++) emp[i] = state.sampleCounts[i] / tot;
+
+  /* Y axis ticks */
+  cx.strokeStyle = 'rgba(255,255,255,0.05)';
+  cx.lineWidth = 1;
+  cx.fillStyle = 'rgba(255,255,255,0.45)';
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'right';
+  const maxAxis = Math.max(0.4, Math.max(...pTrunc, ...emp) * 1.15);
+  for (const v of [0, maxAxis/4, maxAxis/2, 3*maxAxis/4, maxAxis]) {
+    const y = lay.mTop + lay.plotH * (1 - v/maxAxis);
+    cx.beginPath(); cx.moveTo(lay.mL, y); cx.lineTo(W - lay.mR, y); cx.stroke();
+    cx.fillText(v.toFixed(2), lay.mL - 4, y + 3);
+  }
+
+  for (let i = 0; i < lay.n; i++) {
+    const cxp = lay.mL + lay.slot * (i + 0.5);
+    const barX = cxp - lay.barW / 2;
+    /* Empirical (solid) */
+    const yE = lay.mTop + lay.plotH * (1 - Math.min(maxAxis, emp[i]) / maxAxis);
+    cx.fillStyle = CLASS_COLOURS[i % CLASS_COLOURS.length];
+    cx.globalAlpha = 0.75;
+    cx.fillRect(barX, yE, lay.barW, lay.mTop + lay.plotH - yE);
+    cx.globalAlpha = 1;
+    /* Theoretical (outline) */
+    const yT = lay.mTop + lay.plotH * (1 - Math.min(maxAxis, pTrunc[i]) / maxAxis);
+    cx.strokeStyle = pal.teal300;
+    cx.lineWidth = 1.6;
+    cx.beginPath();
+    cx.rect(barX, yT, lay.barW, lay.mTop + lay.plotH - yT);
+    cx.stroke();
+
+    cx.fillStyle = 'rgba(255,255,255,0.6)';
+    cx.font = "500 10px 'Inter Tight', sans-serif";
+    cx.textAlign = 'center';
+    cx.fillText('c' + i, cxp, H - 14);
+    cx.fillStyle = pal.fgPrim;
+    cx.font = "500 10px 'JetBrains Mono', monospace";
+    cx.fillText(state.sampleCounts[i] || 0, cxp, H - 2);
+  }
+
+  /* Legend */
+  cx.fillStyle = 'rgba(255,255,255,0.75)';
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'left';
+  cx.fillText('■ empirical', lay.mL + 4, 14);
+  cx.fillStyle = pal.teal300;
+  cx.fillText('▭ theoretical', lay.mL + 90, 14);
+}
+
+/* =============================================================
+   Panel 4: sorted CDF + top-k / top-p cuts
+   ============================================================= */
+const cvCdf = document.getElementById('c-cdf');
+function renderCdf() {
+  const { cx, W, H } = fit(cvCdf);
+  cx.fillStyle = pal.bgSunken;
+  cx.fillRect(0, 0, W, H);
+
+  const mTop = 18, mBot = 28, mL = 34, mR = 14;
+  const plotH = H - mTop - mBot;
+  const plotW = W - mL - mR;
+
+  /* Use full (pre-truncation) softmax so user can see where cuts land. */
+  const pFull = softmaxTau(state.logits, state.tau, null);
+  const idx = pFull.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+  const sorted = idx.map(r => r[0]);
+  const cum = [];
+  let s = 0;
+  for (const v of sorted) { s += v; cum.push(s); }
+
+  /* Axes */
+  cx.strokeStyle = 'rgba(255,255,255,0.05)';
+  cx.lineWidth = 1;
+  cx.fillStyle = 'rgba(255,255,255,0.45)';
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'right';
+  for (const v of [0, 0.25, 0.5, 0.75, 1.0]) {
+    const y = mTop + plotH * (1 - v);
+    cx.beginPath(); cx.moveTo(mL, y); cx.lineTo(W - mR, y); cx.stroke();
+    cx.fillText(v.toFixed(2), mL - 4, y + 3);
+  }
+  cx.textAlign = 'center';
+  for (let i = 0; i < state.n; i++) {
+    const xp = mL + (i + 0.5) / state.n * plotW;
+    cx.fillStyle = 'rgba(255,255,255,0.55)';
+    cx.fillText(String(idx[i][1]), xp, H - 2);
+  }
+
+  /* Sorted prob bars (short, tucked at bottom) */
+  const slot = plotW / state.n;
+  const barW = Math.min(40, slot - 6);
+  for (let i = 0; i < state.n; i++) {
+    const cxp = mL + slot * (i + 0.5);
+    const barX = cxp - barW / 2;
+    const clsIdx = idx[i][1];
+    const h = sorted[i] * plotH * 0.45;
+    const y0 = mTop + plotH - h;
+    cx.fillStyle = CLASS_COLOURS[clsIdx % CLASS_COLOURS.length];
+    cx.globalAlpha = 0.6;
+    cx.fillRect(barX, y0, barW, h);
+    cx.globalAlpha = 1;
+  }
+
+  /* Cumulative step-curve. Empirical-CDF convention: the curve jumps up
+     at the right edge of each slot, so the point "cum[i] after first i+1
+     classes kept" sits at x = mL + (i+1)/n · plotW — the same x as the
+     top-k vertical cut when topK = i+1. */
+  cx.strokeStyle = pal.teal300;
+  cx.lineWidth = 2;
+  cx.beginPath();
+  cx.moveTo(mL, mTop + plotH);                       /* (0, 0) */
+  for (let i = 0; i < state.n; i++) {
+    const xRight = mL + (i + 1) / state.n * plotW;
+    const yp = mTop + plotH * (1 - cum[i]);
+    const xLeft = mL + i / state.n * plotW;
+    const yPrev = mTop + plotH * (1 - (i === 0 ? 0 : cum[i-1]));
+    /* Horizontal step to the right edge at the previous cum value, then
+       jump vertically up to the new cum. */
+    cx.lineTo(xLeft, yPrev);     /* redundant first iter but harmless */
+    cx.lineTo(xRight, yPrev);
+    cx.lineTo(xRight, yp);
+  }
+  cx.stroke();
+
+  /* Top-k vertical cut */
+  if (state.topK < state.n) {
+    const xk = mL + state.topK / state.n * plotW;
+    cx.strokeStyle = 'rgba(242, 92, 84, 0.85)';
+    cx.setLineDash([5, 4]);
+    cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(xk, mTop); cx.lineTo(xk, mTop + plotH); cx.stroke();
+    cx.setLineDash([]);
+    cx.fillStyle = 'rgba(242, 92, 84, 0.95)';
+    cx.font = "500 10px 'JetBrains Mono', monospace";
+    cx.textAlign = 'left';
+    cx.fillText(`top-k = ${state.topK}`, xk + 4, mTop + 12);
+  }
+  /* Top-p horizontal cut */
+  if (state.topP < 1) {
+    const yp = mTop + plotH * (1 - state.topP);
+    cx.strokeStyle = 'rgba(167, 139, 250, 0.85)';
+    cx.setLineDash([5, 4]);
+    cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(mL, yp); cx.lineTo(W - mR, yp); cx.stroke();
+    cx.setLineDash([]);
+    cx.fillStyle = 'rgba(167, 139, 250, 0.95)';
+    cx.font = "500 10px 'JetBrains Mono', monospace";
+    cx.textAlign = 'right';
+    cx.fillText(`top-p = ${state.topP.toFixed(2)}`, W - mR - 4, yp - 4);
+  }
+  /* Legend */
+  cx.fillStyle = pal.teal300;
+  cx.font = "500 10px 'JetBrains Mono', monospace";
+  cx.textAlign = 'left';
+  cx.fillText('cumulative P(rank ≤ k)', mL + 4, 14);
+}
+
+/* =============================================================
+   Stats
+   ============================================================= */
+function updateStats() {
+  const D = id => document.getElementById(id);
+  const pFull  = softmaxTau(state.logits, state.tau, null);
+  const kMask = topKMask(pFull, state.topK);
+  const pMask = topPMask(pFull, state.topP);
+  const mask  = andMask(kMask, pMask);
+  const pTrunc = softmaxTau(state.logits, state.tau, mask);
+  const H  = entropyBits(pTrunc);
+  const PPL = Math.pow(2, H);
+  const KL = klFromUniformBits(pTrunc);
+  const CE = state.trueClass < state.n
+    ? (pTrunc[state.trueClass] > 0 ? -Math.log2(pTrunc[state.trueClass]) : Infinity)
+    : 0;
+  const top1 = Math.max(...pTrunc);
+  D('stat-H').textContent   = H.toFixed(3);
+  D('stat-PPL').textContent = PPL.toFixed(2);
+  D('stat-KL').textContent  = KL.toFixed(3);
+  D('stat-CE').textContent  = isFinite(CE) ? CE.toFixed(3) : '∞';
+  D('stat-TOP').textContent = top1.toFixed(3);
+  D('probs-meta').textContent = `τ = ${state.tau.toFixed(2)}`;
+  D('cdf-meta').textContent = `k = ${state.topK}, p = ${state.topP.toFixed(2)}`;
+  D('ent-meta').textContent = `${state.totalSamples} sample${state.totalSamples === 1 ? '' : 's'} drawn`;
+}
+
+function renderAll() {
+  loadPalette();
+  renderLogits();
+  renderProbs();
+  renderEnt();
+  renderCdf();
+  updateStats();
+}
+
+/* =============================================================
+   Dragging logits
+   ============================================================= */
+function getLogitsPointer(ev) {
+  const r = cvLogits.getBoundingClientRect();
+  return { x: ev.clientX - r.left, y: ev.clientY - r.top, r };
+}
+cvLogits.addEventListener('pointerdown', ev => {
+  const p = getLogitsPointer(ev);
+  const lay = cvLogits._lay;
+  if (!lay) return;
+  for (let i = 0; i < lay.n; i++) {
+    const cxp = lay.mL + lay.slot * (i + 0.5);
+    if (Math.abs(p.x - cxp) < lay.barW / 2 + 10) {
+      state.draggingIdx = i;
+      cvLogits.setPointerCapture(ev.pointerId);
+      state.logits[i] = logitYToVal(p.y, lay);
+      renderAll();
+      return;
+    }
+  }
+});
+cvLogits.addEventListener('pointermove', ev => {
+  if (state.draggingIdx < 0) return;
+  const p = getLogitsPointer(ev);
+  const lay = cvLogits._lay;
+  if (!lay) return;
+  state.logits[state.draggingIdx] = logitYToVal(p.y, lay);
+  renderAll();
+});
+cvLogits.addEventListener('pointerup',   () => { state.draggingIdx = -1; });
+cvLogits.addEventListener('pointerleave',() => { state.draggingIdx = -1; });
+
+/* =============================================================
+   UI: sliders and chips
+   ============================================================= */
+const D = id => document.getElementById(id);
+
+function rebuildTrueChips() {
+  const row = D('truth-row');
+  row.innerHTML = '';
+  for (let i = 0; i < state.n; i++) {
+    const c = document.createElement('div');
+    c.className = 'truth-chip' + (state.trueClass === i ? ' on' : '');
+    c.textContent = `class ${i}`;
+    c.addEventListener('click', () => {
+      state.trueClass = i;
+      rebuildTrueChips();
+      renderAll();
+    });
+    row.appendChild(c);
+  }
+}
+rebuildTrueChips();
+
+function resizeLogitsTo(n) {
+  if (n > state.logits.length) {
+    while (state.logits.length < n) state.logits.push((rng() - 0.5) * 4);
+  } else {
+    state.logits = state.logits.slice(0, n);
+  }
+  state.n = n;
+  if (state.trueClass >= n) state.trueClass = n - 1;
+  /* Reset samples since the class count changed. */
+  state.sampleCounts = new Array(n).fill(0);
+  state.totalSamples = 0;
+  /* Clamp top-k slider to n. */
+  D('k-slider').max = String(n);
+  if (state.topK > n) state.topK = n;
+  D('k-slider').value = state.topK;
+  D('k-val').textContent = state.topK;
+  rebuildTrueChips();
+  renderAll();
+}
+
+D('n-slider').addEventListener('input', e => {
+  const n = parseInt(e.target.value, 10);
+  D('n-val').textContent = n;
+  resizeLogitsTo(n);
+});
+D('tau-slider').addEventListener('input', e => {
+  state.tau = parseFloat(e.target.value);
+  D('tau-val').textContent = state.tau.toFixed(2);
+  /* Sampling is technically τ-dependent, so reset counts. */
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+D('k-slider').addEventListener('input', e => {
+  state.topK = parseInt(e.target.value, 10);
+  D('k-val').textContent = state.topK;
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+D('p-slider').addEventListener('input', e => {
+  state.topP = parseFloat(e.target.value);
+  D('p-val').textContent = state.topP.toFixed(2);
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+
+/* Randomize / uniform / peaked presets */
+D('btn-rand').addEventListener('click', () => {
+  for (let i = 0; i < state.n; i++) state.logits[i] = (rng() - 0.5) * 6;
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+D('btn-uniform').addEventListener('click', () => {
+  for (let i = 0; i < state.n; i++) state.logits[i] = 0;
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+D('btn-peaked').addEventListener('click', () => {
+  for (let i = 0; i < state.n; i++) state.logits[i] = i === 0 ? 3 : -1;
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+
+/* Sampling */
+function drawSamples(k) {
+  const pFull  = softmaxTau(state.logits, state.tau, null);
+  const kMask = topKMask(pFull, state.topK);
+  const pMask = topPMask(pFull, state.topP);
+  const mask  = andMask(kMask, pMask);
+  const p = softmaxTau(state.logits, state.tau, mask);
+  for (let i = 0; i < k; i++) {
+    const c = sampleCategorical(p);
+    state.sampleCounts[c] = (state.sampleCounts[c] || 0) + 1;
+    state.totalSamples++;
+  }
+  renderAll();
+}
+D('btn-sample').addEventListener('click',  () => drawSamples(50));
+D('btn-sample1').addEventListener('click', () => drawSamples(1));
+D('btn-sample-clear').addEventListener('click', () => {
+  state.sampleCounts = new Array(state.n).fill(0);
+  state.totalSamples = 0;
+  renderAll();
+});
+
+/* =============================================================
+   Boot
+   ============================================================= */
+let resizeT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(renderAll, 80);
+});
+function boot() {
+  loadPalette();
+  /* Reset sample counts to match n */
+  state.sampleCounts = new Array(state.n).fill(0);
+  renderAll();
+}
+if (document.hidden) setTimeout(boot, 0);
+else requestAnimationFrame(boot);
+
 })();
 </script>
+
 </body>
 </html>
