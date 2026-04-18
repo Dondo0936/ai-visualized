@@ -326,12 +326,9 @@
     }
     .lm-popover .pop-close:hover { color: var(--fg-primary); }
 
-    /* Anatomy tour */
-    .lm-tour-backdrop {
-      position: fixed; inset: 0; z-index: 480;
-      background: rgba(6, 6, 7, 0.60);
-      backdrop-filter: blur(1px);
-    }
+    /* Anatomy tour. No separate backdrop — the ring's giant box-shadow
+       acts as the dim layer, so the user can still scroll to follow
+       targets that move between steps. */
     .lm-tour-ring {
       position: fixed; z-index: 490;
       border: 2px solid var(--teal-300);
@@ -2562,15 +2559,12 @@ const tourSteps = [
   { sel: '#chart-acc', title: 'Accuracy curve', text: 'Test accuracy over epochs. If it flatlines while training loss keeps falling, you are overfitting.' },
   { sel: '#net-canvas', title: 'Network diagram', text: 'Teal lines = positive weights, red = negative, thickness = magnitude. Dim nodes are not firing — possibly dead.' },
 ];
-let tourBackdrop = null, tourRing = null, tourPopover = null, tourIdx = 0;
+let tourRing = null, tourPopover = null, tourIdx = 0;
+let tourResizeTimer = null;
 function startTour() {
   if (!lmOn) { lmOn = true; try { localStorage.setItem(LM_KEY, '1'); } catch(e) {} applyLmState(); }
   endTour();
   tourIdx = 0;
-  tourBackdrop = document.createElement('div');
-  tourBackdrop.className = 'lm-tour-backdrop';
-  tourBackdrop.addEventListener('click', endTour);
-  document.body.appendChild(tourBackdrop);
   tourRing = document.createElement('div');
   tourRing.className = 'lm-tour-ring';
   document.body.appendChild(tourRing);
@@ -2579,23 +2573,63 @@ function startTour() {
   document.body.appendChild(tourPopover);
   showTourStep(0);
   window.addEventListener('resize', onTourResize);
+  document.addEventListener('keydown', onTourKey);
 }
-function onTourResize() { if (tourRing && tourPopover) showTourStep(tourIdx); }
-function endTour() {
-  if (tourBackdrop) { tourBackdrop.remove(); tourBackdrop = null; }
-  if (tourRing)     { tourRing.remove();     tourRing = null; }
-  if (tourPopover)  { tourPopover.remove();  tourPopover = null; }
-  window.removeEventListener('resize', onTourResize);
+function onTourResize() {
+  if (!tourRing || !tourPopover) return;
+  clearTimeout(tourResizeTimer);
+  tourResizeTimer = setTimeout(() => showTourStep(tourIdx), 120);
 }
-function showTourStep(i) {
-  tourIdx = i;
-  const step = tourSteps[i];
-  if (!step || !tourRing || !tourPopover) { endTour(); return; }
-  const target = document.querySelector(step.sel);
-  if (!target) { /* if target missing, skip */
-    if (i < tourSteps.length - 1) showTourStep(i+1); else endTour();
+function onTourKey(ev) {
+  if (!tourRing || !tourPopover) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); endTour(); return; }
+  if (ev.key === 'ArrowRight' || ev.key === 'Enter') {
+    ev.preventDefault();
+    if (tourIdx >= tourSteps.length - 1) endTour();
+    else showTourStep(tourIdx + 1);
     return;
   }
+  if (ev.key === 'ArrowLeft') {
+    ev.preventDefault();
+    showTourStep(Math.max(0, tourIdx - 1));
+  }
+}
+function endTour() {
+  if (tourRing)    { tourRing.remove();    tourRing = null; }
+  if (tourPopover) { tourPopover.remove(); tourPopover = null; }
+  window.removeEventListener('resize', onTourResize);
+  document.removeEventListener('keydown', onTourKey);
+  clearTimeout(tourResizeTimer); tourResizeTimer = null;
+}
+
+function positionTourPopover(targetRect) {
+  if (!tourPopover) return;
+  /* Use the popover's real rendered size, not hardcoded guesses. */
+  const prect = tourPopover.getBoundingClientRect();
+  const pw = prect.width, ph = prect.height;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const roomRight  = vw - targetRect.right;
+  const roomLeft   = targetRect.left;
+  const roomBottom = vh - targetRect.bottom;
+  let px, py;
+  if (roomRight >= pw + 24) {
+    px = targetRect.right + 16;
+    py = Math.max(10, Math.min(vh - ph - 10, targetRect.top + targetRect.height/2 - ph/2));
+  } else if (roomLeft >= pw + 24) {
+    px = targetRect.left - pw - 16;
+    py = Math.max(10, Math.min(vh - ph - 10, targetRect.top + targetRect.height/2 - ph/2));
+  } else if (roomBottom >= ph + 20) {
+    px = Math.max(10, Math.min(vw - pw - 10, targetRect.left));
+    py = targetRect.bottom + 14;
+  } else {
+    px = Math.max(10, Math.min(vw - pw - 10, targetRect.left));
+    py = Math.max(10, targetRect.top - ph - 14);
+  }
+  tourPopover.style.left = px + 'px';
+  tourPopover.style.top  = py + 'px';
+}
+
+function paintTourStep(target, step, i) {
   const r = target.getBoundingClientRect();
   const pad = 8;
   tourRing.style.left   = (r.left - pad) + 'px';
@@ -2614,29 +2648,37 @@ function showTourStep(i) {
       </div>
     </div>
   `;
-  /* Position popover: pick the side with more room */
-  const pw = 340, ph = 210;   /* approximate; actual layout may differ */
-  const vw = window.innerWidth, vh = window.innerHeight;
-  let px, py;
-  const roomRight  = vw - r.right;
-  const roomLeft   = r.left;
-  const roomBottom = vh - r.bottom;
-  if (roomRight >= pw + 20) {
-    px = r.right + 16; py = Math.max(10, Math.min(vh - ph - 10, r.top));
-  } else if (roomLeft >= pw + 20) {
-    px = r.left - pw - 16; py = Math.max(10, Math.min(vh - ph - 10, r.top));
-  } else if (roomBottom >= ph + 20) {
-    px = Math.max(10, Math.min(vw - pw - 10, r.left)); py = r.bottom + 14;
-  } else {
-    px = Math.max(10, Math.min(vw - pw - 10, r.left)); py = Math.max(10, r.top - ph - 14);
-  }
-  tourPopover.style.left = px + 'px';
-  tourPopover.style.top  = py + 'px';
+  positionTourPopover(r);
   document.getElementById('t-prev').addEventListener('click', () => showTourStep(Math.max(0, i-1)));
   document.getElementById('t-skip').addEventListener('click', endTour);
   document.getElementById('t-next').addEventListener('click', () => {
     if (i === tourSteps.length - 1) endTour();
     else showTourStep(i + 1);
+  });
+}
+
+function showTourStep(i) {
+  tourIdx = i;
+  const step = tourSteps[i];
+  if (!step || !tourRing || !tourPopover) { endTour(); return; }
+  const target = document.querySelector(step.sel);
+  if (!target) {
+    console.warn('[tour] selector missing:', step.sel);
+    if (i < tourSteps.length - 1) { showTourStep(i+1); return; }
+    endTour(); return;
+  }
+  /* Scroll the target into view in whichever ancestor actually scrolls
+     (window or the control panel). Without this, targets below the fold
+     end up with rects outside the viewport and the ring is invisible. */
+  try {
+    target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+  } catch(e) { /* older browsers ignore option-object; fine */ }
+  /* After an instant scroll the rect is correct in the SAME tick in all
+     modern browsers, but wrap in rAF to be robust against any async
+     scroll anchoring. */
+  requestAnimationFrame(() => {
+    if (!tourRing || !tourPopover) return;
+    paintTourStep(target, step, i);
   });
 }
 
