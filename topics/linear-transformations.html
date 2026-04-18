@@ -3,273 +3,1349 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Linear Transformations - AI Visualized</title>
+  <title>Linear transformations — AI Visualized</title>
+  <meta name="description" content="Change the 2×2 matrix. Watch the grid stretch, rotate, shear, and collapse. Eigenvectors, determinant, and composition in your browser.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ===== Page-local layout ===== */
+    .lt-main {
+      position:relative; width:100%; height:100%;
+      display:grid;
+      grid-template-columns: 1.6fr 1fr;
+      grid-template-rows: 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .lt-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+    }
+    .lt-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+    }
+    .lt-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+    }
+    .lt-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .lt-panel-body {
+      flex: 1; position: relative; overflow: hidden;
+    }
+    .lt-panel-body canvas { display: block; width: 100%; height: 100%; }
+
+    /* Main canvas */
+    #lt-canvas { cursor: crosshair; background: var(--bg-sunken); }
+    #lt-pair   { cursor: default;   background: var(--bg-sunken); }
+
+    /* Bottom stats strip */
+    .lt-stats {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--s-3);
+    }
+    .lt-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 0;
+    }
+    .lt-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .lt-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.25rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      overflow-wrap: anywhere;
+    }
+    .lt-stat.accent .value { color: var(--teal-300); }
+    .lt-stat.warn   .value { color: var(--heat-400); }
+
+    /* Matrix cell grid */
+    .matrix-cells {
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--s-2);
+      padding: var(--s-2);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+    }
+    .mat-cell {
+      display:flex; flex-direction: column; gap: 2px;
+      padding: var(--s-2);
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      position: relative;
+    }
+    .mat-cell .cell-name {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      letter-spacing: var(--tracking-label);
+      text-transform: uppercase;
+      color: var(--fg-muted);
+    }
+    .mat-cell input[type="number"] {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--fg-primary);
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0;
+      width: 100%;
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
+    .mat-cell input[type="number"]::-webkit-outer-spin-button,
+    .mat-cell input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .mat-cell input[type="range"] {
+      margin-top: 2px;
+    }
+    .mat-cell.col-i { border-left: 2px solid var(--teal-400); }
+    .mat-cell.col-j { border-left: 2px solid var(--heat-400); }
+
+    /* Matrix rendering (formula block) */
+    .formula-block {
+      padding: var(--s-3) var(--s-4);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--fg-secondary);
+      line-height: 1.6;
+    }
+    .formula-block .ihat { color: var(--teal-300); }
+    .formula-block .jhat { color: var(--heat-400); }
+    .formula-block em { color: var(--fg-muted); font-style: normal; font-size: var(--fs-micro); }
+
+    /* Preset pills */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--s-2);
+    }
+    .preset-btn {
+      padding: var(--s-2) var(--s-3);
+      border: 1px solid var(--border-default);
+      background: var(--bg-raised);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      text-align: left;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: border-color var(--dur-fast), color var(--dur-fast);
+    }
+    .preset-btn:hover {
+      border-color: var(--teal-400);
+      color: var(--teal-300);
+    }
+
+    /* Toggle chips */
+    .toggle-chips {
+      display: flex; flex-wrap: wrap;
+      gap: var(--s-2);
+    }
+    .chip {
+      padding: 4px 10px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-raised);
+      color: var(--fg-muted);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      user-select: none;
+      transition: all var(--dur-fast) var(--ease-standard);
+    }
+    .chip:hover { border-color: var(--border-strong); color: var(--fg-secondary); }
+    .chip.active {
+      border-color: var(--accent-ring);
+      background: var(--accent-soft);
+      color: var(--teal-300);
+    }
+
+    /* Pair (composition) expand button */
+    .pair-toggle {
+      padding: 4px 10px;
+      border: 1px solid var(--border-default);
+      background: transparent;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+    }
+    .pair-toggle.on {
+      border-color: var(--accent-ring);
+      color: var(--teal-300);
+      background: var(--accent-soft);
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .lt-main { grid-template-columns: 1fr; }
+      .lt-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Linear Transformations</h1>
-      <span class="topic-desc">Change the matrix entries &mdash; watch space stretch, rotate, and shear</span>
-    </div>
 
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">
-        Matrix: [<span id="ov-m">1,0;0,1</span>] &middot; det = <span class="value" id="ov-det">1.00</span>
-      </div>
-    </div>
+<div class="topic-page has-guide">
 
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">A matrix is a function that transforms space</div>
-        <div class="guide-text">
-          A 2&times;2 matrix takes any point (x, y) and moves it somewhere new. It's a function! The two columns tell you where the <strong>basis vectors</strong> i&#770; and j&#770; end up. Everything else stretches, rotates, or shears to match.
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Linear transformations</h1>
+    <span class="topic-desc">Edit a 2×2 matrix. Watch space stretch, rotate, shear, or collapse — with live eigenvectors and determinant.</span>
+  </div>
+
+  <!-- =====================================================
+       Main workspace
+       ===================================================== -->
+  <div class="canvas-area" style="padding:0">
+    <div class="lt-main">
+
+      <!-- Main transformation panel -->
+      <div class="lt-panel" style="grid-row:1 / span 2;">
+        <div class="lt-panel-head">
+          <h4>Transformed space</h4>
+          <span class="meta" id="hint">click to drop a point</span>
+        </div>
+        <div class="lt-panel-body">
+          <canvas id="lt-canvas"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Matrix Entries</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="slider-group">
-            <div class="slider-label"><span>a</span><span class="slider-value" id="a-val">1.00</span></div>
-            <input type="range" id="a-slider" min="-2" max="2" step="0.01" value="1">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>b</span><span class="slider-value" id="b-val">0.00</span></div>
-            <input type="range" id="b-slider" min="-2" max="2" step="0.01" value="0">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>c</span><span class="slider-value" id="c-val">0.00</span></div>
-            <input type="range" id="c-slider" min="-2" max="2" step="0.01" value="0">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>d</span><span class="slider-value" id="d-val">1.00</span></div>
-            <input type="range" id="d-slider" min="-2" max="2" step="0.01" value="1">
-          </div>
+      <!-- Composition view (shows M2 applied AFTER M1) -->
+      <div class="lt-panel" id="pair-panel" style="grid-row:1;">
+        <div class="lt-panel-head">
+          <h4 id="pair-title">Composition · M₂·M₁</h4>
+          <span class="meta" id="pair-meta">off</span>
         </div>
-        <div style="font-family:var(--font-mono);font-size:0.88rem;text-align:center;padding:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-top:8px;">
-          M = [ <span id="m-a" style="color:var(--accent-light)">1.00</span> &nbsp; <span id="m-b" style="color:var(--cyan)">0.00</span> ]<br>
-          &nbsp; &nbsp; &nbsp; [ <span id="m-c" style="color:var(--accent-light)">0.00</span> &nbsp; <span id="m-d" style="color:var(--cyan)">1.00</span> ]
+        <div class="lt-panel-body">
+          <canvas id="lt-pair"></canvas>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Presets</h3>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn btn-secondary" data-preset="identity">Identity (no change)</button>
-          <button class="btn btn-secondary" data-preset="rotate">Rotate 45&deg;</button>
-          <button class="btn btn-secondary" data-preset="scale">Stretch 2x horizontal</button>
-          <button class="btn btn-secondary" data-preset="shear">Shear</button>
-          <button class="btn btn-secondary" data-preset="reflect">Reflect over y-axis</button>
-          <button class="btn btn-secondary" data-preset="collapse">Collapse to line (det = 0)</button>
+      <!-- Stats strip -->
+      <div class="lt-stats">
+        <div class="lt-stat accent">
+          <div class="label">det(M)</div>
+          <div class="value" id="stat-det">1.000</div>
+        </div>
+        <div class="lt-stat">
+          <div class="label">trace</div>
+          <div class="value" id="stat-trace">2.000</div>
+        </div>
+        <div class="lt-stat">
+          <div class="label">eigenvalues λ</div>
+          <div class="value" id="stat-eigs">1, 1</div>
+        </div>
+        <div class="lt-stat">
+          <div class="label">rank</div>
+          <div class="value" id="stat-rank">2</div>
+        </div>
+        <div class="lt-stat">
+          <div class="label">condition</div>
+          <div class="value" id="stat-cond">1.000</div>
         </div>
       </div>
 
-      <div class="control-section">
-        <h3>Animation</h3>
-        <button class="btn btn-primary" id="btn-anim" style="width:100%">Animate: Identity &rarr; Current</button>
-      </div>
-
-      <div class="control-section">
-        <h3>What's the Determinant?</h3>
-        <div class="info-box" id="det-explain">
-          The <strong>determinant</strong> tells you how much the transformation scales area. det = 1 means area is preserved. det = 2 means it doubles. det = 0 means space collapses onto a line. Negative det means space is flipped.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Connection to AI</h3>
-        <div class="info-box">
-          Every layer of a neural network multiplies its input by a weight matrix. <strong>Matrix multiplication IS a linear transformation.</strong> A 512&times;512 weight matrix transforms 512D space. Stacking these (plus non-linear <a href="activation-functions.html">activations</a>) lets networks learn any function.
-        </div>
-      </div>
     </div>
   </div>
 
+  <!-- =====================================================
+       Control panel
+       ===================================================== -->
+  <div class="control-panel">
+
+    <div class="guide-banner" id="guide">
+      <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
+      <div class="guide-step-counter">The big idea</div>
+      <div class="guide-title">A matrix is a function that moves the grid.</div>
+      <div class="guide-text">
+        The two columns of a 2×2 matrix tell you where the basis vectors <span style="color:var(--teal-300)">î</span> = (1,0) and <span style="color:var(--heat-400)">ĵ</span> = (0,1) land. Every other point gets carried along: (x,y) goes to x·î_new + y·ĵ_new. Scaling, rotation, shear, reflection — all of them are just pairs of column choices.
+      </div>
+    </div>
+
+    <!-- Matrix editor -->
+    <div class="control-section">
+      <h3>Matrix M</h3>
+      <div class="matrix-cells">
+        <div class="mat-cell col-i">
+          <span class="cell-name">a &middot; î<sub>x</sub></span>
+          <input type="number" id="a-num" value="1" step="0.05" inputmode="decimal">
+          <input type="range" id="a-slider" min="-2" max="2" step="0.01" value="1">
+        </div>
+        <div class="mat-cell col-j">
+          <span class="cell-name">b &middot; ĵ<sub>x</sub></span>
+          <input type="number" id="b-num" value="0" step="0.05" inputmode="decimal">
+          <input type="range" id="b-slider" min="-2" max="2" step="0.01" value="0">
+        </div>
+        <div class="mat-cell col-i">
+          <span class="cell-name">c &middot; î<sub>y</sub></span>
+          <input type="number" id="c-num" value="0" step="0.05" inputmode="decimal">
+          <input type="range" id="c-slider" min="-2" max="2" step="0.01" value="0">
+        </div>
+        <div class="mat-cell col-j">
+          <span class="cell-name">d &middot; ĵ<sub>y</sub></span>
+          <input type="number" id="d-num" value="1" step="0.05" inputmode="decimal">
+          <input type="range" id="d-slider" min="-2" max="2" step="0.01" value="1">
+        </div>
+      </div>
+      <div class="formula-block" style="margin-top: var(--s-2);">
+        M · <em>(x,y)</em> = <span class="ihat">x·(a,c)</span> + <span class="jhat">y·(b,d)</span>
+      </div>
+    </div>
+
+    <!-- Preset transformations -->
+    <div class="control-section">
+      <h3>Presets</h3>
+      <div class="preset-grid">
+        <button class="preset-btn" data-preset="identity">identity</button>
+        <button class="preset-btn" data-preset="rotate30">rotate 30°</button>
+        <button class="preset-btn" data-preset="rotate90">rotate 90°</button>
+        <button class="preset-btn" data-preset="scaleX2">scale x: 2×</button>
+        <button class="preset-btn" data-preset="scaleIso">scale: 1.5×</button>
+        <button class="preset-btn" data-preset="shearX">shear x</button>
+        <button class="preset-btn" data-preset="shearY">shear y</button>
+        <button class="preset-btn" data-preset="reflectY">reflect over y</button>
+        <button class="preset-btn" data-preset="reflectDiag">reflect diagonal</button>
+        <button class="preset-btn" data-preset="project">project onto x</button>
+        <button class="preset-btn" data-preset="rotateScale">rotate &amp; scale</button>
+        <button class="preset-btn" data-preset="collapse">collapse (det = 0)</button>
+      </div>
+    </div>
+
+    <!-- Point cloud selector -->
+    <div class="control-section">
+      <h3>Sample shape</h3>
+      <div class="toggle-chips" id="shape-chips">
+        <div class="chip active" data-shape="grid">grid</div>
+        <div class="chip" data-shape="circle">circle</div>
+        <div class="chip" data-shape="letterF">letter F</div>
+        <div class="chip" data-shape="smiley">smiley</div>
+        <div class="chip" data-shape="spiral">spiral</div>
+        <div class="chip" data-shape="none">none</div>
+      </div>
+    </div>
+
+    <!-- Display layers -->
+    <div class="control-section">
+      <h3>Display</h3>
+      <div class="toggle-chips">
+        <div class="chip active" id="tog-grid">grid</div>
+        <div class="chip active" id="tog-basis">basis î ĵ</div>
+        <div class="chip active" id="tog-unit">unit square</div>
+        <div class="chip active" id="tog-eig">eigenvectors</div>
+        <div class="chip" id="tog-points">user points</div>
+        <div class="chip" id="tog-inv">inverse map</div>
+      </div>
+    </div>
+
+    <!-- Composition -->
+    <div class="control-section">
+      <h3>Composition <button class="pair-toggle" id="pair-on">enable M₂</button></h3>
+      <div id="pair-editor" style="display:none; margin-top: var(--s-2);">
+        <div class="matrix-cells">
+          <div class="mat-cell col-i">
+            <span class="cell-name">a₂</span>
+            <input type="number" id="a2-num" value="1" step="0.05" inputmode="decimal">
+            <input type="range" id="a2-slider" min="-2" max="2" step="0.01" value="1">
+          </div>
+          <div class="mat-cell col-j">
+            <span class="cell-name">b₂</span>
+            <input type="number" id="b2-num" value="0" step="0.05" inputmode="decimal">
+            <input type="range" id="b2-slider" min="-2" max="2" step="0.01" value="0">
+          </div>
+          <div class="mat-cell col-i">
+            <span class="cell-name">c₂</span>
+            <input type="number" id="c2-num" value="0" step="0.05" inputmode="decimal">
+            <input type="range" id="c2-slider" min="-2" max="2" step="0.01" value="0">
+          </div>
+          <div class="mat-cell col-j">
+            <span class="cell-name">d₂</span>
+            <input type="number" id="d2-num" value="1" step="0.05" inputmode="decimal">
+            <input type="range" id="d2-slider" min="-2" max="2" step="0.01" value="1">
+          </div>
+        </div>
+        <div class="toggle-chips" style="margin-top: var(--s-2);">
+          <div class="chip active" id="order-21">apply M₁ then M₂ (M₂·M₁)</div>
+          <div class="chip" id="order-12">apply M₂ then M₁ (M₁·M₂)</div>
+        </div>
+        <div class="info-box" style="margin-top: var(--s-2); font-size: var(--fs-small);">
+          Matrix multiplication is <strong>not commutative</strong>. The two orders usually give different results — flip the chip above to compare.
+        </div>
+      </div>
+    </div>
+
+    <!-- Animation -->
+    <div class="control-section">
+      <h3>Animate</h3>
+      <div style="display:flex;gap:var(--s-2)">
+        <button class="btn btn-primary" id="btn-anim" style="flex:1">play: I → M</button>
+        <button class="btn btn-secondary" id="btn-reset-anim" style="flex:0">reset</button>
+      </div>
+      <div class="slider-group" style="margin-top: var(--s-3);">
+        <div class="slider-label"><span>Animation t</span><span class="slider-value" id="t-val">1.00</span></div>
+        <input type="range" id="t-slider" min="0" max="1" step="0.01" value="1">
+      </div>
+    </div>
+
+    <!-- Learn more -->
+    <div class="control-section">
+      <h3>Why these numbers matter</h3>
+
+      <div class="learn-more" style="margin:0">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Determinant = signed area scale
+        </button>
+        <div class="learn-more-content">
+          The unit square (1×1) maps to a parallelogram. Its signed area is <code>det(M) = ad − bc</code>. <strong>det = 1</strong> preserves area, <strong>|det| &gt; 1</strong> expands, <strong>|det| &lt; 1</strong> shrinks, <strong>det = 0</strong> collapses onto a line (no area left), and <strong>det &lt; 0</strong> means the orientation flipped — î and ĵ swapped sides. A matrix is invertible iff det ≠ 0.
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Eigenvectors are the directions M doesn't rotate
+        </button>
+        <div class="learn-more-content">
+          An <strong>eigenvector</strong> v of M satisfies <code>M·v = λ·v</code>: M only stretches it by a factor λ (the eigenvalue). On the canvas these show in green. When tr² − 4·det &lt; 0 the eigenvalues are a complex pair — the matrix is a pure rotation or rotation+scale, and no real eigenvector exists (nothing stays put).
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Why composition reads right-to-left
+        </button>
+        <div class="learn-more-content">
+          For a vector v, <code>(M₂·M₁)·v = M₂·(M₁·v)</code>. The right-most matrix acts on v first. So the label "M₂·M₁" means "apply M₁, then M₂" — the order on the page is the opposite of the order applied. Flip the "order" chip above to see the difference: M₂·M₁ ≠ M₁·M₂ in general.
+        </div>
+      </div>
+
+      <div class="learn-more">
+        <button class="learn-more-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Connection to neural networks
+        </button>
+        <div class="learn-more-content">
+          Every dense layer is <code>h = φ(W·x + b)</code>. The matrix W is a linear transformation — in high dimensions it does exactly what the 2×2 does here: rotates, scales, shears, and projects. Activation φ adds the non-linearity. Stack many of these and you can approximate any reasonable function. The intuition you build playing with this 2×2 generalises.
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ========================================================
+     MAIN SCRIPT
+     ======================================================== -->
 <script>
-(function(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  let W, H;
-  let a=1,b=0,c=0,d=1;
-  let animT = 1; // 0 = identity, 1 = full matrix
-  let animating = false;
-  const xR = [-4,4], yR = [-4,4];
+(function() {
+'use strict';
 
-  function resize(){
-    const r=canvas.parentElement.getBoundingClientRect();
-    W=r.width; H=r.height;
-    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-    canvas.style.width=W+'px'; canvas.style.height=H+'px';
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    draw();
-  }
+/* =============================================================
+   State
+   ============================================================= */
+const state = {
+  a: 1, b: 0, c: 0, d: 1,
+  a2: 1, b2: 0, c2: 0, d2: 1,
+  t: 1,                         /* animation parameter 0..1 */
+  animating: false,
+  showGrid: true,
+  showBasis: true,
+  showUnit: true,
+  showEig: true,
+  showPoints: false,
+  showInverse: false,
+  pairOn: false,
+  pairOrder: '21',              /* '21' = M2·M1 ; '12' = M1·M2 */
+  shape: 'grid',
+  userPoints: [],               /* {x,y} in world space */
+};
 
-  function toC(x,y){ return [(x-xR[0])/(xR[1]-xR[0])*W, H-(y-yR[0])/(yR[1]-yR[0])*H]; }
+const XR = [-4, 4], YR = [-4, 4];
 
-  function apply(x, y, t){
-    // Interpolate between identity and current matrix
-    const ma = 1 + (a-1)*t;
-    const mb = b*t;
-    const mc = c*t;
-    const md = 1 + (d-1)*t;
-    return [ma*x + mb*y, mc*x + md*y];
-  }
+/* =============================================================
+   Palette (reload from CSS custom properties)
+   ============================================================= */
+const pal = {};
+function readVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function reloadPalette() {
+  pal.teal300 = readVar('--teal-300');
+  pal.teal400 = readVar('--teal-400');
+  pal.teal500 = readVar('--teal-500');
+  pal.heat300 = readVar('--heat-300') || '#FFC5A6';
+  pal.heat400 = readVar('--heat-400') || '#F25C54';
+  pal.ink300  = readVar('--ink-300');
+  pal.ink500  = readVar('--ink-500');
+  pal.ink700  = readVar('--ink-700');
+  pal.ink850  = readVar('--ink-850');
+  pal.fgPrim  = readVar('--fg-primary');
+  pal.bgSunken= readVar('--bg-sunken') || '#060607';
+  pal.success = readVar('--success') || '#4ADE80';
+  pal.danger  = readVar('--danger')  || '#F25C54';
+}
 
-  function draw(){
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
+/* =============================================================
+   Canvas fit helper
+   ============================================================= */
+function fitCanvas(cv) {
+  const r = cv.getBoundingClientRect();
+  cv.width  = Math.max(1, Math.round(r.width  * devicePixelRatio));
+  cv.height = Math.max(1, Math.round(r.height * devicePixelRatio));
+  const cx = cv.getContext('2d');
+  cx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  return { cx, W: r.width, H: r.height };
+}
 
-    // Original grid (faint)
-    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
-    for(let x=-3;x<=3;x++){const[px]=toC(x,0);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
-    for(let y=-3;y<=3;y++){const[,py]=toC(0,y);ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke();}
+/* World → canvas coordinates. World y grows UP, canvas y grows DOWN. */
+function worldToCanvas(W, H, x, y) {
+  return [
+    (x - XR[0]) / (XR[1] - XR[0]) * W,
+    H - (y - YR[0]) / (YR[1] - YR[0]) * H
+  ];
+}
+function canvasToWorld(W, H, px, py) {
+  return [
+    XR[0] + px / W * (XR[1] - XR[0]),
+    YR[0] + (H - py) / H * (YR[1] - YR[0])
+  ];
+}
 
-    // Transformed grid
-    ctx.strokeStyle='rgba(99,102,241,0.3)'; ctx.lineWidth=1.2;
-    for(let x=-3;x<=3;x++){
-      ctx.beginPath();
-      for(let y=-3;y<=3.01;y+=0.1){
-        const [tx,ty] = apply(x, y, animT);
-        const [cx,cy] = toC(tx, ty);
-        if(y===-3) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
-      }
-      ctx.stroke();
-    }
-    for(let y=-3;y<=3;y++){
-      ctx.beginPath();
-      for(let x=-3;x<=3.01;x+=0.1){
-        const [tx,ty] = apply(x, y, animT);
-        const [cx,cy] = toC(tx, ty);
-        if(x===-3) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
-      }
-      ctx.stroke();
-    }
+/* =============================================================
+   Matrix maths
+   ============================================================= */
+function applyMat(m, x, y) { return [m.a*x + m.b*y, m.c*x + m.d*y]; }
 
-    // Axes
-    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1.5;
-    const[ox,oy]=toC(0,0);
-    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
-
-    // Unit square (shaded)
-    const corners = [[0,0],[1,0],[1,1],[0,1]];
-    const trans = corners.map(p => apply(p[0],p[1],animT));
-    ctx.fillStyle='rgba(251,191,36,0.12)';
-    ctx.beginPath();
-    trans.forEach((p,i)=>{
-      const [x,y] = toC(p[0],p[1]);
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    });
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=1; ctx.stroke();
-
-    // Basis vectors
-    function drawBasis(to, color, label){
-      const [x1,y1]=toC(0,0), [x2,y2]=toC(to[0],to[1]);
-      ctx.strokeStyle=color; ctx.lineWidth=3; ctx.fillStyle=color;
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-      const ang=Math.atan2(y2-y1,x2-x1);
-      ctx.beginPath(); ctx.moveTo(x2,y2);
-      ctx.lineTo(x2-14*Math.cos(ang-0.35), y2-14*Math.sin(ang-0.35));
-      ctx.lineTo(x2-14*Math.cos(ang+0.35), y2-14*Math.sin(ang+0.35));
-      ctx.closePath(); ctx.fill();
-
-      ctx.fillStyle=color; ctx.font='bold 13px Inter,sans-serif';
-      ctx.fillText(label, x2+10, y2-6);
-    }
-
-    const iHat = apply(1,0,animT);
-    const jHat = apply(0,1,animT);
-    drawBasis(iHat, '#818cf8', 'i\u0302 ('+iHat[0].toFixed(1)+','+iHat[1].toFixed(1)+')');
-    drawBasis(jHat, '#22d3ee', 'j\u0302 ('+jHat[0].toFixed(1)+','+jHat[1].toFixed(1)+')');
-
-    // Update overlay
-    const det = a*d - b*c;
-    document.getElementById('ov-m').textContent = `${a.toFixed(1)},${b.toFixed(1)};${c.toFixed(1)},${d.toFixed(1)}`;
-    document.getElementById('ov-det').textContent = det.toFixed(2);
-
-    // Determinant explanation
-    let explain;
-    if(Math.abs(det) < 0.01) explain = `det = 0 &mdash; space is <strong>collapsed</strong> onto a line. The transformation loses information. Cannot be reversed.`;
-    else if(det < 0) explain = `det = ${det.toFixed(2)} &mdash; <strong>negative</strong>. Space has been <strong>flipped</strong> (reflected). Area scales by ${Math.abs(det).toFixed(2)}.`;
-    else if(det < 1) explain = `det = ${det.toFixed(2)} &mdash; space is <strong>compressed</strong>. The unit square (yellow) is smaller than original. Shrinks area.`;
-    else if(Math.abs(det-1) < 0.05) explain = `det = ${det.toFixed(2)} &mdash; area is <strong>preserved</strong>. This is a rotation, shear, or combination that keeps sizes the same.`;
-    else explain = `det = ${det.toFixed(2)} &mdash; space is <strong>expanded</strong>. Area scales by ${det.toFixed(2)}.`;
-    document.getElementById('det-explain').innerHTML = explain;
-  }
-
-  function updateMatrix(){
-    document.getElementById('a-val').textContent=a.toFixed(2);
-    document.getElementById('b-val').textContent=b.toFixed(2);
-    document.getElementById('c-val').textContent=c.toFixed(2);
-    document.getElementById('d-val').textContent=d.toFixed(2);
-    document.getElementById('m-a').textContent=a.toFixed(2);
-    document.getElementById('m-b').textContent=b.toFixed(2);
-    document.getElementById('m-c').textContent=c.toFixed(2);
-    document.getElementById('m-d').textContent=d.toFixed(2);
-    draw();
-  }
-
-  ['a','b','c','d'].forEach(n=>{
-    document.getElementById(n+'-slider').addEventListener('input',e=>{
-      const v=parseFloat(e.target.value);
-      if(n==='a') a=v; else if(n==='b') b=v; else if(n==='c') c=v; else d=v;
-      updateMatrix();
-    });
-  });
-
-  const presets = {
-    identity: [1,0,0,1],
-    rotate: [Math.cos(Math.PI/4), -Math.sin(Math.PI/4), Math.sin(Math.PI/4), Math.cos(Math.PI/4)],
-    scale: [2,0,0,1],
-    shear: [1,1,0,1],
-    reflect: [-1,0,0,1],
-    collapse: [1,1,1,1],
+/* Current matrix interpolated by animation parameter t (t=0 → identity, t=1 → M). */
+function interpMat(t) {
+  return {
+    a: 1 + (state.a - 1) * t,
+    b:     state.b       * t,
+    c:     state.c       * t,
+    d: 1 + (state.d - 1) * t,
   };
-  document.querySelectorAll('[data-preset]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      const p = presets[b.dataset.preset];
-      [a,_b,c,d]=[p[0],p[1],p[2],p[3]];
-      a=p[0]; b_=p[1]; c_=p[2]; d_=p[3];
-      // Note: reassigning a/b/c/d (not using temp vars)
+}
+
+/* Composition: M2·M1 (read: first M1 is applied, then M2). */
+function multiplyMat(A, B) {
+  return {
+    a: A.a*B.a + A.b*B.c,
+    b: A.a*B.b + A.b*B.d,
+    c: A.c*B.a + A.d*B.c,
+    d: A.c*B.b + A.d*B.d,
+  };
+}
+
+function det(m)   { return m.a*m.d - m.b*m.c; }
+function trace(m) { return m.a + m.d; }
+
+/* Real eigenvalues (or null if complex). Returns [λ1, λ2] with λ1 ≥ λ2. */
+function realEigenvalues(m) {
+  const tr = trace(m), dt = det(m);
+  const disc = tr*tr - 4*dt;
+  if (disc < -1e-12) return null;
+  const s = Math.sqrt(Math.max(0, disc));
+  return [(tr + s) / 2, (tr - s) / 2];
+}
+/* A unit eigenvector for a given eigenvalue. Returns null if matrix ≈ λI. */
+function eigenvectorFor(m, lambda) {
+  /* Solve (M - λI) v = 0. Two equations; pick the row with larger norm. */
+  const a = m.a - lambda, b = m.b;
+  const c = m.c,          d = m.d - lambda;
+  const nrm1 = Math.hypot(a, b);
+  const nrm2 = Math.hypot(c, d);
+  let vx, vy;
+  if (nrm1 >= nrm2 && nrm1 > 1e-9) {
+    /* a·vx + b·vy = 0 → v = (-b, a) or (b, -a). */
+    vx = -b; vy = a;
+  } else if (nrm2 > 1e-9) {
+    vx = -d; vy = c;
+  } else {
+    /* Both rows are zero → every vector is an eigenvector. Return null. */
+    return null;
+  }
+  const n = Math.hypot(vx, vy);
+  if (n < 1e-12) return null;
+  return [vx / n, vy / n];
+}
+
+/* Integer rank by row-reduction on a 2×2 with an epsilon. */
+function rank(m) {
+  const eps = 1e-8;
+  const a = Math.abs(m.a), b = Math.abs(m.b), c = Math.abs(m.c), d = Math.abs(m.d);
+  if (a < eps && b < eps && c < eps && d < eps) return 0;
+  /* det near zero → rank 1; else rank 2. */
+  if (Math.abs(det(m)) < eps * Math.max(1, a+b+c+d)) return 1;
+  return 2;
+}
+
+/* 2-norm condition number σ_max/σ_min.
+   σᵢ are the singular values of M, i.e. √(eigenvalues of MᵀM).
+   For a 2×2: MᵀM has trace a²+b²+c²+d² and det (ad−bc)², so
+     μ± = (tr ± √(tr²−4·det)) / 2,   σ± = √μ±
+   This is the right quantity for "how much does M stretch the worst
+   direction vs. the best" — eigenvalue-ratio gives the wrong answer
+   for non-normal matrices such as a shear. */
+function conditionNumber(m) {
+  const a = m.a, b = m.b, c = m.c, d = m.d;
+  const tr  = a*a + b*b + c*c + d*d;
+  const dt2 = (a*d - b*c) * (a*d - b*c);   /* det(MᵀM) = det(M)² */
+  const disc = Math.max(0, tr*tr - 4*dt2);
+  const s = Math.sqrt(disc);
+  const muMax = (tr + s) / 2;
+  const muMin = (tr - s) / 2;
+  if (muMin < 1e-18) return Infinity;
+  return Math.sqrt(muMax / muMin);
+}
+
+/* =============================================================
+   DOM refs
+   ============================================================= */
+const D = id => document.getElementById(id);
+
+const canvas     = D('lt-canvas'),     ctx     = canvas.getContext('2d');
+const pairCanvas = D('lt-pair'),       pairCtx = pairCanvas.getContext('2d');
+const pairPanel  = D('pair-panel');
+
+/* =============================================================
+   Sample shapes (point-lists / line-lists)
+   ============================================================= */
+function sampleShape(name) {
+  if (name === 'none') return { type: 'none' };
+  if (name === 'grid') {
+    /* A dense 2D lattice — rendered as small dots inside [-3, 3]. */
+    const pts = [];
+    for (let y = -3; y <= 3; y += 0.5) {
+      for (let x = -3; x <= 3; x += 0.5) pts.push([x, y]);
+    }
+    return { type: 'dots', pts };
+  }
+  if (name === 'circle') {
+    const pts = [];
+    for (let k = 0; k < 72; k++) {
+      const th = k / 72 * Math.PI * 2;
+      pts.push([2 * Math.cos(th), 2 * Math.sin(th)]);
+    }
+    return { type: 'loop', pts };
+  }
+  if (name === 'letterF') {
+    /* A capital F in [-1.5, 1.5] × [-2, 2]. */
+    const poly = [
+      [-1.2, -2.0], [-0.8, -2.0], [-0.8, -0.2], [ 0.6, -0.2],
+      [ 0.6,  0.2], [-0.8,  0.2], [-0.8,  1.2], [ 1.0,  1.2],
+      [ 1.0,  1.6], [-0.8,  1.6], [-0.8,  2.0], [-1.2,  2.0],
+      [-1.2, -2.0]
+    ];
+    return { type: 'poly', pts: poly };
+  }
+  if (name === 'smiley') {
+    /* Outer circle + eyes (two tiny circles) + a mouth arc. */
+    const loops = [];
+    /* Outer */
+    const outer = [];
+    for (let k = 0; k <= 72; k++) {
+      const th = k / 72 * Math.PI * 2;
+      outer.push([2 * Math.cos(th), 2 * Math.sin(th)]);
+    }
+    loops.push(outer);
+    /* Left eye */
+    const eL = [];
+    for (let k = 0; k <= 24; k++) {
+      const th = k / 24 * Math.PI * 2;
+      eL.push([-0.7 + 0.25 * Math.cos(th), 0.7 + 0.25 * Math.sin(th)]);
+    }
+    loops.push(eL);
+    /* Right eye */
+    const eR = [];
+    for (let k = 0; k <= 24; k++) {
+      const th = k / 24 * Math.PI * 2;
+      eR.push([0.7 + 0.25 * Math.cos(th), 0.7 + 0.25 * Math.sin(th)]);
+    }
+    loops.push(eR);
+    /* Mouth: half circle arc (lower) */
+    const mouth = [];
+    for (let k = 0; k <= 32; k++) {
+      const th = Math.PI + k / 32 * Math.PI;   /* from π to 2π */
+      mouth.push([1.2 * Math.cos(th), -0.4 + 1.2 * Math.sin(th)]);
+    }
+    loops.push(mouth);
+    return { type: 'multiloop', loops };
+  }
+  if (name === 'spiral') {
+    /* An Archimedean spiral from r=0 to r=2 over 3 turns. */
+    const pts = [];
+    const turns = 3, n = 200;
+    for (let k = 0; k <= n; k++) {
+      const frac = k / n;
+      const th = frac * turns * 2 * Math.PI;
+      const r  = frac * 2;
+      pts.push([r * Math.cos(th), r * Math.sin(th)]);
+    }
+    return { type: 'loop', pts };
+  }
+  return { type: 'none' };
+}
+
+/* =============================================================
+   Drawing primitives
+   ============================================================= */
+function drawGrid(cx, W, H) {
+  /* Minor lines at every integer, major at every 2. */
+  cx.save();
+  cx.strokeStyle = 'rgba(255,255,255,0.04)';
+  cx.lineWidth = 1;
+  for (let x = Math.ceil(XR[0]); x <= Math.floor(XR[1]); x++) {
+    const [px] = worldToCanvas(W, H, x, 0);
+    cx.beginPath(); cx.moveTo(px, 0); cx.lineTo(px, H); cx.stroke();
+  }
+  for (let y = Math.ceil(YR[0]); y <= Math.floor(YR[1]); y++) {
+    const [, py] = worldToCanvas(W, H, 0, y);
+    cx.beginPath(); cx.moveTo(0, py); cx.lineTo(W, py); cx.stroke();
+  }
+  /* Axes */
+  cx.strokeStyle = 'rgba(255,255,255,0.10)';
+  cx.lineWidth = 1;
+  const [ox, oy] = worldToCanvas(W, H, 0, 0);
+  cx.beginPath(); cx.moveTo(0, oy); cx.lineTo(W, oy); cx.stroke();
+  cx.beginPath(); cx.moveTo(ox, 0); cx.lineTo(ox, H); cx.stroke();
+  cx.restore();
+}
+
+function drawTransformedGrid(cx, W, H, m, colour) {
+  cx.save();
+  cx.strokeStyle = colour;
+  cx.lineWidth = 1.1;
+  /* Vertical lines (constant x). */
+  for (let x = Math.ceil(XR[0]); x <= Math.floor(XR[1]); x++) {
+    cx.beginPath();
+    for (let y = YR[0]; y <= YR[1] + 1e-6; y += 0.1) {
+      const [tx, ty] = applyMat(m, x, y);
+      const [cxp, cyp] = worldToCanvas(W, H, tx, ty);
+      if (y === YR[0]) cx.moveTo(cxp, cyp); else cx.lineTo(cxp, cyp);
+    }
+    cx.stroke();
+  }
+  /* Horizontal lines (constant y). */
+  for (let y = Math.ceil(YR[0]); y <= Math.floor(YR[1]); y++) {
+    cx.beginPath();
+    for (let x = XR[0]; x <= XR[1] + 1e-6; x += 0.1) {
+      const [tx, ty] = applyMat(m, x, y);
+      const [cxp, cyp] = worldToCanvas(W, H, tx, ty);
+      if (x === XR[0]) cx.moveTo(cxp, cyp); else cx.lineTo(cxp, cyp);
+    }
+    cx.stroke();
+  }
+  cx.restore();
+}
+
+function drawVector(cx, W, H, vx, vy, colour, label, thick) {
+  const [x0, y0] = worldToCanvas(W, H, 0, 0);
+  const [x1, y1] = worldToCanvas(W, H, vx, vy);
+  cx.save();
+  cx.strokeStyle = colour;
+  cx.fillStyle   = colour;
+  cx.lineWidth   = thick || 2.2;
+  cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x1, y1); cx.stroke();
+  /* Arrow head in canvas space. */
+  const ang = Math.atan2(y1 - y0, x1 - x0);
+  const a = 0.38, s = 12;
+  cx.beginPath();
+  cx.moveTo(x1, y1);
+  cx.lineTo(x1 - s * Math.cos(ang - a), y1 - s * Math.sin(ang - a));
+  cx.lineTo(x1 - s * Math.cos(ang + a), y1 - s * Math.sin(ang + a));
+  cx.closePath(); cx.fill();
+  if (label) {
+    cx.font = "500 12px 'JetBrains Mono', monospace";
+    cx.fillStyle = colour;
+    cx.fillText(label, x1 + 8, y1 - 6);
+  }
+  cx.restore();
+}
+
+function drawUnitParallelogram(cx, W, H, m) {
+  const corners = [[0,0],[1,0],[1,1],[0,1]].map(p => applyMat(m, p[0], p[1]));
+  cx.save();
+  /* Orientation: colour fill by sign of determinant. */
+  const d = m.a * m.d - m.b * m.c;
+  cx.fillStyle = d >= 0
+    ? 'rgba(95, 210, 203, 0.14)'   /* teal-tinted */
+    : 'rgba(242, 92, 84, 0.16)';   /* heat-tinted (flipped) */
+  cx.strokeStyle = d >= 0 ? 'rgba(95, 210, 203, 0.55)' : 'rgba(242, 92, 84, 0.55)';
+  cx.lineWidth = 1.2;
+  cx.beginPath();
+  corners.forEach((p, i) => {
+    const [x, y] = worldToCanvas(W, H, p[0], p[1]);
+    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+  });
+  cx.closePath(); cx.fill(); cx.stroke();
+  cx.restore();
+}
+
+function drawShape(cx, W, H, m, name) {
+  const sh = sampleShape(name);
+  if (sh.type === 'none') return;
+  cx.save();
+  if (sh.type === 'dots') {
+    for (const p of sh.pts) {
+      const [x, y] = applyMat(m, p[0], p[1]);
+      const [px, py] = worldToCanvas(W, H, x, y);
+      cx.fillStyle = 'rgba(235, 235, 240, 0.55)';
+      cx.beginPath(); cx.arc(px, py, 1.6, 0, Math.PI * 2); cx.fill();
+    }
+  } else if (sh.type === 'loop' || sh.type === 'poly') {
+    cx.strokeStyle = 'rgba(255, 214, 170, 0.95)';
+    cx.lineWidth = 1.8;
+    cx.beginPath();
+    sh.pts.forEach((p, i) => {
+      const [x, y] = applyMat(m, p[0], p[1]);
+      const [px, py] = worldToCanvas(W, H, x, y);
+      if (i === 0) cx.moveTo(px, py); else cx.lineTo(px, py);
+    });
+    if (sh.type === 'loop') cx.closePath();
+    cx.stroke();
+    /* For polygons, also fill lightly to show orientation. */
+    if (sh.type === 'poly') {
+      cx.fillStyle = 'rgba(255, 214, 170, 0.12)';
+      cx.fill();
+    }
+  } else if (sh.type === 'multiloop') {
+    cx.strokeStyle = 'rgba(255, 214, 170, 0.95)';
+    cx.lineWidth = 1.8;
+    for (const loop of sh.loops) {
+      cx.beginPath();
+      loop.forEach((p, i) => {
+        const [x, y] = applyMat(m, p[0], p[1]);
+        const [px, py] = worldToCanvas(W, H, x, y);
+        if (i === 0) cx.moveTo(px, py); else cx.lineTo(px, py);
+      });
+      cx.stroke();
+    }
+  }
+  cx.restore();
+}
+
+function drawEigenvectors(cx, W, H, m) {
+  const ev = realEigenvalues(m);
+  if (!ev) return;   /* complex → no real eigenvector line */
+  const colours = [pal.success, '#A1E8D1'];
+  const drawn = [];  /* track directions we've drawn; skip near-parallel repeats */
+  for (let i = 0; i < 2; i++) {
+    const v = eigenvectorFor(m, ev[i]);
+    if (!v) continue;
+    const parallel = drawn.some(d => Math.abs(d[0]*v[0] + d[1]*v[1]) > 0.9995);
+    if (parallel) continue;
+    drawn.push(v);
+    /* Draw the eigenspace line fully through origin, then the scaled vector. */
+    const [ox, oy] = worldToCanvas(W, H, 0, 0);
+    const far = 5;
+    const [x1, y1] = worldToCanvas(W, H,  far * v[0],  far * v[1]);
+    const [x2, y2] = worldToCanvas(W, H, -far * v[0], -far * v[1]);
+    cx.save();
+    cx.strokeStyle = 'rgba(74, 222, 128, 0.25)';
+    cx.setLineDash([4, 4]);
+    cx.lineWidth = 1;
+    cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(x2, y2); cx.stroke();
+    cx.setLineDash([]);
+    /* Scaled vector: draw from origin to λ·v. */
+    const lam = ev[i];
+    const [sx, sy] = worldToCanvas(W, H, lam * v[0], lam * v[1]);
+    cx.strokeStyle = colours[i];
+    cx.fillStyle = colours[i];
+    cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(sx, sy); cx.stroke();
+    const ang = Math.atan2(sy - oy, sx - ox);
+    const ah = 10, aa = 0.38;
+    cx.beginPath();
+    cx.moveTo(sx, sy);
+    cx.lineTo(sx - ah * Math.cos(ang - aa), sy - ah * Math.sin(ang - aa));
+    cx.lineTo(sx - ah * Math.cos(ang + aa), sy - ah * Math.sin(ang + aa));
+    cx.closePath(); cx.fill();
+    cx.font = "500 11px 'JetBrains Mono', monospace";
+    cx.fillText(`λ=${lam.toFixed(2)}`, sx + 8, sy - 4);
+    cx.restore();
+  }
+}
+
+function drawUserPoints(cx, W, H, m) {
+  for (const p of state.userPoints) {
+    /* Original (faint) */
+    const [ox, oy] = worldToCanvas(W, H, p.x, p.y);
+    cx.save();
+    cx.fillStyle = 'rgba(255,255,255,0.35)';
+    cx.beginPath(); cx.arc(ox, oy, 3, 0, Math.PI * 2); cx.fill();
+    /* Transformed (bright) */
+    const [tx, ty] = applyMat(m, p.x, p.y);
+    const [cxp, cyp] = worldToCanvas(W, H, tx, ty);
+    cx.fillStyle = pal.teal300;
+    cx.beginPath(); cx.arc(cxp, cyp, 4.2, 0, Math.PI * 2); cx.fill();
+    /* Connector */
+    cx.strokeStyle = 'rgba(95, 210, 203, 0.35)';
+    cx.lineWidth = 1;
+    cx.setLineDash([3, 3]);
+    cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(cxp, cyp); cx.stroke();
+    cx.setLineDash([]);
+    cx.restore();
+  }
+}
+
+/* =============================================================
+   Full render: main canvas
+   ============================================================= */
+function renderMain() {
+  const { cx, W, H } = fitCanvas(canvas);
+  cx.clearRect(0, 0, W, H);
+  cx.fillStyle = pal.bgSunken || '#060607';
+  cx.fillRect(0, 0, W, H);
+
+  const m = interpMat(state.t);
+
+  if (state.showGrid) {
+    drawGrid(cx, W, H);
+    /* Transformed grid overlay in teal. */
+    drawTransformedGrid(cx, W, H, m, 'rgba(32, 184, 174, 0.30)');
+  }
+
+  /* Sample shape */
+  drawShape(cx, W, H, m, state.shape);
+
+  /* Unit square */
+  if (state.showUnit) drawUnitParallelogram(cx, W, H, m);
+
+  /* User points (original + transformed with connector) */
+  if (state.showPoints || state.userPoints.length > 0) drawUserPoints(cx, W, H, m);
+
+  /* Inverse map (apply M^-1 to unit square if invertible) */
+  if (state.showInverse) drawInverseMap(cx, W, H, m);
+
+  /* Eigenvectors */
+  if (state.showEig) drawEigenvectors(cx, W, H, m);
+
+  /* Basis vectors — draw last so they sit on top. */
+  if (state.showBasis) {
+    const iHat = applyMat(m, 1, 0);
+    const jHat = applyMat(m, 0, 1);
+    drawVector(cx, W, H, iHat[0], iHat[1], pal.teal300,
+      `î=(${iHat[0].toFixed(1)}, ${iHat[1].toFixed(1)})`, 2.6);
+    drawVector(cx, W, H, jHat[0], jHat[1], pal.heat400,
+      `ĵ=(${jHat[0].toFixed(1)}, ${jHat[1].toFixed(1)})`, 2.6);
+  }
+}
+
+function drawInverseMap(cx, W, H, m) {
+  /* For an invertible m, draw the preimage of the visible unit square,
+     i.e. apply m^-1 to (0,0)-(1,1). This shows the region that
+     maps to the unit square (i.e. "where did the unit square come from"). */
+  const dd = det(m);
+  if (Math.abs(dd) < 1e-6) return;
+  const inv = { a: m.d / dd, b: -m.b / dd, c: -m.c / dd, d: m.a / dd };
+  const corners = [[0,0],[1,0],[1,1],[0,1]].map(p => applyMat(inv, p[0], p[1]));
+  cx.save();
+  cx.strokeStyle = 'rgba(180, 180, 255, 0.7)';
+  cx.setLineDash([3, 3]);
+  cx.lineWidth = 1.2;
+  cx.beginPath();
+  corners.forEach((p, i) => {
+    const [x, y] = worldToCanvas(W, H, p[0], p[1]);
+    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+  });
+  cx.closePath();
+  cx.stroke();
+  cx.setLineDash([]);
+  cx.restore();
+}
+
+/* =============================================================
+   Composition (pair) canvas
+   ============================================================= */
+function renderPair() {
+  const { cx, W, H } = fitCanvas(pairCanvas);
+  cx.clearRect(0, 0, W, H);
+  cx.fillStyle = pal.bgSunken || '#060607';
+  cx.fillRect(0, 0, W, H);
+
+  if (!state.pairOn) {
+    cx.save();
+    cx.fillStyle = 'rgba(255,255,255,0.3)';
+    cx.font = "500 12px 'JetBrains Mono', monospace";
+    cx.textAlign = 'center';
+    cx.fillText('Enable M₂ in the control panel to compose.', W/2, H/2);
+    cx.restore();
+    D('pair-meta').textContent = 'off';
+    return;
+  }
+
+  const m1 = interpMat(state.t);                       /* the main matrix */
+  const m2 = { a: state.a2, b: state.b2, c: state.c2, d: state.d2 };
+  /* Pair order: 21 → apply M1 first then M2 (composite = M2·M1).
+                 12 → apply M2 first then M1 (composite = M1·M2). */
+  const composite = (state.pairOrder === '21')
+    ? multiplyMat(m2, m1)
+    : multiplyMat(m1, m2);
+
+  D('pair-meta').textContent =
+    (state.pairOrder === '21' ? 'M₂·M₁' : 'M₁·M₂') +
+    `  det=${det(composite).toFixed(2)}`;
+  D('pair-title').textContent =
+    'Composition · ' + (state.pairOrder === '21' ? 'M₂·M₁' : 'M₁·M₂');
+
+  /* Faint identity grid + composite-transformed grid. */
+  drawGrid(cx, W, H);
+  drawTransformedGrid(cx, W, H, composite, 'rgba(32, 184, 174, 0.30)');
+
+  /* Unit square under composite */
+  drawUnitParallelogram(cx, W, H, composite);
+
+  /* Show sample shape after composite */
+  drawShape(cx, W, H, composite, state.shape);
+
+  /* Intermediate step: also show where the unit square lands after the
+     first matrix alone (dashed outline). */
+  const firstOnly = (state.pairOrder === '21') ? m1 : m2;
+  const c1 = [[0,0],[1,0],[1,1],[0,1]].map(p => applyMat(firstOnly, p[0], p[1]));
+  cx.save();
+  cx.strokeStyle = 'rgba(255, 214, 170, 0.7)';
+  cx.setLineDash([4, 4]);
+  cx.lineWidth = 1;
+  cx.beginPath();
+  c1.forEach((p, i) => {
+    const [x, y] = worldToCanvas(W, H, p[0], p[1]);
+    if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+  });
+  cx.closePath(); cx.stroke();
+  cx.setLineDash([]);
+  cx.restore();
+
+  /* Basis vectors under composite */
+  const iHat = applyMat(composite, 1, 0);
+  const jHat = applyMat(composite, 0, 1);
+  drawVector(cx, W, H, iHat[0], iHat[1], pal.teal300, 'î′', 2);
+  drawVector(cx, W, H, jHat[0], jHat[1], pal.heat400, 'ĵ′', 2);
+}
+
+/* =============================================================
+   Stats update
+   ============================================================= */
+function fmtEigValue(ev, tr, dt) {
+  if (ev) return `${ev[0].toFixed(2)}, ${ev[1].toFixed(2)}`;
+  /* Complex pair: λ = α ± iβ, where α = tr/2, β = √(det − α²). */
+  const a = tr / 2;
+  const b = Math.sqrt(Math.max(0, dt - a*a));
+  return `${a.toFixed(2)} ± ${b.toFixed(2)}i`;
+}
+function updateStats() {
+  const m = interpMat(state.t);
+  const dt = det(m), tr = trace(m);
+  const ev = realEigenvalues(m);
+  const r  = rank(m);
+  const cond = conditionNumber(m);
+  D('stat-det').textContent   = dt.toFixed(3);
+  D('stat-trace').textContent = tr.toFixed(3);
+  D('stat-eigs').textContent  = fmtEigValue(ev, tr, dt);
+  D('stat-rank').textContent  = r;
+  D('stat-cond').textContent  = isFinite(cond) ? cond.toFixed(3) : '∞';
+
+  /* Det colour: teal if >0, heat if <0, muted if 0 */
+  const detStat = D('stat-det').parentElement;
+  detStat.classList.toggle('warn', dt < -1e-6);
+  detStat.classList.toggle('accent', dt > 1e-6);
+}
+
+/* =============================================================
+   Render pipeline
+   ============================================================= */
+function renderAll() {
+  reloadPalette();
+  renderMain();
+  renderPair();
+  updateStats();
+}
+
+/* =============================================================
+   UI wiring
+   ============================================================= */
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function bindMatrixInputs(prefix, setter, getter) {
+  ['a','b','c','d'].forEach(k => {
+    const key = prefix + k;
+    const num   = D(`${key}-num`);
+    const slide = D(`${key}-slider`);
+    function setVal(v) {
+      v = clamp(v, -2, 2);
+      setter(k, v);
+      num.value = v.toFixed(2);
+      slide.value = v;
+      renderAll();
+    }
+    num.addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      if (!isFinite(v)) return;
+      setter(k, v);
+      slide.value = clamp(v, -2, 2);
+      renderAll();
+    });
+    num.addEventListener('blur', e => {
+      let v = parseFloat(e.target.value);
+      if (!isFinite(v)) v = getter(k);
+      v = clamp(v, -2, 2);
+      num.value = v.toFixed(2);
+      setter(k, v);
+      slide.value = v;
+      renderAll();
+    });
+    slide.addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      setter(k, v);
+      num.value = v.toFixed(2);
+      renderAll();
     });
   });
-  // Fix preset handling
-  document.querySelectorAll('[data-preset]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const p = presets[btn.dataset.preset];
-      a=p[0]; b=p[1]; c=p[2]; d=p[3];
-      document.getElementById('a-slider').value=a;
-      document.getElementById('b-slider').value=b;
-      document.getElementById('c-slider').value=c;
-      document.getElementById('d-slider').value=d;
-      updateMatrix();
-    });
-  });
+}
 
-  // Animate
-  document.getElementById('btn-anim').addEventListener('click',()=>{
-    if(animating) return;
-    animating = true; animT = 0;
-    const step = () => {
-      animT += 0.015;
-      if(animT >= 1){ animT=1; animating=false; draw(); return; }
-      draw(); requestAnimationFrame(step);
-    };
-    step();
-  });
+/* Bind main M. Pair M₂ is wired below separately. */
+bindMatrixInputs('', (k, v) => { state[k] = v; },  k => state[k]);
 
-  resize(); updateMatrix();
-  window.addEventListener('resize',resize);
+/* Pair M2 wiring: separate helper because the key names are a2/b2/c2/d2. */
+['a','b','c','d'].forEach(k => {
+  const skey = k + '2';
+  const num   = D(`${k}2-num`);
+  const slide = D(`${k}2-slider`);
+  num.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    if (!isFinite(v)) return;
+    state[skey] = v;
+    slide.value = clamp(v, -2, 2);
+    renderAll();
+  });
+  num.addEventListener('blur', e => {
+    let v = parseFloat(e.target.value);
+    if (!isFinite(v)) v = state[skey];
+    v = clamp(v, -2, 2);
+    state[skey] = v;
+    num.value = v.toFixed(2);
+    slide.value = v;
+    renderAll();
+  });
+  slide.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    state[skey] = v;
+    num.value = v.toFixed(2);
+    renderAll();
+  });
+});
+
+/* =============================================================
+   Presets
+   ============================================================= */
+const presets = {
+  identity:    [1, 0, 0, 1],
+  rotate30:    [Math.cos(Math.PI/6),  -Math.sin(Math.PI/6),  Math.sin(Math.PI/6),  Math.cos(Math.PI/6)],
+  rotate90:    [0, -1, 1, 0],
+  scaleX2:     [2, 0, 0, 1],
+  scaleIso:    [1.5, 0, 0, 1.5],
+  shearX:      [1, 1, 0, 1],
+  shearY:      [1, 0, 1, 1],
+  reflectY:    [-1, 0, 0, 1],
+  reflectDiag: [0, 1, 1, 0],
+  project:     [1, 0, 0, 0],
+  rotateScale: [Math.SQRT2 * Math.cos(Math.PI/4), -Math.SQRT2 * Math.sin(Math.PI/4),
+                Math.SQRT2 * Math.sin(Math.PI/4),  Math.SQRT2 * Math.cos(Math.PI/4)],
+  collapse:    [1, 1, 1, 1],
+};
+function applyPreset(key) {
+  const p = presets[key];
+  if (!p) return;
+  [state.a, state.b, state.c, state.d] = p;
+  ['a','b','c','d'].forEach(k => {
+    D(`${k}-num`).value    = state[k].toFixed(2);
+    D(`${k}-slider`).value = clamp(state[k], -2, 2);
+  });
+  state.t = 1;
+  D('t-slider').value = 1;
+  D('t-val').textContent = '1.00';
+  renderAll();
+}
+document.querySelectorAll('[data-preset]').forEach(btn =>
+  btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
+
+/* =============================================================
+   Shape chips
+   ============================================================= */
+document.querySelectorAll('#shape-chips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#shape-chips .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.shape = chip.dataset.shape;
+    renderAll();
+  });
+});
+
+/* =============================================================
+   Display toggles
+   ============================================================= */
+function bindToggle(id, key) {
+  const el = D(id);
+  el.addEventListener('click', () => {
+    state[key] = !state[key];
+    el.classList.toggle('active', state[key]);
+    renderAll();
+  });
+}
+bindToggle('tog-grid',   'showGrid');
+bindToggle('tog-basis',  'showBasis');
+bindToggle('tog-unit',   'showUnit');
+bindToggle('tog-eig',    'showEig');
+bindToggle('tog-points', 'showPoints');
+bindToggle('tog-inv',    'showInverse');
+
+/* =============================================================
+   Composition toggle + order chips
+   ============================================================= */
+const pairBtn = D('pair-on');
+pairBtn.addEventListener('click', () => {
+  state.pairOn = !state.pairOn;
+  pairBtn.classList.toggle('on', state.pairOn);
+  pairBtn.textContent = state.pairOn ? 'disable M₂' : 'enable M₂';
+  D('pair-editor').style.display = state.pairOn ? '' : 'none';
+  renderAll();
+});
+D('order-21').addEventListener('click', () => {
+  state.pairOrder = '21';
+  D('order-21').classList.add('active');
+  D('order-12').classList.remove('active');
+  renderAll();
+});
+D('order-12').addEventListener('click', () => {
+  state.pairOrder = '12';
+  D('order-12').classList.add('active');
+  D('order-21').classList.remove('active');
+  renderAll();
+});
+
+/* =============================================================
+   Animation
+   ============================================================= */
+const btnAnim = D('btn-anim');
+const tSlider = D('t-slider');
+const tVal    = D('t-val');
+tSlider.addEventListener('input', e => {
+  state.t = parseFloat(e.target.value);
+  tVal.textContent = state.t.toFixed(2);
+  renderAll();
+});
+btnAnim.addEventListener('click', () => {
+  if (state.animating) {
+    state.animating = false;
+    btnAnim.textContent = 'play: I → M';
+    return;
+  }
+  state.animating = true;
+  state.t = 0;
+  btnAnim.textContent = 'pause';
+  const step = () => {
+    if (!state.animating) return;
+    state.t = Math.min(1, state.t + 0.012);
+    tSlider.value = state.t;
+    tVal.textContent = state.t.toFixed(2);
+    renderAll();
+    if (state.t >= 1) {
+      state.animating = false;
+      btnAnim.textContent = 'play: I → M';
+      return;
+    }
+    requestAnimationFrame(step);
+  };
+  step();
+});
+D('btn-reset-anim').addEventListener('click', () => {
+  state.animating = false;
+  state.t = 1;
+  tSlider.value = 1;
+  tVal.textContent = '1.00';
+  btnAnim.textContent = 'play: I → M';
+  renderAll();
+});
+
+/* =============================================================
+   Click main canvas to drop a user point
+   ============================================================= */
+canvas.addEventListener('click', ev => {
+  const r = canvas.getBoundingClientRect();
+  const W = r.width, H = r.height;
+  const [wx, wy] = canvasToWorld(W, H, ev.clientX - r.left, ev.clientY - r.top);
+  if (wx < XR[0] || wx > XR[1] || wy < YR[0] || wy > YR[1]) return;
+  state.userPoints.push({ x: wx, y: wy });
+  /* Keep only last 12 user points to avoid clutter. */
+  if (state.userPoints.length > 12) state.userPoints.shift();
+  state.showPoints = true;
+  D('tog-points').classList.add('active');
+  renderAll();
+});
+/* Right-click clears all user points. */
+canvas.addEventListener('contextmenu', ev => {
+  ev.preventDefault();
+  state.userPoints = [];
+  renderAll();
+});
+
+/* =============================================================
+   Resize + boot
+   ============================================================= */
+let resizeT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(renderAll, 80);
+});
+
+function boot() {
+  reloadPalette();
+  renderAll();
+}
+if (document.hidden) setTimeout(boot, 0);
+else requestAnimationFrame(boot);
+
 })();
 </script>
+
 </body>
 </html>
