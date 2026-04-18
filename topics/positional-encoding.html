@@ -3,231 +3,1019 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Positional Encoding - AI Visualized</title>
+  <title>Positional encoding — AI Visualized</title>
+  <meta name="description" content="Transformers have no clue what order their inputs come in — until you inject positional encoding. Sinusoidal, learned, RoPE, and ALiBi, side by side, as heatmaps, curves, and dot-product similarity rings.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .pe-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 2.2fr 1fr;
+      grid-template-rows: 1.3fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .pe-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .pe-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+    .pe-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin: 0;
+    }
+    .pe-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+
+    .pe-viz   { grid-column: 1; grid-row: 1 / span 2; }
+    .pe-ctrls { grid-column: 2; grid-row: 1; overflow-y: auto; }
+    .pe-side  { grid-column: 2; grid-row: 2; overflow-y: auto; }
+
+    .pe-viz-body {
+      flex: 1; min-height: 0;
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: var(--s-3);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+    }
+    .pe-stage {
+      background: var(--bg-app);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      position: relative;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .pe-stage h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin: 0;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .pe-stage h5 .hint {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-muted); text-transform: none;
+      letter-spacing: 0;
+    }
+    .pe-stage canvas {
+      width: 100%; flex: 1;
+      display: block;
+      background: #0a0a0b;
+    }
+
+    /* Controls */
+    .pe-ctrl-body { padding: var(--s-3) var(--s-4) var(--s-4); overflow-y: auto; }
+    .ctl-group { margin-bottom: var(--s-4); }
+    .ctl-group h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      padding: 6px 10px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pill:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .slider-wrap { display:flex; flex-direction:column; gap: 4px; margin-bottom: var(--s-3); }
+    .slider-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .slider-row .v { color: var(--teal-300); font-weight: 500; }
+    input[type=range].pe-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; background: var(--border-default);
+      border-radius: 2px; outline: none;
+    }
+    input[type=range].pe-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    input[type=range].pe-slider::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+
+    .pe-note {
+      font-family: var(--font-sans);
+      font-size: 12px; line-height: 1.6;
+      color: var(--fg-tertiary);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      margin-top: var(--s-3);
+    }
+    .pe-note strong { color: var(--teal-200); font-weight: 600; }
+    .pe-note code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-raised);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--teal-300);
+    }
+
+    /* Side panel */
+    .pe-side-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+    .formula {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 8px 10px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      color: var(--teal-200);
+      margin-bottom: 8px;
+      line-height: 1.55;
+      overflow-x: auto; white-space: nowrap;
+    }
+    .formula .muted { color: var(--fg-muted); }
+    .formula .heat  { color: var(--heat-400); }
+
+    .prop-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      margin-bottom: var(--s-3);
+    }
+    .prop-grid .k { color: var(--fg-muted); text-align: right; }
+    .prop-grid .v { color: var(--fg-primary); }
+    .prop-grid .v.ok   { color: var(--teal-300); }
+    .prop-grid .v.warn { color: var(--heat-400); }
+
+    .mini-canvas {
+      width: 100%; height: 150px; display: block;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+    }
+
+    /* Bottom stats */
+    .pe-stats {
+      grid-column: 1 / -1; grid-row: 3;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--s-3);
+    }
+    .pe-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-height: 66px;
+    }
+    .pe-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .pe-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pe-stat.accent .value { color: var(--teal-300); }
+    .pe-stat.heat .value   { color: var(--heat-400); }
+
+    .pe-legend {
+      position: absolute; top: 10px; left: 10px;
+      padding: 6px 8px;
+      background: rgba(10,10,11,0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--fg-tertiary);
+      pointer-events: none;
+      z-index: 2;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1000px) {
+      .pe-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+      }
+      .pe-viz   { grid-column: 1; grid-row: 1; }
+      .pe-ctrls { grid-column: 1; grid-row: 2; }
+      .pe-side  { grid-column: 1; grid-row: 3; }
+      .pe-stats { grid-row: 4; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Positional Encoding</h1>
-      <span class="topic-desc">How transformers know where each word is &mdash; sinusoidal patterns at different frequencies</span>
-    </div>
-
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">
-        Hover rows to see individual frequency patterns
-      </div>
-    </div>
-
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">Why transformers need positions</div>
-        <div class="guide-text">
-          Unlike older models, transformers process all words <strong>in parallel</strong>. Fast! But they lose track of word order. "Dog bites man" and "Man bites dog" would look identical. Positional encoding adds a unique "signature" to each position so the model knows which word came first.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Sequence Length</h3>
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Positions</span>
-            <span class="slider-value" id="seq-val">64</span>
-          </div>
-          <input type="range" id="seq-slider" min="8" max="128" step="4" value="64">
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Embedding Dimensions</h3>
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>d_model</span>
-            <span class="slider-value" id="dim-val">64</span>
-          </div>
-          <input type="range" id="dim-slider" min="16" max="128" step="4" value="64">
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Why Sine &amp; Cosine?</h3>
-        <div class="info-box">
-          The original Transformer paper uses sinusoids at <strong>different frequencies</strong>. Each dimension oscillates at a different rate: dim 0 oscillates fast, dim 64 oscillates slowly. Every position gets a unique pattern, and the model can learn relative distances (like "4 positions apart") using simple linear combinations.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Formula</h3>
-        <div class="formula" style="font-size:0.78rem">
-          PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>)<br>
-          PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Hovered Dimension</h3>
-        <div class="info-box" id="dim-info" style="font-family:var(--font-mono);font-size:0.82rem">
-          Hover a row on the heatmap to inspect.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Modern Variants</h3>
-        <div class="info-box">
-          The original sinusoidal PE is being replaced by <strong>RoPE</strong> (Rotary Position Embeddings) in models like LLaMA and GPT-NeoX. RoPE rotates query/key vectors in 2D planes. The intuition is the same: give each position a distinct pattern that encodes relative distance naturally.
-        </div>
-      </div>
-    </div>
+<div class="topic-page">
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Positional encoding</h1>
+    <span class="topic-desc">Transformers shuffle inputs freely. Positional encoding puts the order back in.</span>
   </div>
 
+  <div class="pe-main">
+
+    <section class="pe-panel pe-viz">
+      <header class="pe-panel-head">
+        <h4>The PE matrix &amp; its signature</h4>
+        <span class="meta" id="viz-meta">sinusoidal &middot; pos 0..63 &middot; d 64</span>
+      </header>
+      <div class="pe-viz-body">
+        <div class="pe-stage">
+          <h5>
+            <span>PE matrix (positions &darr;, dimensions &rarr;)</span>
+            <span class="hint">click a row to inspect</span>
+          </h5>
+          <canvas id="heat-canvas"></canvas>
+          <div class="pe-legend" id="heat-legend">
+            sinusoidal: each column i oscillates at frequency 1/10000^(2i/d)
+          </div>
+        </div>
+        <div class="pe-stage">
+          <h5>
+            <span>Row signature at pos = <span id="row-label" style="color:var(--teal-300)">0</span></span>
+            <span class="hint">one curve per selected row</span>
+          </h5>
+          <canvas id="row-canvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="pe-panel pe-ctrls">
+      <header class="pe-panel-head">
+        <h4>Controls</h4>
+        <span class="meta" id="ctl-meta">sinusoidal</span>
+      </header>
+      <div class="pe-ctrl-body">
+
+        <div class="ctl-group">
+          <h5>Encoding</h5>
+          <div class="pill-row" id="enc-pills">
+            <span class="pill active" data-enc="sin">sinusoidal</span>
+            <span class="pill" data-enc="learned">learned</span>
+            <span class="pill" data-enc="rope">rope</span>
+            <span class="pill" data-enc="alibi">alibi</span>
+            <span class="pill" data-enc="nope">none</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Shape</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>sequence length</span><span class="v" id="len-val">64</span></div>
+            <input type="range" class="pe-slider" id="len-slider" min="8" max="256" step="1" value="64">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>model dim (d)</span><span class="v" id="dim-val">64</span></div>
+            <input type="range" class="pe-slider" id="dim-slider" min="8" max="128" step="2" value="64">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>base / &theta;</span><span class="v" id="base-val">10000</span></div>
+            <input type="range" class="pe-slider" id="base-slider" min="100" max="50000" step="100" value="10000">
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Highlight position</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>pos</span><span class="v" id="pos-val">0</span></div>
+            <input type="range" class="pe-slider" id="pos-slider" min="0" max="63" step="1" value="0">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>compare pos</span><span class="v" id="cmp-val">8</span></div>
+            <input type="range" class="pe-slider" id="cmp-slider" min="0" max="63" step="1" value="8">
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Display</h5>
+          <div class="pill-row" id="view-pills">
+            <span class="pill active" data-view="pe">pe heatmap</span>
+            <span class="pill" data-view="sim">self-similarity</span>
+            <span class="pill" data-view="rope2d">rope rotation</span>
+          </div>
+          <div class="pill-row" style="margin-top:4px" id="cmap-pills">
+            <span class="pill active" data-cmap="signed">signed</span>
+            <span class="pill" data-cmap="mag">magnitude</span>
+          </div>
+        </div>
+
+        <div class="pe-note">
+          <strong>Why positional encoding exists.</strong> Self-attention is a permutation-equivariant operation: shuffle the input tokens and the output shuffles too. Without an extra signal, "dog bit man" and "man bit dog" would look identical. Positional encoding adds order info either by <em>adding</em> a vector to each token (sinusoidal, learned), <em>rotating</em> query/key pairs (RoPE), or <em>biasing</em> attention directly (ALiBi).
+        </div>
+      </div>
+    </section>
+
+    <section class="pe-panel pe-side">
+      <header class="pe-panel-head">
+        <h4>Equations &amp; properties</h4>
+        <span class="meta" id="side-meta">sinusoidal</span>
+      </header>
+      <div class="pe-side-body" id="side-body">
+        <div class="formula" id="formula"></div>
+        <div class="prop-grid" id="prop-grid"></div>
+
+        <h5 style="font-family: var(--font-mono); font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--fg-muted); margin: var(--s-3) 0 var(--s-2);">Dot product PE(i)&middot;PE(j) vs |i&minus;j|</h5>
+        <canvas id="dot-canvas" class="mini-canvas"></canvas>
+        <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-muted); margin-top: 4px;">
+          Good positional codes give a smooth, monotone falloff with distance &mdash; the model can easily tell <em>how far</em> two tokens are apart.
+        </div>
+
+        <div class="pe-note" id="tip-note"></div>
+      </div>
+    </section>
+
+    <section class="pe-stats">
+      <div class="pe-stat"><div class="label">encoding</div><div class="value" id="s-enc">sinusoidal</div></div>
+      <div class="pe-stat accent"><div class="label">||PE(pos)||</div><div class="value" id="s-norm">&mdash;</div></div>
+      <div class="pe-stat"><div class="label">PE(p)&middot;PE(q)</div><div class="value" id="s-dot">&mdash;</div></div>
+      <div class="pe-stat heat"><div class="label">cos(PE(p), PE(q))</div><div class="value" id="s-cos">&mdash;</div></div>
+      <div class="pe-stat"><div class="label">min period</div><div class="value" id="s-minper">&mdash;</div></div>
+      <div class="pe-stat"><div class="label">max period</div><div class="value" id="s-maxper">&mdash;</div></div>
+    </section>
+
+  </div>
+</div>
+
 <script>
+"use strict";
+/* ------------------------------------------------------------------
+   POSITIONAL ENCODING — put the order back in.
+
+   We implement five variants and render each as:
+     1) a heatmap of the PE matrix (L × d)
+     2) the row signature at the selected position
+     3) a dot-product PE(i)·PE(j) vs |i−j| curve
+     4) an optional self-similarity matrix (or the RoPE rotation plane)
+
+   Variants:
+     sin:      Vaswani et al. (2017). PE[p, 2i] = sin(p / θ^(2i/d))
+               PE[p, 2i+1] = cos(p / θ^(2i/d))
+     learned:  deterministic pseudo-learned — a fixed-seed random matrix
+               standing in for trained absolute PE.
+     rope:     Rotary PE (Su et al. 2021). PE is applied as a 2D rotation
+               on pairs (q_{2i}, q_{2i+1}) by angle m·θ^(−2i/d). We don't
+               separately emit a PE vector; instead we visualize the
+               rotation angles and the effective "rotated identity".
+     alibi:    Press et al. (2021). No per-token PE at all — just an
+               additive bias on attention scores, −m·|i−j|, with head
+               slope m. We visualize the bias matrix.
+     nope:     No positional encoding. Baseline.
+   ------------------------------------------------------------------ */
+
 (function(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  let W, H;
-  let seq = 64, dim = 64, hoverDim = -1;
 
-  function resize(){
-    const r=canvas.parentElement.getBoundingClientRect();
-    W=r.width; H=r.height;
-    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-    canvas.style.width=W+'px'; canvas.style.height=H+'px';
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    draw();
+  // ----------------------------------------------------------------
+  // 1) STATE.
+  // ----------------------------------------------------------------
+  const state = {
+    enc: 'sin',
+    L: 64,            // sequence length
+    d: 64,            // model dim
+    base: 10000,      // θ for sinusoidal/RoPE
+    pos: 0,
+    cmp: 8,
+    view: 'pe',       // pe | sim | rope2d
+    cmap: 'signed',   // signed | mag
+  };
+
+  // ----------------------------------------------------------------
+  // 2) PE COMPUTATION.
+  //    All return either a 2D matrix (L × d) called PE[p][i], or a
+  //    special object for ALiBi (just a bias matrix).
+  // ----------------------------------------------------------------
+
+  // Sinusoidal PE: the original Vaswani formulation.
+  function peSin(L, d, base) {
+    const M = [];
+    for (let p = 0; p < L; p++) {
+      const row = new Array(d);
+      for (let i = 0; i < d; i++) {
+        const twoI = (i >> 1) << 1; // floor(i/2)*2
+        const angle = p / Math.pow(base, twoI / d);
+        row[i] = (i % 2 === 0) ? Math.sin(angle) : Math.cos(angle);
+      }
+      M.push(row);
+    }
+    return M;
   }
 
-  function pe(pos, i, d){
-    const denom = Math.pow(10000, 2*Math.floor(i/2)/d);
-    return i % 2 === 0 ? Math.sin(pos/denom) : Math.cos(pos/denom);
+  // Learned PE: deterministic seeded random, scaled so ||PE(p)|| ≈ 1.
+  function peLearned(L, d) {
+    // mulberry32 seeded on (L, d)
+    let s = ((L * 1315423911) ^ (d * 2654435761)) >>> 0;
+    const rnd = () => {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const M = [];
+    for (let p = 0; p < L; p++) {
+      const row = new Array(d);
+      let sum = 0;
+      for (let i = 0; i < d; i++) {
+        const u = Math.max(1e-9, rnd()), v = Math.max(1e-9, rnd());
+        const g = Math.sqrt(-2 * Math.log(u)) * Math.cos(2*Math.PI*v);
+        row[i] = g; sum += g*g;
+      }
+      const scale = 1 / Math.sqrt(sum / d); // normalize so mean sq ≈ 1
+      for (let i = 0; i < d; i++) row[i] *= scale;
+      M.push(row);
+    }
+    return M;
   }
 
-  function heatColor(v){
-    // v in [-1, 1], red for negative, white for 0, blue for positive
-    const t = (v + 1) / 2; // [0, 1]
-    if(t < 0.5){
-      const s = t / 0.5;
-      return `rgb(${Math.floor(248 - s*150)}, ${Math.floor(113 - s*50)}, ${Math.floor(113 + s*50)})`;
+  // RoPE: produce the "rotated identity" — for a vector of all 1's, apply
+  // the RoPE rotation matrix at position p. Useful for showing the
+  // angular signature.
+  // Formally: the rotation is (cos, -sin; sin, cos) on each (2i, 2i+1)
+  // pair, with angle θ_i = p · base^(-2i/d).
+  function peRope(L, d, base) {
+    const M = [];
+    for (let p = 0; p < L; p++) {
+      const row = new Array(d);
+      for (let i = 0; i < d; i += 2) {
+        const theta = p * Math.pow(base, -i / d);
+        row[i]     = Math.cos(theta);
+        row[i + 1] = Math.sin(theta);
+      }
+      M.push(row);
+    }
+    return M;
+  }
+
+  // ALiBi: per-head slope m_h = 1 / 2^(h·8/H) (Press et al.) but we
+  // simplify: produce a single-head bias matrix B[i][j] = -m·|i-j|.
+  // Here m = 1 / sqrt(d), a small positive slope.
+  function peAlibi(L, d) {
+    const m = 1 / Math.sqrt(d);
+    const B = [];
+    for (let i = 0; i < L; i++) {
+      const row = new Array(L);
+      for (let j = 0; j < L; j++) row[j] = -m * Math.abs(i - j);
+      B.push(row);
+    }
+    return B;
+  }
+
+  function peNope(L, d) {
+    const M = [];
+    for (let p = 0; p < L; p++) M.push(new Array(d).fill(0));
+    return M;
+  }
+
+  // ----------------------------------------------------------------
+  // 3) MATH HELPERS.
+  // ----------------------------------------------------------------
+  function dot(a, b) {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+    return s;
+  }
+  function norm(a) { return Math.sqrt(dot(a, a)); }
+  function cosine(a, b) {
+    const na = norm(a), nb = norm(b);
+    if (na < 1e-12 || nb < 1e-12) return 0;
+    return dot(a, b) / (na * nb);
+  }
+
+  // ----------------------------------------------------------------
+  // 4) CURRENT-ENCODING DISPATCH.
+  //    Returns { PE, isBias } where isBias=true for ALiBi.
+  // ----------------------------------------------------------------
+  function currentPE() {
+    const L = state.L, d = state.d, base = state.base;
+    if (state.enc === 'sin')     return { PE: peSin(L, d, base),    isBias: false };
+    if (state.enc === 'learned') return { PE: peLearned(L, d),      isBias: false };
+    if (state.enc === 'rope')    return { PE: peRope(L, d, base),   isBias: false };
+    if (state.enc === 'alibi')   return { PE: peAlibi(L, d),        isBias: true };
+    return { PE: peNope(L, d), isBias: false };
+  }
+
+  // ----------------------------------------------------------------
+  // 5) CANVAS SETUP.
+  // ----------------------------------------------------------------
+  const heatCanvas = document.getElementById('heat-canvas');
+  const rowCanvas  = document.getElementById('row-canvas');
+  const dotCanvas  = document.getElementById('dot-canvas');
+  const hctx = heatCanvas.getContext('2d');
+  const rctx = rowCanvas.getContext('2d');
+  const dctx = dotCanvas.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+
+  function resizeCanvas(canvas, ctx) {
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * DPR; canvas.height = r.height * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    return { w: r.width, h: r.height };
+  }
+
+  // ----------------------------------------------------------------
+  // 6) HEATMAP OR SIM/ROPE DRAW.
+  // ----------------------------------------------------------------
+  function drawMainViz() {
+    const { w, h } = resizeCanvas(heatCanvas, hctx);
+    const { PE, isBias } = currentPE();
+    // Choose the matrix we render:
+    //   view=pe    → L × d   PE matrix (or L × L bias for ALiBi)
+    //   view=sim   → L × L   similarity matrix PE(i)·PE(j)
+    //   view=rope2d→ 2×2 rotation angles plot (for rope only)
+    let M, mW, mH, title;
+    if (state.view === 'rope2d' && state.enc === 'rope') {
+      drawRopeRotation(w, h);
+      document.getElementById('heat-legend').textContent = 'RoPE: each pair (2i, 2i+1) rotates by pos · base^(−2i/d)';
+      return;
+    }
+    if (state.view === 'sim' || isBias) {
+      // Similarity: PE(i)·PE(j); for ALiBi we just show the bias matrix.
+      M = [];
+      if (isBias) M = PE;
+      else {
+        for (let i = 0; i < state.L; i++) {
+          const row = new Array(state.L);
+          for (let j = 0; j < state.L; j++) row[j] = dot(PE[i], PE[j]);
+          M.push(row);
+        }
+      }
+      mW = state.L; mH = state.L;
+      title = isBias ? 'alibi bias (i × j)' : 'PE(i)·PE(j) similarity';
     } else {
-      const s = (t-0.5)/0.5;
-      return `rgb(${Math.floor(98 - s*60)}, ${Math.floor(64 + s*130)}, ${Math.floor(163 + s*70)})`;
+      // PE heatmap
+      M = PE; mW = state.d; mH = state.L;
+      title = state.enc + ' PE (pos × dim)';
     }
+    // Find max abs for color scaling
+    let absMax = 0;
+    for (let i = 0; i < mH; i++) for (let j = 0; j < mW; j++) {
+      const a = Math.abs(M[i][j]);
+      if (a > absMax) absMax = a;
+    }
+    if (absMax < 1e-12) absMax = 1;
+
+    // Render into an offscreen mW×mH canvas, then stretch
+    const off = document.createElement('canvas');
+    off.width = mW; off.height = mH;
+    const octx = off.getContext('2d');
+    const img = octx.createImageData(mW, mH);
+    for (let i = 0; i < mH; i++) {
+      for (let j = 0; j < mW; j++) {
+        const v = M[i][j];
+        const p = (i * mW + j) * 4;
+        const t = Math.min(1, Math.abs(v) / absMax);
+        if (state.cmap === 'signed') {
+          if (v >= 0) {
+            img.data[p]   = Math.round(20 + (95  - 20) * t);
+            img.data[p+1] = Math.round(20 + (210 - 20) * t);
+            img.data[p+2] = Math.round(20 + (203 - 20) * t);
+          } else {
+            img.data[p]   = Math.round(20 + (255 - 20) * t);
+            img.data[p+1] = Math.round(20 + (122 - 20) * t);
+            img.data[p+2] = Math.round(20 + (41  - 20) * t);
+          }
+          img.data[p+3] = 255;
+        } else {
+          const g = Math.round(t * 255);
+          img.data[p] = g; img.data[p+1] = g; img.data[p+2] = g; img.data[p+3] = 255;
+        }
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    hctx.clearRect(0, 0, w, h);
+    hctx.imageSmoothingEnabled = false;
+    // Fit matrix into the canvas preserving a small left axis for labels
+    const padL = 36, padT = 6, padR = 6, padB = 16;
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    hctx.drawImage(off, padL, padT, plotW, plotH);
+
+    // Axes / ticks
+    hctx.font = "10px 'JetBrains Mono', monospace";
+    hctx.fillStyle = 'rgba(155,155,163,0.85)';
+    hctx.textAlign = 'right';
+    // y-ticks
+    const yTicks = Math.min(8, mH);
+    for (let t = 0; t <= yTicks; t++) {
+      const v = Math.round(t * (mH - 1) / yTicks);
+      const y = padT + (v + 0.5) * (plotH / mH);
+      hctx.fillText(v.toString(), padL - 4, y + 3);
+    }
+    hctx.textAlign = 'center';
+    // x-ticks
+    const xTicks = Math.min(10, mW);
+    for (let t = 0; t <= xTicks; t++) {
+      const v = Math.round(t * (mW - 1) / xTicks);
+      const x = padL + (v + 0.5) * (plotW / mW);
+      hctx.fillText(v.toString(), x, h - 4);
+    }
+    hctx.textAlign = 'left';
+
+    // Highlight rows for pos and cmp
+    const highlight = (rowIdx, color) => {
+      if (rowIdx < 0 || rowIdx >= mH) return;
+      const y = padT + rowIdx * (plotH / mH);
+      hctx.strokeStyle = color; hctx.lineWidth = 1.5;
+      hctx.strokeRect(padL - 0.5, y - 0.5, plotW + 1, plotH / mH + 1);
+    };
+    if (state.view === 'pe' && !isBias) {
+      highlight(state.pos, 'rgba(95,210,203,0.95)');
+      highlight(state.cmp, 'rgba(255,122,41,0.95)');
+    }
+
+    // Legend text
+    document.getElementById('heat-legend').textContent = title +
+      ' · max |v| ' + absMax.toFixed(3);
   }
 
-  function draw(){
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
-
-    const margin = 40;
-    const headerH = 50;
-    const sideBarW = hoverDim >= 0 ? 180 : 0;
-    const availW = W - margin*2 - sideBarW;
-    const availH = H - headerH - margin*2;
-    const cellW = availW / seq;
-    const cellH = availH / dim;
-    const matX = margin, matY = headerH + margin/2;
-
-    // Title
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='11px JetBrains Mono'; ctx.textAlign='center';
-    ctx.fillText(`Positional Encoding Matrix: ${dim} dims \u00D7 ${seq} positions`, W/2, 28);
-
-    // Axis labels
-    ctx.textAlign='center'; ctx.font='10px JetBrains Mono'; ctx.fillStyle='rgba(255,255,255,0.4)';
-    ctx.fillText('pos \u2192 (token position in sequence)', matX + availW/2, matY + availH + 24);
-    ctx.save(); ctx.translate(matX-20, matY + availH/2); ctx.rotate(-Math.PI/2);
-    ctx.fillText('dim \u2193', 0, 0); ctx.restore();
-
-    // Draw cells
-    for(let d=0; d<dim; d++){
-      const highlight = d === hoverDim;
-      for(let p=0; p<seq; p++){
-        const v = pe(p, d, dim);
-        ctx.fillStyle = heatColor(v);
-        if(hoverDim >= 0 && !highlight) ctx.globalAlpha = 0.3;
-        ctx.fillRect(matX + p*cellW, matY + d*cellH, cellW+0.5, cellH+0.5);
-        ctx.globalAlpha = 1;
+  function drawRopeRotation(w, h) {
+    hctx.clearRect(0, 0, w, h);
+    // Draw a grid of small rotation visualizations: one per (pair-index).
+    // For each pair i∈{0, 2, 4, ...}, show the 2D unit vector rotated by
+    // theta = pos·base^(-2i/d). Plot all positions for one pair as a ring
+    // of dots, with the current pos highlighted.
+    const pairs = state.d >> 1;
+    const maxShow = Math.min(8, pairs);
+    const cw = w / maxShow, ch = h;
+    hctx.font = "10px 'JetBrains Mono', monospace";
+    hctx.textAlign = 'center';
+    for (let k = 0; k < maxShow; k++) {
+      const i = Math.round(k * (pairs - 1) / Math.max(1, maxShow - 1)) * 2;
+      const cx = k * cw + cw/2, cy = ch/2;
+      const r = Math.min(cw, ch) * 0.35;
+      // circle
+      hctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      hctx.lineWidth = 1;
+      hctx.beginPath(); hctx.arc(cx, cy, r, 0, Math.PI*2); hctx.stroke();
+      // points for all positions
+      for (let p = 0; p < state.L; p++) {
+        const theta = p * Math.pow(state.base, -i / state.d);
+        const x = cx + Math.cos(theta) * r;
+        const y = cy - Math.sin(theta) * r;
+        hctx.fillStyle = 'rgba(95,210,203,' + (0.15 + 0.5 * p / state.L) + ')';
+        hctx.beginPath(); hctx.arc(x, y, 2, 0, Math.PI*2); hctx.fill();
       }
-      if(highlight){
-        ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2;
-        ctx.strokeRect(matX, matY + d*cellH, availW, cellH);
-      }
+      // current pos
+      const thetaCur = state.pos * Math.pow(state.base, -i / state.d);
+      const xc = cx + Math.cos(thetaCur) * r, yc = cy - Math.sin(thetaCur) * r;
+      hctx.strokeStyle = 'rgba(245,245,247,0.9)'; hctx.lineWidth = 2;
+      hctx.beginPath(); hctx.moveTo(cx, cy); hctx.lineTo(xc, yc); hctx.stroke();
+      hctx.fillStyle = 'rgba(255,122,41,0.95)';
+      hctx.beginPath(); hctx.arc(xc, yc, 4, 0, Math.PI*2); hctx.fill();
+      // label
+      hctx.fillStyle = 'rgba(155,155,163,0.9)';
+      hctx.fillText('pair ' + (i/2), cx, ch - 6);
+      hctx.fillText('θ=' + thetaCur.toFixed(2), cx, 14);
     }
-
-    // Border
-    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1;
-    ctx.strokeRect(matX, matY, availW, availH);
-
-    // Side bar: show hovered row as line chart
-    if(hoverDim >= 0){
-      const sx = matX + availW + 20;
-      const sw = sideBarW - 20;
-      const sh = availH;
-      ctx.fillStyle='rgba(14,14,26,0.8)';
-      ctx.fillRect(sx, matY, sw, sh);
-      ctx.strokeStyle='rgba(251,191,36,0.5)'; ctx.lineWidth=1;
-      ctx.strokeRect(sx, matY, sw, sh);
-
-      ctx.fillStyle='#fbbf24'; ctx.font='bold 11px JetBrains Mono'; ctx.textAlign='left';
-      ctx.fillText(`dim ${hoverDim}`, sx+8, matY+16);
-      const freq = Math.pow(10000, 2*Math.floor(hoverDim/2)/dim);
-      ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px JetBrains Mono';
-      ctx.fillText(hoverDim%2===0?'sin':'cos', sx+8, matY+30);
-      ctx.fillText(`period ${(2*Math.PI*freq).toFixed(1)}`, sx+8, matY+42);
-
-      // Line chart
-      const chartY = matY + 60, chartH = sh - 80;
-      ctx.strokeStyle='rgba(255,255,255,0.1)';
-      ctx.beginPath(); ctx.moveTo(sx+8, chartY+chartH/2); ctx.lineTo(sx+sw-8, chartY+chartH/2); ctx.stroke();
-
-      ctx.strokeStyle='#fbbf24'; ctx.lineWidth=1.5; ctx.beginPath();
-      for(let p=0; p<seq; p++){
-        const v = pe(p, hoverDim, dim);
-        const x = sx + 8 + (p/(seq-1))*(sw-16);
-        const y = chartY + chartH/2 - v*(chartH/2-4);
-        if(p===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-
-      ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='9px JetBrains Mono'; ctx.textAlign='right';
-      ctx.fillText('+1', sx+sw-4, chartY+4);
-      ctx.fillText('-1', sx+sw-4, chartY+chartH);
-
-      // Update panel
-      document.getElementById('dim-info').innerHTML =
-        `Dimension <strong style="color:var(--yellow)">${hoverDim}</strong><br>` +
-        `Function: ${hoverDim%2===0?'sin':'cos'}<br>` +
-        `Period: ${(2*Math.PI*freq).toFixed(1)} positions<br>` +
-        `<span style="color:var(--text-muted);font-size:0.75rem">Low dims = fast wiggles<br>High dims = slow waves</span>`;
-    }
-
-    canvas._layout = { matX, matY, cellW, cellH, availW, availH };
+    hctx.textAlign = 'left';
   }
 
-  canvas.addEventListener('mousemove', e=>{
-    const L = canvas._layout; if(!L) return;
-    const r=canvas.getBoundingClientRect();
-    const mx=e.clientX-r.left, my=e.clientY-r.top;
-    if(mx >= L.matX && mx < L.matX+L.availW && my >= L.matY && my < L.matY+L.availH){
-      const d = Math.floor((my - L.matY)/L.cellH);
-      if(d !== hoverDim){ hoverDim = d; draw(); }
+  // ----------------------------------------------------------------
+  // 7) ROW SIGNATURE VIEW.
+  //    Plot PE(pos) as a curve across dimensions (and PE(cmp) in heat).
+  // ----------------------------------------------------------------
+  function drawRow() {
+    const { w, h } = resizeCanvas(rowCanvas, rctx);
+    rctx.clearRect(0, 0, w, h);
+    const { PE, isBias } = currentPE();
+    const pad = 20;
+    rctx.strokeStyle = 'rgba(255,255,255,0.08)'; rctx.lineWidth = 1;
+    rctx.beginPath(); rctx.moveTo(pad, h/2); rctx.lineTo(w - pad, h/2); rctx.stroke();
+    rctx.beginPath(); rctx.moveTo(pad, pad); rctx.lineTo(pad, h - pad); rctx.stroke();
+
+    if (isBias) {
+      rctx.fillStyle = 'rgba(155,155,163,0.85)';
+      rctx.font = "11px 'JetBrains Mono', monospace";
+      rctx.fillText('ALiBi has no per-token PE — the bias is added to the attention score.', pad + 4, pad + 14);
+      return;
     }
-  });
-  canvas.addEventListener('mouseleave', ()=>{ hoverDim=-1; document.getElementById('dim-info').textContent='Hover a row on the heatmap to inspect.'; draw(); });
 
-  document.getElementById('seq-slider').addEventListener('input',e=>{
-    seq = parseInt(e.target.value); document.getElementById('seq-val').textContent=seq; draw();
-  });
-  document.getElementById('dim-slider').addEventListener('input',e=>{
-    dim = parseInt(e.target.value); document.getElementById('dim-val').textContent=dim; draw();
+    const plotCurve = (row, color, dashed) => {
+      if (!row) return;
+      rctx.strokeStyle = color; rctx.lineWidth = 1.8;
+      if (dashed) rctx.setLineDash([3, 3]); else rctx.setLineDash([]);
+      rctx.beginPath();
+      // Scale y to [-1.1, 1.1] (or the row's max)
+      let absMax = 0; for (const v of row) absMax = Math.max(absMax, Math.abs(v));
+      if (absMax < 1e-9) absMax = 1;
+      for (let i = 0; i < row.length; i++) {
+        const x = pad + (i / (row.length - 1)) * (w - 2*pad);
+        const y = h/2 - (row[i] / absMax) * (h/2 - pad);
+        if (i === 0) rctx.moveTo(x, y); else rctx.lineTo(x, y);
+      }
+      rctx.stroke();
+      rctx.setLineDash([]);
+    };
+    plotCurve(PE[state.pos], 'rgba(95,210,203,0.95)');
+    plotCurve(PE[state.cmp], 'rgba(255,122,41,0.85)', true);
+
+    // Labels
+    rctx.fillStyle = 'rgba(95,210,203,0.95)';
+    rctx.font = "11px 'JetBrains Mono', monospace";
+    rctx.fillText('PE(' + state.pos + ')', pad + 4, pad + 10);
+    rctx.fillStyle = 'rgba(255,122,41,0.95)';
+    rctx.fillText('PE(' + state.cmp + ')', pad + 4, pad + 24);
+    rctx.fillStyle = 'rgba(155,155,163,0.85)';
+    rctx.font = "10px 'JetBrains Mono', monospace";
+    rctx.textAlign = 'right';
+    rctx.fillText('dim →', w - 4, h - 4);
+    rctx.textAlign = 'left';
+    document.getElementById('row-label').textContent = state.pos;
+  }
+
+  // ----------------------------------------------------------------
+  // 8) DOT-PRODUCT VS DISTANCE CHART.
+  // ----------------------------------------------------------------
+  function drawDot() {
+    const { w, h } = resizeCanvas(dotCanvas, dctx);
+    dctx.clearRect(0, 0, w, h);
+    const { PE, isBias } = currentPE();
+    const pad = 22;
+    dctx.strokeStyle = 'rgba(255,255,255,0.08)'; dctx.lineWidth = 1;
+    dctx.beginPath(); dctx.moveTo(pad, h - pad); dctx.lineTo(w - pad, h - pad); dctx.stroke();
+    dctx.beginPath(); dctx.moveTo(pad, pad); dctx.lineTo(pad, h - pad); dctx.stroke();
+
+    // For each distance Δ, collect mean dot PE(i) · PE(i+Δ) over i
+    const L = state.L;
+    const series = [];
+    if (isBias) {
+      for (let dst = 0; dst < L; dst++) series.push(PE[0][Math.min(L-1, dst)]);
+    } else {
+      for (let dst = 0; dst < L; dst++) {
+        let s = 0, cnt = 0;
+        for (let i = 0; i + dst < L; i++) { s += dot(PE[i], PE[i+dst]); cnt++; }
+        series.push(cnt ? s / cnt : 0);
+      }
+    }
+    let mn = Infinity, mx = -Infinity;
+    for (const v of series) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    if (mx - mn < 1e-9) { mx = mn + 1; }
+
+    dctx.strokeStyle = 'rgba(32,184,174,0.95)'; dctx.lineWidth = 1.8;
+    dctx.beginPath();
+    for (let i = 0; i < series.length; i++) {
+      const x = pad + (i / (series.length - 1)) * (w - 2*pad);
+      const y = h - pad - ((series[i] - mn) / (mx - mn)) * (h - 2*pad);
+      if (i === 0) dctx.moveTo(x, y); else dctx.lineTo(x, y);
+    }
+    dctx.stroke();
+
+    dctx.fillStyle = 'rgba(155,155,163,0.85)';
+    dctx.font = "10px 'JetBrains Mono', monospace";
+    dctx.fillText('Δ=0', pad + 2, h - 6);
+    dctx.textAlign = 'right';
+    dctx.fillText('Δ=' + (L-1), w - 4, h - 6);
+    dctx.fillText(mx.toFixed(2), w - 4, pad + 10);
+    dctx.fillText(mn.toFixed(2), w - 4, h - pad - 2);
+    dctx.textAlign = 'left';
+  }
+
+  // ----------------------------------------------------------------
+  // 9) FORMULAS AND PROPERTIES.
+  // ----------------------------------------------------------------
+  const DESCRIPTIONS = {
+    sin: {
+      formula: 'PE[p, 2i]   = sin( p / θ^(2i/d) )<br>PE[p, 2i+1] = cos( p / θ^(2i/d) )',
+      tip: '<strong>Sinusoidal PE</strong> (Vaswani et al., 2017). Each dimension pair oscillates at a different frequency &mdash; shorter dimensions wiggle fast, longer ones wiggle slowly. Beautiful property: PE(p+k) is a <em>linear</em> function of PE(p) alone. That lets the model learn "shift by k" as a single rotation.',
+      extrap: 'yes (bounded values)',
+    },
+    learned: {
+      formula: 'PE[p, i] &larr; trained parameter<br><span class="muted">here: seeded random, unit sphere</span>',
+      tip: '<strong>Learned PE</strong>. Just a free parameter per (pos, dim). Flexible, easy to implement, used in BERT, GPT-1/2/3. Downside: positions beyond the training max length have no embedding at all &mdash; no generalization.',
+      extrap: 'no (hard cap at trained length)',
+    },
+    rope: {
+      formula: 'q\u2032[2i..2i+1] = R<sub>θ_i·p</sub> · q[2i..2i+1]<br><span class="muted">θ_i = base^(&minus;2i/d)</span>',
+      tip: '<strong>RoPE</strong> (Su et al., 2021). Don\u2019t add a PE to the token at all &mdash; rotate the query and key 2D sub-vectors by an angle proportional to position. Then the attention dot product depends only on the <em>relative</em> angle &mdash; naturally translation-equivariant. Used in LLaMA, PaLM, Qwen, Mistral.',
+      extrap: 'yes (with frequency-base tweaks)',
+    },
+    alibi: {
+      formula: 'score_{i,j} &larr; score_{i,j} &minus; m · |i &minus; j|<br><span class="muted">m is a small per-head slope</span>',
+      tip: '<strong>ALiBi</strong> (Press et al., 2021). No PE vector at all; just punish distant attention scores linearly. Dead simple, extrapolates to arbitrary context lengths. Used in BLOOM, MPT. <span style="color: var(--fg-muted)">This demo uses a single slope m=1/&radic;d for simplicity; the paper assigns a different geometric m<sub>h</sub>=2<sup>&minus;8h/H</sup> to each attention head so one head sees the very short range while another sees the very long range.</span>',
+      extrap: 'yes (best of all four on long-context benchmarks)',
+    },
+    nope: {
+      formula: 'PE = 0 &mdash; no positional signal',
+      tip: '<strong>No PE baseline</strong>. Self-attention is permutation-equivariant: shuffle inputs and outputs shuffle too. The model will learn to ignore order entirely &mdash; catastrophic for language, surprisingly OK for bag-of-words classification.',
+      extrap: 'n/a',
+    },
+  };
+
+  function renderSide() {
+    const info = DESCRIPTIONS[state.enc];
+    document.getElementById('formula').innerHTML = info.formula;
+    document.getElementById('tip-note').innerHTML = info.tip;
+
+    const { PE, isBias } = currentPE();
+    const rows = [];
+    if (!isBias) {
+      const p = Math.min(state.L - 1, Math.max(0, state.pos));
+      const q = Math.min(state.L - 1, Math.max(0, state.cmp));
+      const npe = norm(PE[p]);
+      const dpq = dot(PE[p], PE[q]);
+      const cpq = cosine(PE[p], PE[q]);
+      rows.push(['||PE(p)||', npe.toFixed(4)]);
+      rows.push(['PE(p)·PE(q)', dpq.toFixed(4)]);
+      rows.push(['cos(PE(p), PE(q))', cpq.toFixed(4)]);
+      rows.push(['dist |p&minus;q|', Math.abs(p - q)]);
+      rows.push(['extrapolates?', '<span class="v ok">' + info.extrap + '</span>']);
+      rows.push(['dimensions d', state.d]);
+      rows.push(['sequence L', state.L]);
+    } else {
+      rows.push(['bias at (p,q)', PE[state.pos][state.cmp].toFixed(4)]);
+      rows.push(['slope m', (1 / Math.sqrt(state.d)).toFixed(4)]);
+      rows.push(['extrapolates?', '<span class="v ok">' + info.extrap + '</span>']);
+      rows.push(['sequence L', state.L]);
+    }
+
+    // Min/max period for sinusoidal
+    if (state.enc === 'sin' || state.enc === 'rope') {
+      // Periods are 2π·base^(2i/d) for i=0..d/2-1
+      const minPer = 2 * Math.PI; // i=0 → period 2π
+      const maxPer = 2 * Math.PI * Math.pow(state.base, (state.d - 2) / state.d);
+      document.getElementById('s-minper').textContent = minPer.toFixed(2);
+      document.getElementById('s-maxper').textContent = maxPer.toFixed(1);
+    } else {
+      document.getElementById('s-minper').textContent = '—';
+      document.getElementById('s-maxper').textContent = '—';
+    }
+
+    const grid = document.getElementById('prop-grid');
+    grid.innerHTML = '';
+    for (const [k, v] of rows) {
+      const kd = document.createElement('div'); kd.className = 'k'; kd.innerHTML = k;
+      const vd = document.createElement('div'); vd.className = 'v'; vd.innerHTML = v;
+      grid.appendChild(kd); grid.appendChild(vd);
+    }
+
+    // Stats strip
+    document.getElementById('s-enc').textContent = state.enc;
+    document.getElementById('s-norm').textContent = isBias ? '—' : norm(PE[state.pos]).toFixed(3);
+    document.getElementById('s-dot').textContent  = isBias ? PE[state.pos][state.cmp].toFixed(3) : dot(PE[state.pos], PE[state.cmp]).toFixed(3);
+    document.getElementById('s-cos').textContent  = isBias ? '—' : cosine(PE[state.pos], PE[state.cmp]).toFixed(3);
+
+    document.getElementById('side-meta').textContent = state.enc;
+    document.getElementById('ctl-meta').textContent = state.enc;
+    document.getElementById('viz-meta').textContent = state.enc + ' \u00b7 pos 0..' + (state.L - 1) + ' \u00b7 d ' + state.d;
+  }
+
+  // ----------------------------------------------------------------
+  // 10) HIT-TEST: click on heatmap to pick a pos row.
+  // ----------------------------------------------------------------
+  heatCanvas.addEventListener('click', (ev) => {
+    const r = heatCanvas.getBoundingClientRect();
+    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const padL = 36, padT = 6, padR = 6, padB = 16;
+    const plotW = r.width - padL - padR, plotH = r.height - padT - padB;
+    if (x < padL || x > padL + plotW || y < padT || y > padT + plotH) return;
+    const posFrac = (y - padT) / plotH;
+    state.pos = Math.max(0, Math.min(state.L - 1, Math.floor(posFrac * state.L)));
+    document.getElementById('pos-slider').value = state.pos;
+    document.getElementById('pos-val').textContent = state.pos;
+    drawAll();
   });
 
-  resize(); window.addEventListener('resize',resize);
+  // ----------------------------------------------------------------
+  // 11) WIRING.
+  // ----------------------------------------------------------------
+  document.querySelectorAll('#enc-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#enc-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.enc = p.dataset.enc;
+      drawAll();
+    });
+  });
+  document.querySelectorAll('#view-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#view-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.view = p.dataset.view;
+      drawAll();
+    });
+  });
+  document.querySelectorAll('#cmap-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#cmap-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.cmap = p.dataset.cmap;
+      drawAll();
+    });
+  });
+
+  function syncPosSliders() {
+    const posEl = document.getElementById('pos-slider');
+    const cmpEl = document.getElementById('cmp-slider');
+    posEl.max = state.L - 1; cmpEl.max = state.L - 1;
+    if (state.pos > state.L - 1) state.pos = state.L - 1;
+    if (state.cmp > state.L - 1) state.cmp = state.L - 1;
+    posEl.value = state.pos; cmpEl.value = state.cmp;
+    document.getElementById('pos-val').textContent = state.pos;
+    document.getElementById('cmp-val').textContent = state.cmp;
+  }
+  document.getElementById('len-slider').addEventListener('input', (ev) => {
+    state.L = parseInt(ev.target.value, 10);
+    document.getElementById('len-val').textContent = state.L;
+    syncPosSliders();
+    drawAll();
+  });
+  document.getElementById('dim-slider').addEventListener('input', (ev) => {
+    let v = parseInt(ev.target.value, 10);
+    if (v % 2 !== 0) v--; // keep d even so rope pair-indexing is safe
+    state.d = v;
+    document.getElementById('dim-val').textContent = v;
+    drawAll();
+  });
+  document.getElementById('base-slider').addEventListener('input', (ev) => {
+    state.base = parseInt(ev.target.value, 10);
+    document.getElementById('base-val').textContent = state.base;
+    drawAll();
+  });
+  document.getElementById('pos-slider').addEventListener('input', (ev) => {
+    state.pos = parseInt(ev.target.value, 10);
+    document.getElementById('pos-val').textContent = state.pos;
+    drawAll();
+  });
+  document.getElementById('cmp-slider').addEventListener('input', (ev) => {
+    state.cmp = parseInt(ev.target.value, 10);
+    document.getElementById('cmp-val').textContent = state.cmp;
+    drawAll();
+  });
+
+  window.addEventListener('resize', drawAll);
+
+  // ----------------------------------------------------------------
+  // 12) MAIN RENDER.
+  // ----------------------------------------------------------------
+  function drawAll() {
+    drawMainViz();
+    drawRow();
+    drawDot();
+    renderSide();
+  }
+
+  // ----------------------------------------------------------------
+  // 13) INIT.
+  // ----------------------------------------------------------------
+  syncPosSliders();
+  drawAll();
+
 })();
 </script>
 </body>
