@@ -3,279 +3,1057 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Softmax Temperature - AI Visualized</title>
+  <title>Softmax temperature — AI Visualized</title>
+  <meta name="description" content="One slider, one dial, 50,000 possible next tokens. Temperature, top-k, and top-p (nucleus) sampling — with live entropy, perplexity, and a tiny next-character language model you can sample from.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .sm-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 2.2fr 1fr;
+      grid-template-rows: 1.3fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .sm-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .sm-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+    .sm-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin: 0;
+    }
+    .sm-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+
+    .sm-plot    { grid-column: 1; grid-row: 1 / span 2; }
+    .sm-ctrls   { grid-column: 2; grid-row: 1; overflow-y: auto; }
+    .sm-side    { grid-column: 2; grid-row: 2; overflow-y: auto; }
+
+    .sm-plot-body {
+      flex: 1; min-height: 0;
+      display: grid;
+      grid-template-rows: 1fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+    }
+    .sm-stage {
+      background: var(--bg-app);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .sm-stage h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin: 0;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .sm-stage h5 .hint {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-muted);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .sm-stage canvas {
+      width: 100%; flex: 1;
+      display: block;
+      background: var(--bg-app);
+    }
+    .sm-gen {
+      background: var(--bg-app);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--fg-secondary);
+      min-height: 0;
+      max-height: 150px;
+      overflow-y: auto;
+      position: relative;
+    }
+    .sm-gen .prompt { color: var(--teal-300); }
+    .sm-gen .cur { background: var(--heat-400); color: var(--ink-950); padding: 0 2px; border-radius: 2px; }
+
+    /* Controls */
+    .sm-ctrl-body { padding: var(--s-3) var(--s-4) var(--s-4); overflow-y: auto; }
+    .ctl-group { margin-bottom: var(--s-4); }
+    .ctl-group h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      padding: 6px 10px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pill:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .slider-wrap { display:flex; flex-direction:column; gap: 4px; margin-bottom: var(--s-3); }
+    .slider-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .slider-row .v { color: var(--teal-300); font-weight: 500; }
+    input[type=range].sm-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; background: var(--border-default);
+      border-radius: 2px; outline: none;
+    }
+    input[type=range].sm-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    input[type=range].sm-slider::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    .btn-row { display: flex; gap: 6px; }
+    .sm-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .sm-btn:hover { border-color: var(--border-strong); }
+    .sm-btn.primary {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .sm-btn.primary:hover { background: var(--accent-ring); color: var(--teal-100); }
+    .sm-btn.heat {
+      background: var(--sub-accent-soft);
+      border-color: rgba(255,122,41,0.3);
+      color: var(--heat-300);
+    }
+
+    .sm-note {
+      font-family: var(--font-sans);
+      font-size: 12px; line-height: 1.6;
+      color: var(--fg-tertiary);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      margin-top: var(--s-3);
+    }
+    .sm-note strong { color: var(--teal-200); font-weight: 600; }
+    .sm-note code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-raised);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--teal-300);
+    }
+
+    .sm-side-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+    .formula {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      padding: 8px 10px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      color: var(--teal-200);
+      margin-bottom: 8px;
+      line-height: 1.65;
+      overflow-x: auto;
+    }
+    .formula .muted { color: var(--fg-muted); }
+    .formula .heat  { color: var(--heat-400); }
+
+    .ranking {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-2) var(--s-3);
+      max-height: 220px; overflow-y: auto;
+      line-height: 1.5;
+    }
+    .rank-row {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      gap: 8px; align-items: center;
+      padding: 3px 0;
+    }
+    .rank-row.cut { opacity: 0.35; }
+    .rank-row .n { color: var(--fg-muted); width: 22px; }
+    .rank-row .t { color: var(--teal-200); }
+    .rank-row .b {
+      height: 4px; border-radius: 2px;
+      background: linear-gradient(90deg, var(--teal-400) var(--pct, 0%), transparent var(--pct, 0%));
+    }
+    .rank-row .p { color: var(--teal-300); white-space: nowrap; min-width: 54px; text-align: right; }
+    .rank-row.cut .t { color: var(--heat-400); }
+
+    /* Bottom stats */
+    .sm-stats {
+      grid-column: 1 / -1; grid-row: 3;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--s-3);
+    }
+    .sm-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-height: 66px;
+    }
+    .sm-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .sm-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sm-stat.accent .value { color: var(--teal-300); }
+    .sm-stat.heat .value   { color: var(--heat-400); }
+
+    @media (max-width: 1000px) {
+      .sm-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto auto;
+      }
+      .sm-plot  { grid-column: 1; grid-row: 1; }
+      .sm-ctrls { grid-column: 1; grid-row: 2; }
+      .sm-side  { grid-column: 1; grid-row: 3; }
+      .sm-stats { grid-row: 4; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
-  <div class="topic-page has-guide">
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>Softmax Temperature</h1>
-      <span class="topic-desc">Drag the temperature slider to see how an LLM picks its next word</span>
-    </div>
-
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">
-        Temperature: <span class="value" id="ov-temp">1.00</span> &mdash; <span id="ov-desc">balanced</span>
-      </div>
-    </div>
-
-    <div class="control-panel">
-      <div class="guide-banner" id="guide">
-        <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
-        <div class="guide-step-counter">The Big Idea</div>
-        <div class="guide-title">Temperature = how "creative" the AI is</div>
-        <div class="guide-text">
-          When ChatGPT picks the next word, it has raw "scores" (called <strong>logits</strong>) for every possible word. Softmax turns these into probabilities. <strong>Temperature</strong> controls how much the model favors the top word vs. exploring alternatives.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Temperature (&tau;)</h3>
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Drag to control randomness</span>
-            <span class="slider-value" id="tau-val">1.00</span>
-          </div>
-          <input type="range" id="tau-slider" min="0.05" max="3" step="0.01" value="1">
-        </div>
-        <div class="btn-group" style="margin-top:6px;flex-wrap:wrap">
-          <button class="btn btn-secondary" data-temp="0.1">0.1</button>
-          <button class="btn btn-secondary" data-temp="0.7">0.7</button>
-          <button class="btn btn-secondary active" data-temp="1.0">1.0</button>
-          <button class="btn btn-secondary" data-temp="1.5">1.5</button>
-          <button class="btn btn-secondary" data-temp="2.5">2.5</button>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Prompt</h3>
-        <div class="btn-group" style="flex-wrap:wrap">
-          <button class="btn btn-secondary active" data-prompt="0">"The cat sat on the ___"</button>
-        </div>
-        <div class="btn-group" style="flex-wrap:wrap;margin-top:6px">
-          <button class="btn btn-secondary" data-prompt="1">"I feel so ___"</button>
-          <button class="btn btn-secondary" data-prompt="2">"2 + 2 = ___"</button>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Sample Next Word</h3>
-        <button class="btn btn-primary" id="btn-sample" style="width:100%">Sample a word</button>
-        <div style="font-family:var(--font-mono);font-size:0.85rem;text-align:center;padding:12px;margin-top:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);min-height:46px;">
-          <span id="sampled" style="color:var(--cyan);font-weight:700;font-size:1.1rem">&mdash;</span>
-        </div>
-        <div class="info-box" style="margin-top:6px">
-          Samples a word using the current probabilities. At low &tau;, you'll almost always get the same top word. At high &tau;, each click is unpredictable.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Intuition</h3>
-        <div class="info-box" id="intuition">
-          At &tau; = 1.0, the model samples using the raw probabilities. Likely words come up more often, but there's still variety.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>In Real LLMs</h3>
-        <div class="info-box">
-          <strong>&tau; = 0</strong> &mdash; Always picks the top word. Deterministic, but repetitive and robotic.<br>
-          <strong>&tau; = 0.7</strong> &mdash; Default for many chatbots. Coherent but not boring.<br>
-          <strong>&tau; = 1.0</strong> &mdash; Balanced &mdash; raw model probabilities.<br>
-          <strong>&tau; &gt; 1.5</strong> &mdash; Creative writing. Can go off-rails.<br>
-          <strong>&tau; = &infin;</strong> &mdash; Uniform random &mdash; complete gibberish.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Formula</h3>
-        <div class="formula">
-          p<sub>i</sub> = exp(z<sub>i</sub> / &tau;) / &Sigma; exp(z<sub>j</sub> / &tau;)
-        </div>
-      </div>
-    </div>
+<div class="topic-page">
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>Softmax temperature</h1>
+    <span class="topic-desc">One slider reshapes the LLM's next-token distribution &mdash; greedy, balanced, or wild.</span>
   </div>
 
+  <div class="sm-main">
+
+    <section class="sm-panel sm-plot">
+      <header class="sm-panel-head">
+        <h4>Logits &rarr; probabilities &rarr; samples</h4>
+        <span class="meta" id="plot-meta">T = 1.00 &middot; k = 8</span>
+      </header>
+      <div class="sm-plot-body">
+        <div class="sm-stage">
+          <h5>
+            <span>Logits z<sub>i</sub> (before softmax)</span>
+            <span class="hint">click-drag a bar to edit</span>
+          </h5>
+          <canvas id="logit-canvas"></canvas>
+        </div>
+        <div class="sm-stage">
+          <h5>
+            <span>Probabilities p<sub>i</sub> = softmax(z / T), after top-k / top-p</span>
+            <span class="hint">cut bars shown in orange</span>
+          </h5>
+          <canvas id="prob-canvas"></canvas>
+        </div>
+        <div class="sm-gen" id="gen-body">
+          <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Tiny character LM &rarr; press generate below</div>
+          <div><span class="prompt" id="gen-text">once upon a time</span><span class="cur">&nbsp;</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sm-panel sm-ctrls">
+      <header class="sm-panel-head">
+        <h4>Controls</h4>
+        <span class="meta" id="ctl-meta">temperature 1.0</span>
+      </header>
+      <div class="sm-ctrl-body">
+
+        <div class="ctl-group">
+          <h5>Scenario</h5>
+          <div class="pill-row" id="scn-pills">
+            <span class="pill active" data-scn="peaked">peaked</span>
+            <span class="pill" data-scn="flat">flat</span>
+            <span class="pill" data-scn="bimodal">bimodal</span>
+            <span class="pill" data-scn="longtail">long tail</span>
+            <span class="pill" data-scn="uniform">uniform</span>
+            <span class="pill" data-scn="random">random</span>
+          </div>
+          <div class="btn-row" style="margin-top: 6px">
+            <button class="sm-btn" id="btn-perturb">Perturb logits</button>
+            <button class="sm-btn" id="btn-sort">Sort desc</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Temperature</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>T</span><span class="v" id="T-val">1.00</span></div>
+            <input type="range" class="sm-slider" id="T-slider" min="0.01" max="5" step="0.01" value="1.00">
+          </div>
+          <div class="pill-row" id="preset-T">
+            <span class="pill" data-t="0.01">0 (argmax)</span>
+            <span class="pill" data-t="0.3">0.3</span>
+            <span class="pill" data-t="0.7">0.7</span>
+            <span class="pill active" data-t="1.0">1.0</span>
+            <span class="pill" data-t="1.5">1.5</span>
+            <span class="pill" data-t="3.0">3.0</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Truncation</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>top-k</span><span class="v" id="topk-val">0 (off)</span></div>
+            <input type="range" class="sm-slider" id="topk-slider" min="0" max="32" step="1" value="0">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>top-p</span><span class="v" id="topp-val">1.00</span></div>
+            <input type="range" class="sm-slider" id="topp-slider" min="0.1" max="1.0" step="0.01" value="1.00">
+          </div>
+          <div class="sm-note" style="margin-top:6px">
+            <strong>Order of operations:</strong> <code>softmax(z/T)</code> &rarr; keep only the top-k largest &rarr; keep only the smallest set whose cumulative probability &ge; p &rarr; renormalize.
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Sampling histogram</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>samples</span><span class="v" id="n-val">1000</span></div>
+            <input type="range" class="sm-slider" id="n-slider" min="100" max="5000" step="100" value="1000">
+          </div>
+          <div class="btn-row">
+            <button class="sm-btn primary" id="btn-sample">Sample now</button>
+            <button class="sm-btn" id="btn-stream">Stream</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Generate text</h5>
+          <div class="btn-row">
+            <button class="sm-btn primary" id="btn-gen-step">+1 char</button>
+            <button class="sm-btn primary" id="btn-gen-50">+50</button>
+            <button class="sm-btn heat" id="btn-gen-reset">Reset</button>
+          </div>
+        </div>
+
+        <div class="sm-note">
+          <strong>What temperature does.</strong> T &lt; 1 sharpens the distribution toward the argmax &mdash; safer, more repetitive. T &gt; 1 flattens it &mdash; more creative, more chaotic. T=0 is deterministic (just <code>argmax</code>); T&rarr;&infin; becomes uniform over surviving tokens. Real LLMs (GPT-4, Claude) ship with T=1 but let you ask for T=0 for code and T=1.5 for poetry.
+        </div>
+      </div>
+    </section>
+
+    <section class="sm-panel sm-side">
+      <header class="sm-panel-head">
+        <h4>Distribution &amp; ranking</h4>
+        <span class="meta" id="side-meta">&mdash;</span>
+      </header>
+      <div class="sm-side-body">
+        <div class="formula" id="formula">
+          <span class="muted">softmax</span>:  p<sub>i</sub> = e<sup>z<sub>i</sub> / T</sup> / &Sigma;<sub>j</sub> e<sup>z<sub>j</sub> / T</sup>
+        </div>
+        <div class="formula" id="formula2">
+          <span class="muted">entropy (bits)</span>:  H(p) = &minus;&Sigma;<sub>i</sub> p<sub>i</sub> log<sub>2</sub> p<sub>i</sub><br>
+          <span class="muted">perplexity</span>:  PP(p) = 2<sup>H(p)</sup>
+        </div>
+
+        <h5 style="font-family: var(--font-mono); font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--fg-muted); margin: var(--s-3) 0 var(--s-2);">
+          Ranking (post-truncation)
+        </h5>
+        <div class="ranking" id="ranking">&mdash;</div>
+
+        <h5 style="font-family: var(--font-mono); font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--fg-muted); margin: var(--s-3) 0 var(--s-2);">
+          Entropy vs temperature
+        </h5>
+        <canvas id="ent-canvas" style="display:block; width:100%; height:110px; background: var(--bg-sunken); border: 1px solid var(--border-subtle); border-radius: var(--r-sm);"></canvas>
+        <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-muted); margin-top: 4px;">
+          H(T) &rarr; 0 as T &rarr; 0 (argmax), H(T) &rarr; log<sub>2</sub>(V) = <span style="color:var(--teal-300)" id="max-H">&mdash;</span> bits as T &rarr; &infin; (uniform). The vertical line is the current T.
+        </div>
+
+        <div class="sm-note" id="tip-note">
+          Entropy measures how "spread out" the distribution is. 0 bits means perfectly confident, log<sub>2</sub>(V) bits means perfectly uniform over V items. Perplexity <code>2<sup>H</sup></code> maps that to an effective vocabulary size.
+        </div>
+      </div>
+    </section>
+
+    <section class="sm-stats">
+      <div class="sm-stat"><div class="label">T</div><div class="value" id="s-T">1.00</div></div>
+      <div class="sm-stat accent"><div class="label">top probability</div><div class="value" id="s-top">&mdash;</div></div>
+      <div class="sm-stat"><div class="label">entropy (bits)</div><div class="value" id="s-ent">&mdash;</div></div>
+      <div class="sm-stat"><div class="label">perplexity</div><div class="value" id="s-pp">&mdash;</div></div>
+      <div class="sm-stat heat"><div class="label">tokens kept</div><div class="value" id="s-kept">&mdash;</div></div>
+      <div class="sm-stat"><div class="label">cumulative kept</div><div class="value" id="s-cum">&mdash;</div></div>
+    </section>
+
+  </div>
+</div>
+
 <script>
+"use strict";
+/* ------------------------------------------------------------------
+   SOFTMAX TEMPERATURE — shaping next-token distributions.
+
+   Pipeline:
+     logits z  →  z/T  →  softmax  →  top-k filter  →  top-p filter  →
+     renormalize  →  (optional) sample.
+
+   We also include a tiny next-character LM trained from a corpus of
+   English sentences so you can see temperature at work in real text.
+   The LM is a Markov chain over 3-character contexts (trigram LM).
+   ------------------------------------------------------------------ */
+
 (function(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  let W, H;
 
-  const prompts = [
-    { text: 'The cat sat on the ___',
-      words: ['mat','floor','couch','roof','bed','chair','table','tree','moon','ceiling'],
-      logits: [4.2, 3.1, 2.8, 1.5, 2.2, 2.0, 1.8, 0.8, -0.5, 0.3] },
-    { text: 'I feel so ___',
-      words: ['happy','tired','sad','excited','hungry','alone','confused','alive','weird','blessed'],
-      logits: [3.8, 3.5, 2.9, 2.7, 2.3, 1.9, 1.4, 1.2, 0.6, 0.4] },
-    { text: '2 + 2 = ___',
-      words: ['4','four','5','3','8','22','7','pi','apple','six'],
-      logits: [7.5, 4.2, 0.3, 0.1, 0.0, 0.5, -0.2, -1.5, -2.5, -0.8] },
-  ];
+  // ----------------------------------------------------------------
+  // 1) TOKEN SET for the logit chart. We keep 16 tokens so bars read
+  //    at a glance. Labels are the first 16 letters of the alphabet.
+  // ----------------------------------------------------------------
+  const TOKENS = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p'];
+  const V = TOKENS.length;
 
-  let promptIdx = 0, tau = 1;
-
-  function resize(){
-    const r=canvas.parentElement.getBoundingClientRect();
-    W=r.width; H=r.height;
-    canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
-    canvas.style.width=W+'px'; canvas.style.height=H+'px';
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-    draw();
+  // ----------------------------------------------------------------
+  // 2) SCENARIOS: preset logit vectors that illustrate different
+  //    distributional shapes.
+  // ----------------------------------------------------------------
+  function scnPeaked() {
+    const z = new Array(V).fill(-2);
+    z[3] = 6; z[7] = 4.5; z[11] = 3;
+    return z;
   }
-
-  function softmax(logits, tau){
-    const max = Math.max(...logits);
-    const exp = logits.map(z => Math.exp((z-max)/tau));
-    const sum = exp.reduce((a,b)=>a+b,0);
-    return exp.map(v=>v/sum);
+  function scnFlat() {
+    const z = new Array(V).fill(0);
+    for (let i = 0; i < V; i++) z[i] = 0.3 * (i - V/2);
+    return z;
   }
-
-  function heatColor(t){
-    // Cool to warm: blue -> cyan -> yellow -> red
-    if(t<0.33){const s=t/0.33; return `rgb(${Math.floor(30+s*50)},${Math.floor(100+s*100)},${Math.floor(200+s*30)})`;}
-    if(t<0.66){const s=(t-0.33)/0.33; return `rgb(${Math.floor(80+s*170)},${Math.floor(200+s*20)},${Math.floor(230-s*150)})`;}
-    const s=(t-0.66)/0.34; return `rgb(${Math.floor(250)},${Math.floor(220-s*100)},${Math.floor(80-s*60)})`;
+  function scnBimodal() {
+    const z = new Array(V).fill(-1);
+    z[2] = 4.5; z[3] = 5; z[4] = 4.2;
+    z[11] = 4.3; z[12] = 4.8; z[13] = 4.1;
+    return z;
   }
-
-  function draw(){
-    ctx.clearRect(0,0,W,H); ctx.fillStyle='#08080f'; ctx.fillRect(0,0,W,H);
-
-    const p = prompts[promptIdx];
-    const probs = softmax(p.logits, tau);
-
-    // Draw prompt header
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='12px JetBrains Mono'; ctx.textAlign='center';
-    ctx.fillText('Prompt:', W/2, 28);
-    ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='bold 20px Inter,sans-serif';
-    ctx.fillText(p.text, W/2, 58);
-
-    // Layout: horizontal bar chart
-    const topMargin = 90;
-    const bottomMargin = 40;
-    const leftLabel = 120;
-    const rightPad = 80;
-    const availH = H - topMargin - bottomMargin;
-    const availW = W - leftLabel - rightPad;
-    const barH = Math.min(36, availH/p.words.length - 4);
-    const gap = 4;
-    const totalH = p.words.length * (barH + gap);
-    const startY = topMargin + (availH - totalH)/2;
-
-    // Sort by probability for visual ranking
-    const indexed = p.words.map((w,i)=>({w, i, prob: probs[i], logit: p.logits[i]}));
-    indexed.sort((a,b)=>b.prob-a.prob);
-
-    const maxProb = indexed[0].prob;
-
-    indexed.forEach((item, rank) => {
-      const y = startY + rank*(barH+gap);
-      const barW = (item.prob / 1) * availW; // full scale 0-1
-
-      // Word label
-      ctx.fillStyle = rank===0 ? '#22d3ee' : 'rgba(255,255,255,0.7)';
-      ctx.font = rank===0 ? 'bold 13px Inter,sans-serif' : '12px Inter,sans-serif';
-      ctx.textAlign='right';
-      ctx.fillText(item.w, leftLabel-10, y+barH/2+4);
-
-      // Background bar
-      ctx.fillStyle='rgba(255,255,255,0.04)';
-      ctx.fillRect(leftLabel, y, availW, barH);
-
-      // Prob bar
-      ctx.fillStyle = heatColor(item.prob/maxProb);
-      ctx.globalAlpha = 0.4 + 0.6*(item.prob);
-      ctx.fillRect(leftLabel, y, barW, barH);
-      ctx.globalAlpha = 1;
-
-      // Prob text
-      ctx.font='11px JetBrains Mono'; ctx.textAlign='left';
-      ctx.fillStyle='rgba(255,255,255,0.9)';
-      ctx.fillText((item.prob*100).toFixed(1)+'%', leftLabel+barW+8, y+barH/2+4);
-
-      // Logit (on left)
-      ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.25)';
-      ctx.font='9px JetBrains Mono';
-      ctx.fillText('z='+item.logit.toFixed(1), 8, y+barH/2+3);
-    });
-
-    // Axis label
-    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px JetBrains Mono'; ctx.textAlign='center';
-    ctx.fillText('probability', leftLabel+availW/2, H-18);
-
-    // Update overlay
-    document.getElementById('ov-temp').textContent = tau.toFixed(2);
-    const desc = tau<0.3?'very confident':tau<0.8?'focused':tau<1.3?'balanced':tau<2?'creative':'chaotic';
-    document.getElementById('ov-desc').textContent = desc;
-
-    updateIntuition();
+  function scnLongTail() {
+    const z = new Array(V);
+    for (let i = 0; i < V; i++) z[i] = 5 * Math.exp(-i * 0.25) - 1;
+    return z;
   }
+  function scnUniform() { return new Array(V).fill(0); }
+  function scnRandom() {
+    const z = new Array(V);
+    for (let i = 0; i < V; i++) z[i] = (Math.random() * 8 - 3);
+    return z;
+  }
+  const SCN = {
+    peaked: scnPeaked, flat: scnFlat, bimodal: scnBimodal,
+    longtail: scnLongTail, uniform: scnUniform, random: scnRandom,
+  };
 
-  function updateIntuition(){
-    const el = document.getElementById('intuition');
-    let msg;
-    if(tau<0.3){
-      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, the model is <strong>very confident</strong>. One word dominates. Great for math and facts, bad for creative writing.`;
-    } else if(tau<0.8){
-      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities lean toward the top few words. Coherent but not repetitive. This is where most chatbots live.`;
-    } else if(tau<1.3){
-      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities are close to the raw model output. Balanced creativity.`;
-    } else if(tau<2){
-      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities flatten out. The model takes more risks &mdash; good for creative writing, but may produce weird results.`;
-    } else {
-      msg = `At <strong>&tau; = ${tau.toFixed(2)}</strong>, probabilities are nearly uniform. The model picks almost randomly. Output becomes chaotic and often nonsensical.`;
+  // ----------------------------------------------------------------
+  // 3) STATE.
+  // ----------------------------------------------------------------
+  const state = {
+    logits: scnPeaked(),
+    T: 1.0,
+    topK: 0,          // 0 = off
+    topP: 1.0,        // 1.0 = off
+    nSamples: 1000,
+    histogram: new Array(V).fill(0),
+    scn: 'peaked',
+    dragIdx: -1,
+    lastProbs: new Array(V).fill(0),
+    lastKept: new Array(V).fill(true),
+    genText: 'once upon a time',
+    genTimer: null,
+    streamTimer: null,
+  };
+
+  // ----------------------------------------------------------------
+  // 4) SOFTMAX + TRUNCATION.
+  //    softmax(z/T), top-k, top-p. We keep a "kept" mask so we can
+  //    show which tokens survived truncation.
+  // ----------------------------------------------------------------
+  function softmax(z, T) {
+    const zt = z.map(v => v / Math.max(1e-6, T));
+    let mx = -Infinity;
+    for (const v of zt) if (v > mx) mx = v;
+    const exps = zt.map(v => Math.exp(v - mx)); // stable
+    let s = 0;
+    for (const v of exps) s += v;
+    return exps.map(v => v / s);
+  }
+  function applyTruncation(probs, K, P) {
+    // Rank indices by probability descending
+    const order = probs.map((p, i) => i).sort((a, b) => probs[b] - probs[a]);
+    const kept = new Array(probs.length).fill(false);
+    // First: top-k pass (if K > 0)
+    let allowed;
+    if (K > 0 && K < probs.length) allowed = order.slice(0, K);
+    else allowed = order.slice();
+    // Then: top-p pass — keep the smallest prefix whose cumulative
+    // probability ≥ P. If P >= 1, keep everything already allowed.
+    if (P < 1) {
+      let cum = 0, cutAt = allowed.length;
+      for (let i = 0; i < allowed.length; i++) {
+        cum += probs[allowed[i]];
+        if (cum >= P) { cutAt = i + 1; break; }
+      }
+      allowed = allowed.slice(0, cutAt);
     }
-    el.innerHTML = msg;
+    for (const idx of allowed) kept[idx] = true;
+    // Renormalize over surviving tokens
+    const out = new Array(probs.length).fill(0);
+    let s = 0;
+    for (let i = 0; i < probs.length; i++) if (kept[i]) s += probs[i];
+    if (s > 0) {
+      for (let i = 0; i < probs.length; i++) if (kept[i]) out[i] = probs[i] / s;
+    } else {
+      // degenerate: nothing kept — fall back to argmax
+      const maxIdx = order[0];
+      out[maxIdx] = 1; kept[maxIdx] = true;
+    }
+    return { probs: out, kept };
+  }
+  function entropyBits(p) {
+    let h = 0;
+    for (const q of p) if (q > 0) h -= q * Math.log2(q);
+    return h;
+  }
+  function perplexity(p) {
+    return Math.pow(2, entropyBits(p));
   }
 
-  document.getElementById('tau-slider').addEventListener('input',e=>{
-    tau = parseFloat(e.target.value);
-    document.querySelectorAll('[data-temp]').forEach(b=>b.classList.remove('active'));
-    draw();
-  });
-  document.querySelectorAll('[data-temp]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('[data-temp]').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      tau = parseFloat(b.dataset.temp);
-      document.getElementById('tau-slider').value = tau;
-      draw();
-    });
-  });
-  document.querySelectorAll('[data-prompt]').forEach(b=>{
-    b.addEventListener('click',()=>{
-      document.querySelectorAll('[data-prompt]').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      promptIdx = parseInt(b.dataset.prompt);
-      document.getElementById('sampled').textContent='—';
-      draw();
-    });
-  });
-
-  document.getElementById('btn-sample').addEventListener('click',()=>{
-    const p = prompts[promptIdx];
-    const probs = softmax(p.logits, tau);
+  // ----------------------------------------------------------------
+  // 5) SAMPLING.
+  //    Draw N times from the truncated distribution using inverse CDF.
+  // ----------------------------------------------------------------
+  function sampleOnce(probs) {
     const r = Math.random();
-    let acc = 0;
-    for(let i=0;i<probs.length;i++){
-      acc += probs[i];
-      if(r<acc){
-        const el = document.getElementById('sampled');
-        el.textContent = p.words[i];
-        el.style.color = i===p.logits.indexOf(Math.max(...p.logits)) ? 'var(--cyan)' : 'var(--yellow)';
-        return;
+    let cum = 0;
+    for (let i = 0; i < probs.length; i++) {
+      cum += probs[i];
+      if (r <= cum) return i;
+    }
+    return probs.length - 1;
+  }
+  function sampleMany(probs, N) {
+    const counts = new Array(probs.length).fill(0);
+    for (let k = 0; k < N; k++) counts[sampleOnce(probs)]++;
+    return counts;
+  }
+
+  // ----------------------------------------------------------------
+  // 6) TINY CHAR LM.
+  //    We train a trigram model on a small literary corpus so the
+  //    temperature effect on realistic text can be seen.
+  // ----------------------------------------------------------------
+  const CORPUS = (
+    "once upon a time there was a little girl who lived in a big forest. " +
+    "she walked every day through the trees and the meadows. " +
+    "the birds sang above her and the stream rushed beside her. " +
+    "one morning she met a wise old fox who knew all the secrets of the wood. " +
+    "the fox taught her to listen carefully to the wind and the leaves. " +
+    "she learned the names of every flower and every tree. " +
+    "she learned that the stars are always there, even when the clouds hide them. " +
+    "she learned that silence is its own kind of music. " +
+    "as the seasons passed she grew wiser and kinder and stronger. " +
+    "she became known as the girl who spoke to the forest. " +
+    "and every child who heard her story remembered to listen too. " +
+    "the forest thanked her with a thousand small mercies. " +
+    "a flower where one was needed. a wind to cool her face. " +
+    "a path where she was lost. a friend where she was lonely. " +
+    "and when at last she grew very old, the forest opened its arms. "
+  ).toLowerCase();
+
+  // trigram: context -> {nextChar: count}
+  const LM = new Map();
+  (function trainLM() {
+    for (let i = 0; i + 3 <= CORPUS.length; i++) {
+      const ctx = CORPUS.slice(i, i + 3);
+      const next = CORPUS[i + 3];
+      if (!next) break;
+      if (!LM.has(ctx)) LM.set(ctx, new Map());
+      const m = LM.get(ctx);
+      m.set(next, (m.get(next) || 0) + 1);
+    }
+  })();
+
+  // Return logits vector + labels for the current end-of-text context.
+  function lmLogits(text) {
+    const ctx = text.slice(-3).padStart(3, ' ');
+    const distMap = LM.get(ctx);
+    // Convert counts to logits via log(count) (add-one smoothing across
+    // the alphabet to avoid log(0) problems).
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz .,';
+    const counts = new Array(alphabet.length).fill(1); // laplace
+    if (distMap) {
+      for (const [c, n] of distMap) {
+        const idx = alphabet.indexOf(c);
+        if (idx >= 0) counts[idx] += n;
       }
     }
+    const total = counts.reduce((a, b) => a + b, 0);
+    const probs = counts.map(c => c / total);
+    const logits = probs.map(p => Math.log(p));
+    return { logits, labels: alphabet.split('') };
+  }
+
+  function lmSample(text, T, K, P) {
+    const { logits, labels } = lmLogits(text);
+    const probs = softmax(logits, T);
+    const { probs: trunc } = applyTruncation(probs, K, P);
+    const idx = sampleOnce(trunc);
+    return labels[idx];
+  }
+
+  // ----------------------------------------------------------------
+  // 7) RENDERING: logit and probability bar charts.
+  // ----------------------------------------------------------------
+  const logitCanvas = document.getElementById('logit-canvas');
+  const probCanvas  = document.getElementById('prob-canvas');
+  const lctx = logitCanvas.getContext('2d');
+  const pctx = probCanvas.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+
+  function resizeCanvas(c, ctx) {
+    const r = c.getBoundingClientRect();
+    c.width = r.width * DPR; c.height = r.height * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    return { w: r.width, h: r.height };
+  }
+
+  function drawLogits() {
+    const { w, h } = resizeCanvas(logitCanvas, lctx);
+    lctx.clearRect(0, 0, w, h);
+    const pad = 20, labelPad = 22;
+    const N = V;
+    const barW = (w - 2*pad) / N;
+    // y-range
+    let mn = Infinity, mx = -Infinity;
+    for (const v of state.logits) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    mn = Math.min(-1, mn); mx = Math.max(1, mx);
+    const y0 = pad + (mx / (mx - mn)) * (h - pad - labelPad);
+    // baseline at z=0
+    lctx.strokeStyle = 'rgba(255,255,255,0.12)'; lctx.lineWidth = 1;
+    lctx.beginPath(); lctx.moveTo(pad, y0); lctx.lineTo(w - pad, y0); lctx.stroke();
+
+    for (let i = 0; i < N; i++) {
+      const z = state.logits[i];
+      const x = pad + i * barW + 2;
+      const bh = (Math.abs(z) / (mx - mn)) * (h - pad - labelPad);
+      const by = z >= 0 ? y0 - bh : y0;
+      const color = z >= 0 ? 'rgba(95,210,203,0.85)' : 'rgba(255,122,41,0.75)';
+      lctx.fillStyle = color;
+      lctx.fillRect(x, by, barW - 4, bh);
+      // value
+      lctx.fillStyle = 'rgba(245,245,247,0.9)';
+      lctx.font = "10.5px 'JetBrains Mono', monospace";
+      lctx.textAlign = 'center';
+      lctx.fillText(z.toFixed(2), x + barW/2 - 2, z >= 0 ? Math.max(10, by - 4) : Math.min(h - labelPad - 4, by + bh + 10));
+      // label
+      lctx.fillStyle = 'rgba(155,155,163,0.9)';
+      lctx.fillText(TOKENS[i], x + barW/2 - 2, h - 4);
+    }
+    // axes
+    lctx.fillStyle = 'rgba(108,108,116,0.85)';
+    lctx.font = "10px 'JetBrains Mono', monospace";
+    lctx.textAlign = 'right';
+    lctx.fillText(mx.toFixed(1), w - 4, pad + 10);
+    lctx.fillText(mn.toFixed(1), w - 4, h - labelPad);
+    lctx.textAlign = 'left';
+  }
+
+  function drawProbs() {
+    const { w, h } = resizeCanvas(probCanvas, pctx);
+    pctx.clearRect(0, 0, w, h);
+    const pad = 20, labelPad = 22;
+    const N = V;
+    const barW = (w - 2*pad) / N;
+
+    // Compute softmax + truncation
+    const raw = softmax(state.logits, state.T);
+    const { probs, kept } = applyTruncation(raw, state.topK, state.topP);
+    state.lastProbs = probs; state.lastKept = kept;
+
+    const mx = Math.max.apply(null, probs.concat([0.01]));
+
+    for (let i = 0; i < N; i++) {
+      const p = probs[i];
+      const x = pad + i * barW + 2;
+      const bh = (p / mx) * (h - pad - labelPad);
+      const by = h - labelPad - bh;
+      const c = kept[i]
+        ? 'rgba(95,210,203,0.88)'
+        : 'rgba(255,122,41,0.4)';
+      pctx.fillStyle = c;
+      pctx.fillRect(x, by, barW - 4, bh);
+
+      // histogram overlay (empirical)
+      const total = state.histogram.reduce((a,b)=>a+b,0);
+      if (total > 0) {
+        const emp = state.histogram[i] / total;
+        const ey = h - labelPad - (emp / mx) * (h - pad - labelPad);
+        pctx.strokeStyle = 'rgba(245,245,247,0.75)';
+        pctx.lineWidth = 1.5;
+        pctx.beginPath();
+        pctx.moveTo(x, ey); pctx.lineTo(x + barW - 4, ey);
+        pctx.stroke();
+      }
+
+      // p value
+      pctx.fillStyle = 'rgba(245,245,247,0.9)';
+      pctx.font = "10.5px 'JetBrains Mono', monospace";
+      pctx.textAlign = 'center';
+      pctx.fillText(p.toFixed(2), x + barW/2 - 2, Math.max(10, by - 4));
+      // label
+      pctx.fillStyle = 'rgba(155,155,163,0.9)';
+      pctx.fillText(TOKENS[i], x + barW/2 - 2, h - 4);
+    }
+
+    // axis
+    pctx.fillStyle = 'rgba(108,108,116,0.85)';
+    pctx.font = "10px 'JetBrains Mono', monospace";
+    pctx.textAlign = 'right';
+    pctx.fillText(mx.toFixed(2), w - 4, pad + 10);
+    pctx.textAlign = 'left';
+  }
+
+  // ----------------------------------------------------------------
+  // 8) SIDE PANEL: ranking and stats.
+  // ----------------------------------------------------------------
+  function renderSide() {
+    const raw = softmax(state.logits, state.T);
+    const { probs, kept } = applyTruncation(raw, state.topK, state.topP);
+    const order = probs.map((p, i) => i).sort((a, b) => probs[b] - probs[a]);
+    const r = document.getElementById('ranking');
+    r.innerHTML = '';
+    const mx = Math.max.apply(null, probs.concat([0.0001]));
+    let cum = 0;
+    for (let rank = 0; rank < order.length; rank++) {
+      const i = order[rank];
+      const pct = (probs[i] / mx) * 100;
+      const row = document.createElement('div');
+      row.className = 'rank-row' + (kept[i] ? '' : ' cut');
+      cum += probs[i];
+      row.style.setProperty('--pct', pct.toFixed(1) + '%');
+      row.innerHTML =
+        '<span class="n">#' + (rank+1) + '</span>' +
+        '<span class="t">' + TOKENS[i] + '</span>' +
+        '<span class="b"></span>' +
+        '<span class="p">' + (probs[i] * 100).toFixed(1) + '%</span>';
+      r.appendChild(row);
+    }
+
+    // Stats
+    const H = entropyBits(probs);
+    const PP = perplexity(probs);
+    const topP_ = Math.max.apply(null, probs);
+    const nKept = kept.filter(Boolean).length;
+    document.getElementById('s-T').textContent = state.T.toFixed(2);
+    document.getElementById('s-top').textContent = (topP_ * 100).toFixed(1) + '%';
+    document.getElementById('s-ent').textContent = H.toFixed(2);
+    document.getElementById('s-pp').textContent  = PP.toFixed(2);
+    document.getElementById('s-kept').textContent = nKept + ' / ' + V;
+    document.getElementById('s-cum').textContent = (cum * 100).toFixed(1) + '%';
+
+    document.getElementById('plot-meta').textContent = 'T = ' + state.T.toFixed(2) + ' \u00b7 kept ' + nKept + '/' + V;
+    document.getElementById('side-meta').textContent = 'H=' + H.toFixed(2) + ' bits';
+    document.getElementById('ctl-meta').textContent = 'temperature ' + state.T.toFixed(2);
+
+    // Tip based on T
+    const tip = document.getElementById('tip-note');
+    if (state.T < 0.1) tip.innerHTML = '<strong>Effectively argmax.</strong> All probability mass concentrates on the top logit. Deterministic output &mdash; use this for code, classification, structured data.';
+    else if (state.T < 0.7) tip.innerHTML = '<strong>Sharper than trained.</strong> The model is more confident than during training &mdash; safer, less creative, more likely to repeat.';
+    else if (state.T < 1.2) tip.innerHTML = '<strong>Near the training distribution.</strong> This is how the model was calibrated during training. Good default for open-ended text.';
+    else if (state.T < 2.5) tip.innerHTML = '<strong>Flatter than trained.</strong> More creative, but more likely to drop into incoherent-but-novel regions. Pair with top-p &le; 0.9 to keep it on the rails.';
+    else tip.innerHTML = '<strong>Close to uniform.</strong> Any token is almost as likely as any other. Unusable for quality generation &mdash; but a useful sanity check.';
+  }
+
+  // ----------------------------------------------------------------
+  // 9) LOGIT EDITING via click/drag on the chart.
+  // ----------------------------------------------------------------
+  function editLogitFromEvent(ev) {
+    const r = logitCanvas.getBoundingClientRect();
+    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const pad = 20, labelPad = 22;
+    const barW = (r.width - 2*pad) / V;
+    const i = Math.floor((x - pad) / barW);
+    if (i < 0 || i >= V) return;
+    // y-range from current logits
+    let mn = Infinity, mx = -Infinity;
+    for (const v of state.logits) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    mn = Math.min(-1, mn); mx = Math.max(1, mx);
+    // Invert y to logit
+    const plotH = r.height - pad - labelPad;
+    const y0 = pad + (mx / (mx - mn)) * plotH;
+    const z = (y0 - y) / plotH * (mx - mn);
+    state.logits[i] = Math.max(-8, Math.min(8, z));
+    state.histogram = new Array(V).fill(0); // invalidate samples
+    drawAll();
+  }
+  logitCanvas.addEventListener('mousedown', (ev) => {
+    state.dragIdx = 1;
+    editLogitFromEvent(ev);
+  });
+  window.addEventListener('mousemove', (ev) => {
+    if (state.dragIdx > 0) editLogitFromEvent(ev);
+  });
+  window.addEventListener('mouseup', () => { state.dragIdx = -1; });
+
+  // ----------------------------------------------------------------
+  // 10) SAMPLING BUTTONS.
+  // ----------------------------------------------------------------
+  document.getElementById('btn-sample').addEventListener('click', () => {
+    const { probs } = applyTruncation(softmax(state.logits, state.T), state.topK, state.topP);
+    state.histogram = sampleMany(probs, state.nSamples);
+    drawAll();
+  });
+  document.getElementById('btn-stream').addEventListener('click', (ev) => {
+    if (state.streamTimer) {
+      clearInterval(state.streamTimer); state.streamTimer = null;
+      ev.target.textContent = 'Stream';
+      return;
+    }
+    ev.target.textContent = 'Stop';
+    state.histogram = new Array(V).fill(0);
+    state.streamTimer = setInterval(() => {
+      const { probs } = applyTruncation(softmax(state.logits, state.T), state.topK, state.topP);
+      const idx = sampleOnce(probs);
+      state.histogram[idx]++;
+      drawAll();
+    }, 40);
   });
 
-  resize(); window.addEventListener('resize',resize);
+  // ----------------------------------------------------------------
+  // 11) TEXT GENERATION (tiny char LM).
+  // ----------------------------------------------------------------
+  function appendGenChar() {
+    const ch = lmSample(state.genText, state.T, state.topK, state.topP);
+    state.genText += ch;
+    if (state.genText.length > 400) state.genText = state.genText.slice(-400);
+    document.getElementById('gen-text').textContent = state.genText;
+  }
+  document.getElementById('btn-gen-step').addEventListener('click', appendGenChar);
+  document.getElementById('btn-gen-50').addEventListener('click', () => {
+    for (let i = 0; i < 50; i++) appendGenChar();
+  });
+  document.getElementById('btn-gen-reset').addEventListener('click', () => {
+    state.genText = 'once upon a time';
+    document.getElementById('gen-text').textContent = state.genText;
+  });
+
+  // ----------------------------------------------------------------
+  // 12) WIRING.
+  // ----------------------------------------------------------------
+  document.querySelectorAll('#scn-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#scn-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.scn = p.dataset.scn;
+      state.logits = SCN[state.scn]();
+      state.histogram = new Array(V).fill(0);
+      drawAll();
+    });
+  });
+  document.getElementById('btn-perturb').addEventListener('click', () => {
+    state.logits = state.logits.map(v => v + (Math.random() - 0.5) * 1.5);
+    state.histogram = new Array(V).fill(0);
+    drawAll();
+  });
+  document.getElementById('btn-sort').addEventListener('click', () => {
+    state.logits.sort((a, b) => b - a);
+    state.histogram = new Array(V).fill(0);
+    drawAll();
+  });
+
+  document.getElementById('T-slider').addEventListener('input', (ev) => {
+    state.T = parseFloat(ev.target.value);
+    document.getElementById('T-val').textContent = state.T.toFixed(2);
+    drawAll();
+  });
+  document.querySelectorAll('#preset-T .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#preset-T .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.T = parseFloat(p.dataset.t);
+      document.getElementById('T-slider').value = state.T;
+      document.getElementById('T-val').textContent = state.T.toFixed(2);
+      drawAll();
+    });
+  });
+
+  document.getElementById('topk-slider').addEventListener('input', (ev) => {
+    state.topK = parseInt(ev.target.value, 10);
+    document.getElementById('topk-val').textContent = state.topK === 0 ? '0 (off)' : state.topK;
+    drawAll();
+  });
+  document.getElementById('topp-slider').addEventListener('input', (ev) => {
+    state.topP = parseFloat(ev.target.value);
+    document.getElementById('topp-val').textContent = state.topP.toFixed(2);
+    drawAll();
+  });
+  document.getElementById('n-slider').addEventListener('input', (ev) => {
+    state.nSamples = parseInt(ev.target.value, 10);
+    document.getElementById('n-val').textContent = state.nSamples;
+  });
+
+  window.addEventListener('resize', drawAll);
+
+  // ----------------------------------------------------------------
+  // 13) MAIN RENDER.
+  // ----------------------------------------------------------------
+  // ----------------------------------------------------------------
+  //   Entropy-vs-T chart: sweep T from 0.05 to 5 and plot H(p(z/T))
+  //   for the current logits. Shows the characteristic sigmoid-like
+  //   rise from near-0 at low T up to log2(V) at high T.
+  // ----------------------------------------------------------------
+  function drawEntropy() {
+    const canvas = document.getElementById('ent-canvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * DPR; canvas.height = rect.height * DPR;
+    const c = canvas.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const w = rect.width, h = rect.height;
+    c.clearRect(0, 0, w, h);
+    const pad = 6;
+    const plotW = w - 2*pad, plotH = h - 2*pad;
+
+    // Precompute entropy over a T grid on [Tmin, Tmax] (log-spaced for
+    // readability since very small T compresses rapidly).
+    const Tmin = 0.05, Tmax = 5;
+    const N = 80;
+    const pts = new Array(N + 1);
+    const maxH = Math.log2(V);
+    for (let i = 0; i <= N; i++) {
+      const frac = i / N;
+      // log-spaced T:
+      const T = Tmin * Math.pow(Tmax / Tmin, frac);
+      const p = softmax(state.logits, T);
+      pts[i] = { T, H: entropyBits(p) };
+    }
+
+    // Max entropy dashed guideline at log2(V).
+    c.strokeStyle = 'rgba(255,255,255,0.18)';
+    c.setLineDash([3, 3]); c.lineWidth = 1;
+    const yMax = pad + plotH - (maxH / maxH) * plotH; // y for H = log2 V
+    c.beginPath(); c.moveTo(pad, yMax); c.lineTo(w - pad, yMax); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = 'rgba(155,155,163,0.85)';
+    c.font = "9.5px 'JetBrains Mono', monospace";
+    c.fillText('log\u2082 V = ' + maxH.toFixed(2), pad + 4, yMax - 3);
+
+    // Curve.
+    c.strokeStyle = 'rgba(32,184,174,0.95)'; c.lineWidth = 1.8;
+    c.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const x = pad + (i / N) * plotW;
+      const y = pad + plotH - (pts[i].H / maxH) * plotH;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+
+    // Current-T vertical line.
+    const frac = Math.log(state.T / Tmin) / Math.log(Tmax / Tmin);
+    const fracC = Math.max(0, Math.min(1, frac));
+    const xT = pad + fracC * plotW;
+    c.strokeStyle = 'rgba(255,122,41,0.85)'; c.lineWidth = 1.5;
+    c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(xT, pad); c.lineTo(xT, h - pad); c.stroke();
+    c.setLineDash([]);
+
+    // T tick labels.
+    c.fillStyle = 'rgba(108,108,116,0.85)';
+    c.font = "9px 'JetBrains Mono', monospace";
+    c.textAlign = 'left';
+    c.fillText('T=' + Tmin, pad + 2, h - 2);
+    c.textAlign = 'right';
+    c.fillText('T=' + Tmax, w - pad, h - 2);
+    c.textAlign = 'left';
+
+    document.getElementById('max-H').textContent = maxH.toFixed(2);
+  }
+
+  function drawAll() {
+    drawLogits();
+    drawProbs();
+    drawEntropy();
+    renderSide();
+  }
+
+  // ----------------------------------------------------------------
+  // 14) INIT.
+  // ----------------------------------------------------------------
+  drawAll();
+
 })();
 </script>
 </body>
