@@ -186,6 +186,388 @@
     @media (max-width: 1100px) {
       .nnp-main { grid-template-columns: 1fr; }
     }
+
+    /* =================================================================
+       LEARNING MODE — beginner scaffolding (hidden unless body.lm-on)
+       ================================================================= */
+    .lm-toggle-row {
+      display:flex; align-items:center; justify-content:space-between;
+      gap: var(--s-2);
+      padding: var(--s-3) var(--s-4);
+      margin: 0 0 var(--s-3) 0;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+    }
+    .lm-toggle-row .lm-kicker {
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .lm-toggle {
+      display:inline-flex; align-items:center; gap: var(--s-2);
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-sunken);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      cursor: pointer; user-select:none;
+      transition: all var(--dur-fast) var(--ease-standard);
+    }
+    .lm-toggle:hover { border-color: var(--border-strong); color: var(--fg-primary); }
+    .lm-toggle .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--ink-500);
+      transition: background var(--dur-fast), box-shadow var(--dur-fast);
+    }
+    .lm-toggle.on {
+      color: var(--teal-300);
+      border-color: var(--accent-ring);
+      background: var(--accent-soft);
+    }
+    .lm-toggle.on .dot {
+      background: var(--teal-300);
+      box-shadow: 0 0 8px var(--teal-500);
+    }
+    .lm-toggle-row .lm-sub {
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      color: var(--fg-muted);
+    }
+    .lm-start-tour {
+      padding: 4px 10px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: transparent;
+      color: var(--fg-secondary);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      cursor: pointer;
+      display: none;
+    }
+    body.lm-on .lm-start-tour { display: inline-flex; }
+    .lm-start-tour:hover { border-color: var(--teal-400); color: var(--teal-300); }
+
+    /* Show-when-on helpers */
+    .lm-only           { display: none !important; }
+    body.lm-on .lm-only { display: initial !important; }
+    body.lm-on .lm-only.lm-flex  { display: flex !important; }
+    body.lm-on .lm-only.lm-block { display: block !important; }
+    body.lm-on .lm-only.lm-inline-flex { display: inline-flex !important; }
+
+    /* Per-control info button */
+    .lm-info-btn {
+      display: inline-flex; align-items:center; justify-content:center;
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 1px solid var(--border-default); background: transparent;
+      color: var(--fg-muted);
+      font-family: var(--font-display); font-size: 11px; font-weight: 600;
+      line-height: 1; cursor: pointer;
+      margin-left: var(--s-2);
+      transition: border-color var(--dur-fast), color var(--dur-fast);
+      vertical-align: middle;
+    }
+    .lm-info-btn:hover, .lm-info-btn.active {
+      border-color: var(--teal-400);
+      color: var(--teal-300);
+    }
+    .lm-info-btn:focus { outline: none; }
+
+    /* Compare button (next to certain control headers) */
+    .lm-compare-btn {
+      padding: 3px 8px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: transparent;
+      color: var(--fg-muted);
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+      cursor: pointer;
+      margin-left: var(--s-2);
+      vertical-align: middle;
+    }
+    .lm-compare-btn:hover { border-color: var(--teal-400); color: var(--teal-300); }
+    .lm-compare-btn:disabled { opacity: 0.5; cursor: default; }
+
+    /* Popover (used by info buttons) */
+    .lm-popover {
+      position: absolute; z-index: 500;
+      width: 300px; padding: var(--s-3) var(--s-4);
+      background: var(--bg-raised);
+      border: 1px solid var(--accent-ring);
+      border-radius: var(--r-md);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.55);
+      font-size: var(--fs-small);
+      color: var(--fg-primary);
+    }
+    .lm-popover .pop-title {
+      font-family: var(--font-display);
+      font-size: 1rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--teal-300);
+      margin-bottom: var(--s-2);
+      padding-right: 18px;
+    }
+    .lm-popover .pop-body { color: var(--fg-secondary); line-height: 1.5; }
+    .lm-popover .pop-row { display:flex; gap: var(--s-2); margin-top: 6px; align-items: baseline; }
+    .lm-popover .pop-tag {
+      font-family: var(--font-mono); font-size: 9.5px;
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      flex-shrink: 0; min-width: 40px;
+    }
+    .lm-popover .pop-val { color: var(--fg-secondary); flex: 1; line-height: 1.5; }
+    .lm-popover .pop-val.warn { color: var(--heat-400); }
+    .lm-popover .pop-val.ok   { color: var(--teal-300); }
+    .lm-popover .pop-close {
+      position: absolute; top: 6px; right: 8px;
+      background: transparent; border: none;
+      color: var(--fg-muted); cursor: pointer;
+      font-size: 14px; line-height: 1; padding: 2px 4px;
+    }
+    .lm-popover .pop-close:hover { color: var(--fg-primary); }
+
+    /* Anatomy tour */
+    .lm-tour-backdrop {
+      position: fixed; inset: 0; z-index: 480;
+      background: rgba(6, 6, 7, 0.60);
+      backdrop-filter: blur(1px);
+    }
+    .lm-tour-ring {
+      position: fixed; z-index: 490;
+      border: 2px solid var(--teal-300);
+      border-radius: var(--r-md);
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(6,6,7,0.62), 0 0 24px var(--teal-500);
+      transition: all 0.28s var(--ease-standard);
+    }
+    .lm-tour-popover {
+      position: fixed; z-index: 500;
+      width: 340px; padding: var(--s-4);
+      background: var(--bg-raised);
+      border: 1px solid var(--accent-ring);
+      border-radius: var(--r-md);
+      box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+      font-size: var(--fs-small);
+    }
+    .lm-tour-popover .tour-counter {
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+      color: var(--teal-300);
+      margin-bottom: var(--s-2);
+    }
+    .lm-tour-popover .tour-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin-bottom: var(--s-2);
+    }
+    .lm-tour-popover .tour-text {
+      color: var(--fg-secondary); line-height: 1.55;
+      margin-bottom: var(--s-3);
+    }
+    .lm-tour-popover .tour-nav { display:flex; gap: var(--s-2); justify-content: space-between; align-items:center; }
+    .lm-tour-popover .tour-nav button {
+      padding: 5px 12px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-sunken);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      cursor: pointer;
+    }
+    .lm-tour-popover .tour-nav button:hover:not(:disabled) {
+      border-color: var(--border-strong); color: var(--fg-primary);
+    }
+    .lm-tour-popover .tour-nav button.primary {
+      border-color: var(--accent-ring); background: var(--accent-soft); color: var(--teal-300);
+    }
+    .lm-tour-popover .tour-nav button:disabled { opacity: 0.35; cursor: default; }
+
+    /* Compare modal */
+    .lm-compare-modal {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(6,6,7,0.84);
+      display: flex; align-items:center; justify-content:center;
+      padding: var(--s-6);
+      animation: lm-fade-in 0.16s var(--ease-standard);
+    }
+    @keyframes lm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .lm-compare-modal .mc-panel {
+      width: min(960px, 100%); max-height: 92vh; overflow:auto;
+      background: var(--bg-raised);
+      border: 1px solid var(--accent-ring);
+      border-radius: var(--r-md);
+      padding: var(--s-5);
+      display: flex; flex-direction: column; gap: var(--s-4);
+    }
+    .lm-compare-modal .mc-head {
+      display:flex; align-items: baseline; justify-content: space-between; gap: var(--s-3);
+    }
+    .lm-compare-modal .mc-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem; font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+    }
+    .lm-compare-modal .mc-sub {
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .lm-compare-modal .mc-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: var(--s-3);
+    }
+    .lm-compare-modal .mc-cell {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+      display: flex; flex-direction: column; gap: var(--s-2);
+    }
+    .lm-compare-modal .mc-cell .mc-tag {
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .lm-compare-modal .mc-cell.variant .mc-tag { color: var(--teal-300); }
+    .lm-compare-modal .mc-cell .mc-knob {
+      font-family: var(--font-display); font-size: 0.95rem; font-weight: 500;
+      color: var(--fg-primary);
+      letter-spacing: var(--tracking-tight);
+    }
+    .lm-compare-modal .mc-boundary {
+      width: 100%; aspect-ratio: 1;
+      background: var(--bg-sunken);
+      border-radius: 4px;
+    }
+    .lm-compare-modal .mc-loss-wrap {
+      position: relative;
+      width: 100%; height: 90px;
+    }
+    .lm-compare-modal .mc-loss {
+      width: 100%; height: 100%;
+      background: var(--bg-sunken);
+      border-radius: 4px;
+    }
+    .lm-compare-modal .mc-loss-label {
+      position: absolute; top: 4px; left: 8px;
+      font-family: var(--font-mono); font-size: 9px;
+      color: var(--fg-muted);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+    }
+    .lm-compare-modal .mc-stats {
+      display:flex; gap: var(--s-3);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .lm-compare-modal .mc-stats .stat-num { color: var(--teal-300); }
+    .lm-compare-modal .mc-spinner {
+      padding: var(--s-5);
+      text-align: center;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-muted);
+      text-transform: uppercase; letter-spacing: var(--tracking-label);
+    }
+    .lm-compare-modal .mc-takeaway {
+      padding: var(--s-3) var(--s-4);
+      border-left: 2px solid var(--teal-400);
+      background: var(--accent-soft);
+      color: var(--fg-secondary);
+      font-size: var(--fs-small);
+      line-height: 1.55;
+      border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    }
+    .lm-compare-modal .mc-takeaway strong { color: var(--teal-300); }
+    .lm-compare-modal .mc-foot {
+      display:flex; align-items:center; gap: var(--s-2); justify-content: flex-end;
+    }
+    .lm-compare-modal .mc-foot button {
+      padding: 6px 14px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-sunken);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      cursor: pointer;
+    }
+    .lm-compare-modal .mc-foot button:hover { border-color: var(--border-strong); color: var(--fg-primary); }
+    .lm-compare-modal .mc-foot button.primary {
+      border-color: var(--accent-ring); background: var(--accent-soft); color: var(--teal-300);
+    }
+
+    /* Dependency graph */
+    .lm-graph-card {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-3);
+      position: relative;
+    }
+    .lm-graph-svg { display:block; width: 100%; height: 320px; }
+    .lm-graph-svg .node circle {
+      fill: var(--bg-raised);
+      stroke: var(--border-default);
+      stroke-width: 1.4;
+      transition: stroke 0.18s var(--ease-standard), fill 0.18s var(--ease-standard), stroke-width 0.18s;
+      cursor: pointer;
+    }
+    .lm-graph-svg .node.control circle { fill: var(--accent-soft); stroke: var(--accent-ring); }
+    .lm-graph-svg .node.output circle  { fill: rgba(242, 92, 84, 0.10); stroke: var(--heat-400); }
+    .lm-graph-svg .node.hot circle {
+      stroke-width: 2.4;
+      filter: drop-shadow(0 0 6px var(--teal-500));
+    }
+    .lm-graph-svg .node text {
+      font-family: var(--font-mono); font-size: 10.5px;
+      fill: var(--fg-secondary);
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      user-select: none;
+    }
+    .lm-graph-svg .node.hot text { fill: var(--fg-primary); }
+    .lm-graph-svg .node.dim circle { opacity: 0.28; }
+    .lm-graph-svg .node.dim text   { opacity: 0.5; }
+    .lm-graph-svg .edge {
+      stroke: var(--border-default);
+      stroke-width: 1.1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 0.18s, stroke-width 0.18s, opacity 0.18s;
+    }
+    .lm-graph-svg .edge.hot {
+      stroke: var(--teal-300);
+      stroke-width: 2;
+    }
+    .lm-graph-svg .edge.dim { opacity: 0.14; }
+    .lm-graph-svg .col-label {
+      font-family: var(--font-mono); font-size: 9.5px;
+      fill: var(--fg-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .lm-graph-note {
+      font-family: var(--font-mono); font-size: var(--fs-micro);
+      color: var(--fg-muted);
+      min-height: 1.6em; line-height: 1.5;
+      margin-top: var(--s-2);
+      padding: var(--s-2) var(--s-3);
+      background: var(--bg-raised);
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--r-sm);
+    }
+    .lm-graph-note.hot { color: var(--teal-300); border-color: var(--accent-ring); }
+
+    /* Affect-flash ring on output panels */
+    .flash-ring {
+      animation: flash-pulse 1s var(--ease-standard);
+    }
+    @keyframes flash-pulse {
+      0%   { box-shadow: 0 0 0 0 var(--teal-500); }
+      18%  { box-shadow: 0 0 0 3px var(--teal-500); }
+      100% { box-shadow: 0 0 0 0 rgba(32,184,174,0); }
+    }
   </style>
 </head>
 <body>
@@ -269,6 +651,16 @@
        ===================================================== -->
   <div class="control-panel">
 
+    <!-- Learning mode toggle (always visible) -->
+    <div class="lm-toggle-row">
+      <span class="lm-kicker">Mode</span>
+      <div class="lm-toggle" id="lm-toggle" title="Scaffold the UI with explanations, tour, and a compare tool">
+        <span class="dot"></span>
+        <span class="lm-label">Learning mode</span>
+      </div>
+      <button class="lm-start-tour" id="lm-start-tour" title="Walk through the whole playground, one piece at a time">Start tour</button>
+    </div>
+
     <div class="guide-banner" id="guide">
       <button class="guide-dismiss" onclick="this.parentElement.style.display='none'">&times;</button>
       <div class="guide-step-counter">The big idea</div>
@@ -320,7 +712,7 @@
     <!-- Optimizer -->
     <div class="control-section">
       <h3>Optimizer</h3>
-      <div class="btn-group">
+      <div class="btn-group" id="opt-row">
         <button class="btn btn-secondary active" data-opt="sgd">SGD</button>
         <button class="btn btn-secondary" data-opt="momentum">Momentum</button>
         <button class="btn btn-secondary" data-opt="rmsprop">RMSProp</button>
@@ -427,6 +819,15 @@
         <div class="learn-more-content">
           A flexible network with too little data or too many parameters will <em>memorise</em> the training points, including the noise, and fail to generalise. Increase L2, add dropout, shrink the network, or get more data. The gap between train loss and test accuracy is the clearest signal.
         </div>
+      </div>
+    </div>
+
+    <!-- Dependency graph (learning mode only) -->
+    <div class="control-section lm-only lm-block">
+      <h3>How these connect</h3>
+      <div class="lm-graph-card">
+        <svg class="lm-graph-svg" id="lm-graph" viewBox="0 0 360 320" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="lm-graph-note" id="lm-graph-note">Hover a node or edge &mdash; the line between a knob and a panel says <em>what</em> that knob changes.</div>
       </div>
     </div>
 
@@ -1254,10 +1655,1006 @@ function init() {
   renderDB(); renderNet(); updateStats();
   drawSparkline(document.getElementById('chart-loss'), lossHist, pal.teal400);
   drawSparkline(document.getElementById('chart-acc'), accHist, pal.heat);
+  initLearningMode();
 }
 
-/* Defer init to next tick so CSS vars are parsed */
-requestAnimationFrame(init);
+/* Defer init to next tick so CSS vars are parsed. Use rAF when the tab is
+   visible (layout is guaranteed to have run), fall back to setTimeout when
+   the tab is hidden (rAF is paused for hidden tabs in most browsers). */
+if (typeof document !== 'undefined' && document.hidden) {
+  setTimeout(init, 0);
+} else {
+  requestAnimationFrame(init);
+}
+
+/* ================================================================
+   LEARNING MODE
+   Beginner-facing scaffolding, all gated on body.lm-on.
+   Layers:
+     1. Anatomy tour       — stepped highlight + popover across 15 targets
+     2. Cause-effect       — per-control ⓘ popovers + "Compare" side-by-side runner
+     3. Interactions graph — SVG dependency map with hover highlighting
+     4. Affect-flash       — teal ring pulse on output panels when a control changes
+   ================================================================ */
+
+const LM_KEY       = 'nnp-learning-mode-v1';
+const LM_TOUR_SEEN = 'nnp-tour-seen-v1';
+let lmOn = false;
+try { lmOn = localStorage.getItem(LM_KEY) === '1'; } catch(e) {}
+
+function applyLmState() {
+  document.body.classList.toggle('lm-on', lmOn);
+  const t = document.getElementById('lm-toggle');
+  if (t) t.classList.toggle('on', lmOn);
+}
+
+const lmTogEl = document.getElementById('lm-toggle');
+if (lmTogEl) {
+  lmTogEl.addEventListener('click', () => {
+    lmOn = !lmOn;
+    try { localStorage.setItem(LM_KEY, lmOn ? '1' : '0'); } catch(e) {}
+    applyLmState();
+    if (!lmOn) { closeAllPopovers(); endTour(); }
+    /* First-time enable auto-starts tour */
+    let seen = true;
+    try { seen = localStorage.getItem(LM_TOUR_SEEN) === '1'; } catch(e) {}
+    if (lmOn && !seen) {
+      try { localStorage.setItem(LM_TOUR_SEEN, '1'); } catch(e) {}
+      setTimeout(startTour, 120);
+    }
+  });
+}
+applyLmState();
+
+/* ================================================================
+   LAYER 2a: Cause-effect copy table and info popovers
+   ================================================================ */
+const ctlCopy = {
+  dataset: {
+    title: 'Dataset',
+    what:  'Which classification puzzle the network is trying to solve. Six shapes are included; harder shapes need more network capacity.',
+    watch: 'Boundary panel &mdash; the coloured region should fit the point clusters.',
+    tryv:  'Start with XOR; then try Spiral for a genuinely hard case.',
+    high:  'Spiral and Rings need at least two hidden layers.',
+    low:   'Linear is solvable with zero hidden layers (a single sigmoid neuron).'
+  },
+  noise: {
+    title: 'Noise',
+    what:  'Jitter added to point coordinates (not to the labels). Simulates real-world measurement error.',
+    watch: 'Boundary panel &mdash; at high noise even a perfect boundary leaves some points on the wrong side.',
+    tryv:  '0.10 to see it shimmer; 0.30 to see it genuinely hurt accuracy.',
+    high:  'Beyond about 0.3 there is an irreducible error floor &mdash; no network can fix it.',
+    low:   'Zero noise means a perfect boundary is possible.'
+  },
+  split: {
+    title: 'Train / test split',
+    what:  'Fraction of points used for training. The rest become held-out test data.',
+    watch: 'Accuracy stat + enable "Test points" to see which points are held out.',
+    tryv:  'Drop to 0.5 to watch a train/test gap appear when overfitting.',
+    high:  'Too high &mdash; test set shrinks, test accuracy estimate gets noisy.',
+    low:   'Too low &mdash; training is starved, the boundary stays rough.'
+  },
+  arch: {
+    title: 'Architecture',
+    what:  'Hidden-layer widths. Depth &times; width is model capacity.',
+    watch: 'Network diagram (new columns appear) + parameter count stat.',
+    tryv:  '[2&nbsp;&middot;&nbsp;6&nbsp;&middot;&nbsp;1] for XOR; [2&nbsp;&middot;&nbsp;8&nbsp;&middot;&nbsp;8&nbsp;&middot;&nbsp;8&nbsp;&middot;&nbsp;1] for Spiral.',
+    high:  'Too much capacity + small data = overfitting. Pair with L2 or dropout.',
+    low:   'Zero hidden layers = linear classifier. XOR, Spiral, Rings are then unsolvable.'
+  },
+  act: {
+    title: 'Hidden activation',
+    what:  'The non-linear function between linear layers. Without it, stacking collapses to one linear map.',
+    watch: 'Boundary (smooth vs. piecewise) + network diagram (dim nodes = dead).',
+    tryv:  'tanh for small nets; ReLU for deep nets. Try LReLU if ReLU dies.',
+    high:  'ReLU + high &alpha; &rarr; neurons can get stuck at 0 ("dying ReLU"). Switch to LReLU/ELU.',
+    low:   'Sigmoid in deep nets &rarr; vanishing gradients, training stalls.'
+  },
+  opt: {
+    title: 'Optimizer',
+    what:  'How gradients become weight updates. SGD = raw steps; Momentum smooths; RMSProp adapts by magnitude; Adam combines both.',
+    watch: 'Loss curve &mdash; Adam usually descends smoother than SGD at the same &alpha;.',
+    tryv:  'Adam on Spiral; SGD on XOR to feel the difference.',
+    high:  'Adam adapts aggressively &mdash; it can memorise fast, so watch for overfit.',
+    low:   'SGD with tiny &alpha; on a deep net trains glacially.'
+  },
+  lr: {
+    title: 'Learning rate &alpha;',
+    what:  'Step size for each gradient update. The single most important hyperparameter.',
+    watch: 'Loss curve &mdash; should go down smoothly.',
+    tryv:  '0.1 with Adam, 0.3 with SGD. If loss bounces, halve it.',
+    high:  'Loss explodes (NaN), oscillates, or diverges. Halve &alpha; and press Reset.',
+    low:   'Loss barely moves. Double &alpha; or switch to Adam.'
+  },
+  bs: {
+    title: 'Batch size',
+    what:  'Samples per gradient step. Small = noisy stochastic gradient; big = smooth average but fewer updates.',
+    watch: 'Loss curve &mdash; batch&nbsp;=&nbsp;1 makes it look jagged even when descending.',
+    tryv:  '8 for stochastic feel; 64 for smooth curves.',
+    high:  'Fewer updates per epoch &rarr; slower learning on small datasets.',
+    low:   'Batch&nbsp;=&nbsp;1 (pure SGD) is noisy but sometimes escapes local minima.'
+  },
+  l2: {
+    title: 'L2 (weight decay)',
+    what:  'Shrinks every weight a bit at each step (adds &lambda;&middot;w to the gradient). Fights overfitting by preferring simpler models.',
+    watch: 'Network diagram &mdash; connections get thinner as weights decay.',
+    tryv:  '0.01 on the over-fitting preset to see the boundary smooth.',
+    high:  'Too high &rarr; under-fitting; network cannot even memorise.',
+    low:   'Zero = no regularisation; on noisy data, expect over-fitting.'
+  },
+  dp: {
+    title: 'Dropout',
+    what:  'Randomly zeros hidden neurons during training; inverted scaling keeps the expected output unchanged.',
+    watch: 'Loss curve &mdash; training loss gets noisier; test accuracy usually improves.',
+    tryv:  '0.2 on the over-fitting preset.',
+    high:  'Above 0.4 and the network underfits or struggles to converge.',
+    low:   'Zero = off. Pair with L2 for extra regularisation.'
+  },
+  eps: {
+    title: 'Epochs per frame',
+    what:  'How many training epochs run per animation frame. Display speed only &mdash; no effect on final model.',
+    watch: 'Just the speed of the counter.',
+    tryv:  '1 to watch each epoch deliberately; 20 to sprint.',
+    high:  'Frame drops on slow laptops.',
+    low:   'Slow and observable.'
+  },
+  display: {
+    title: 'Display toggles',
+    what:  'Which visual layers are drawn. Nothing about training.',
+    watch: 'Boundary and network panels.',
+    tryv:  'Enable Activations after a bit of training to see which neurons fire.',
+    high:  null, low: null
+  }
+};
+
+let openPopover = null;
+function closeAllPopovers() {
+  if (openPopover) { openPopover.remove(); openPopover = null; }
+  document.querySelectorAll('.lm-info-btn.active').forEach(b => b.classList.remove('active'));
+}
+
+function showInfoPopover(anchor, key) {
+  closeAllPopovers();
+  const c = ctlCopy[key];
+  if (!c) return;
+  const pop = document.createElement('div');
+  pop.className = 'lm-popover';
+  pop.innerHTML = `
+    <button class="pop-close" aria-label="Close">&times;</button>
+    <div class="pop-title">${c.title}</div>
+    <div class="pop-body">${c.what}</div>
+    ${c.watch ? `<div class="pop-row"><span class="pop-tag">Watch</span><span class="pop-val">${c.watch}</span></div>` : ''}
+    ${c.tryv  ? `<div class="pop-row"><span class="pop-tag">Try</span><span class="pop-val">${c.tryv}</span></div>`  : ''}
+    ${c.high  ? `<div class="pop-row"><span class="pop-tag">Too high</span><span class="pop-val warn">${c.high}</span></div>` : ''}
+    ${c.low   ? `<div class="pop-row"><span class="pop-tag">Too low</span><span class="pop-val ok">${c.low}</span></div>`    : ''}
+  `;
+  document.body.appendChild(pop);
+  anchor.classList.add('active');
+  /* Position to the left of the anchor (control panel is on the right) */
+  const ar = anchor.getBoundingClientRect();
+  const pw = pop.offsetWidth;
+  const ph = pop.offsetHeight;
+  let left = ar.left - pw - 10;
+  if (left < 10) left = ar.right + 10;
+  let top = ar.top + ar.height/2 - ph/2;
+  top = Math.max(10, Math.min(window.innerHeight - ph - 10, top));
+  pop.style.left = left + 'px';
+  pop.style.top  = top  + 'px';
+  pop.querySelector('.pop-close').addEventListener('click', closeAllPopovers);
+  openPopover = pop;
+  setTimeout(() => {
+    document.addEventListener('click', onDocClickClose, { once: true });
+  }, 0);
+  function onDocClickClose(ev) {
+    if (openPopover && !openPopover.contains(ev.target) && ev.target !== anchor) {
+      closeAllPopovers();
+    } else if (openPopover) {
+      setTimeout(() => document.addEventListener('click', onDocClickClose, { once: true }), 0);
+    }
+  }
+}
+
+/* Inject ⓘ icons. Attach one per logical control. */
+function injectInfoButtons() {
+  const specs = [
+    { after: '#dataset-grid',   key: 'dataset', mode: 'afterend' },
+    { after: '#noise-slider',   key: 'noise',   mode: 'nearSliderLabel' },
+    { after: '#split-slider',   key: 'split',   mode: 'nearSliderLabel' },
+    { after: '#arch-row',       key: 'arch',    mode: 'afterend' },
+    { after: '#act-chips',      key: 'act',     mode: 'afterend' },
+    { after: '#lr-slider',      key: 'lr',      mode: 'nearSliderLabel' },
+    { after: '#bs-slider',      key: 'bs',      mode: 'nearSliderLabel' },
+    { after: '#l2-slider',      key: 'l2',      mode: 'nearSliderLabel' },
+    { after: '#dp-slider',      key: 'dp',      mode: 'nearSliderLabel' },
+    { after: '#eps-slider',     key: 'eps',     mode: 'nearSliderLabel' },
+  ];
+  /* Also add an ⓘ to the Optimizer section header, next to its h3 text. */
+  const sectionsList = Array.from(document.querySelectorAll('.control-section'));
+  const optSec = sectionsList.find(el => {
+    const h = el.querySelector('h3');
+    if (!h) return false;
+    for (const n of h.childNodes) if (n.nodeType === 3) return n.textContent.trim() === 'Optimizer';
+    return false;
+  });
+  if (optSec) specs.push({ anchor: optSec, key: 'opt', mode: 'inSectionH3' });
+
+  specs.forEach(s => {
+    const target = s.anchor || document.querySelector(s.after);
+    if (!target) return;
+    const btn = document.createElement('button');
+    btn.className = 'lm-info-btn lm-only lm-inline-flex';
+    btn.type = 'button';
+    btn.textContent = 'i';
+    btn.title = ctlCopy[s.key] ? ctlCopy[s.key].title + ' — explain' : 'Explain';
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (openPopover && openPopover.dataset.key === s.key) {
+        closeAllPopovers();
+      } else {
+        showInfoPopover(btn, s.key);
+        if (openPopover) openPopover.dataset.key = s.key;
+      }
+    });
+    if (s.mode === 'nearSliderLabel') {
+      /* Inject into the .slider-label next to the value. */
+      const slGrp = target.closest('.slider-group');
+      if (slGrp) {
+        const lbl = slGrp.querySelector('.slider-label span:first-child');
+        if (lbl) lbl.appendChild(btn);
+      }
+    } else if (s.mode === 'inSectionH3') {
+      const h3 = target.querySelector('h3');
+      if (h3) h3.appendChild(btn);
+    } else {
+      target.parentElement.insertBefore(btn, target.nextSibling);
+    }
+  });
+}
+
+/* ================================================================
+   LAYER 2b: Compare runner + modal
+   ================================================================ */
+function snapshotState() {
+  return {
+    W: W.map(l => l.map(r => r.slice())),
+    b: b.map(l => l.slice()),
+    mW: mW.map(l => l.map(r => r.slice())),
+    mb: mb.map(l => l.slice()),
+    vW: vW.map(l => l.map(r => r.slice())),
+    vb: vb.map(l => l.slice()),
+    tStep: tStep,
+    arch: architecture.slice(),
+    actName: activationName,
+    opt: optimizer,
+    lr: lr, batchSize: batchSize, l2: l2, dropout: dropout,
+    noise: noise, split: split,
+    epoch: epoch,
+    lossHist: lossHist.slice(),
+    accHist: accHist.slice(),
+    trainData: trainData.map(p => ({x:p.x, y:p.y, cls:p.cls})),
+    testData:  testData.map(p => ({x:p.x, y:p.y, cls:p.cls})),
+    rawData:   rawData.map(p => ({x:p.x, y:p.y, cls:p.cls})),
+    datasetName: datasetName
+  };
+}
+function restoreState(s) {
+  W  = s.W.map(l => l.map(r => r.slice()));
+  b  = s.b.map(l => l.slice());
+  mW = s.mW.map(l => l.map(r => r.slice()));
+  mb = s.mb.map(l => l.slice());
+  vW = s.vW.map(l => l.map(r => r.slice()));
+  vb = s.vb.map(l => l.slice());
+  tStep = s.tStep;
+  architecture = s.arch.slice();
+  activationName = s.actName;
+  optimizer = s.opt;
+  lr = s.lr; batchSize = s.batchSize; l2 = s.l2; dropout = s.dropout;
+  noise = s.noise; split = s.split;
+  epoch = s.epoch;
+  lossHist = s.lossHist.slice();
+  accHist  = s.accHist.slice();
+  trainData = s.trainData.map(p => ({x:p.x, y:p.y, cls:p.cls}));
+  testData  = s.testData.map(p => ({x:p.x, y:p.y, cls:p.cls}));
+  rawData   = s.rawData.map(p => ({x:p.x, y:p.y, cls:p.cls}));
+  datasetName = s.datasetName;
+}
+function useSeedWeights(seedW, seedB) {
+  W = seedW.map(l => l.map(r => r.slice()));
+  b = seedB.map(l => l.slice());
+  mW = W.map(l => l.map(r => r.map(() => 0)));
+  mb = b.map(l => l.map(() => 0));
+  vW = W.map(l => l.map(r => r.map(() => 0)));
+  vb = b.map(l => l.map(() => 0));
+  tStep = 0;
+  lossHist = []; accHist = []; epoch = 0;
+}
+
+function runHeadlessEpochs(n) {
+  /* Runs trainOneEpoch n times without rendering.
+     Returns { loss, acc, finalLoss, finalAcc, grid }. */
+  const wasTraining = training;
+  training = true;
+  lossHist = []; accHist = []; epoch = 0;
+  for (let i = 0; i < n; i++) trainOneEpoch();
+  const loss = lossHist.slice();
+  const acc  = accHist.slice();
+  const finalLoss = loss.length ? loss[loss.length-1] : 0;
+  const finalAcc  = acc.length  ? acc[acc.length-1]   : 0;
+  training = false;
+  /* Final decision-boundary grid, sampled without dropout */
+  const N = 40;
+  const grid = new Array(N);
+  for (let gy = 0; gy < N; gy++) {
+    grid[gy] = new Array(N);
+    for (let gx = 0; gx < N; gx++) {
+      const dx = XR[0] + (gx + 0.5)/N * (XR[1]-XR[0]);
+      const dy = YR[0] + (gy + 0.5)/N * (YR[1]-YR[0]);
+      grid[gy][gx] = forward(dx, dy, false);
+    }
+  }
+  training = wasTraining;
+  return { loss, acc, finalLoss, finalAcc, grid };
+}
+
+function compareApplyVariant(knob, snap) {
+  /* Mutates the live globals to the variant config. Returns a label object. */
+  if (knob === 'arch') {
+    /* Add one extra hidden layer, width = last hidden width (or 4). */
+    const a = snap.arch.slice();
+    const hiddens = a.slice(1, -1);
+    const extraWidth = hiddens.length ? hiddens[hiddens.length-1] : 4;
+    architecture = [...a.slice(0, -1), extraWidth, a[a.length-1]];
+    return { label: `arch: ${architecture.join('·')}`, archChanged: true,
+             vs: `vs. ${snap.arch.join('·')}`,
+             takeaway: 'Extra capacity can fit harder boundaries, but on simple data it mainly adds overfitting risk. Notice the parameter count and the boundary shape.' };
+  }
+  if (knob === 'act') {
+    const flipMap = { tanh: 'relu', relu: 'tanh', leakyRelu: 'relu',
+                      sigmoid: 'tanh', elu: 'tanh', swish: 'tanh', gelu: 'tanh' };
+    activationName = flipMap[snap.actName] || 'relu';
+    return { label: `activation: ${activationName}`, archChanged: false,
+             vs: `vs. ${snap.actName}`,
+             takeaway: 'Different activations prefer different inits and step sizes. Shape the boundary differently (piecewise-linear for ReLU, smooth for tanh) and train at different speeds.' };
+  }
+  if (knob === 'lr') {
+    lr = Math.min(1, +(snap.lr * 3).toFixed(3));
+    const mult = snap.lr > 0 ? (lr / snap.lr) : 3;
+    return { label: `α = ${lr.toFixed(3)} (${mult.toFixed(1)}×)`, archChanged: false,
+             vs: `vs. α = ${snap.lr.toFixed(3)}`,
+             takeaway: 'Multiplying α by three sits at the edge of stability: if the original α was too small, it accelerates descent; if it was already near-optimal, expect bounces or divergence.' };
+  }
+  if (knob === 'l2') {
+    l2 = 0.05;
+    return { label: `L2 = 0.050`, archChanged: false,
+             vs: `vs. L2 = ${snap.l2.toFixed(3)}`,
+             takeaway: 'Strong L2 shrinks weights every step. Expect a simpler boundary; test accuracy improves on noisy data, falls on clean data (underfit).' };
+  }
+  if (knob === 'dp') {
+    dropout = 0.3;
+    return { label: `dropout = 0.30`, archChanged: false,
+             vs: `vs. dropout = ${snap.dropout.toFixed(2)}`,
+             takeaway: 'Dropout trains an implicit ensemble. Training loss gets noisier; the train/test gap narrows when it was wide, and final accuracy wobbles when there was nothing to regularise.' };
+  }
+}
+
+let compareModal = null;
+function closeCompareModal() {
+  if (compareModal) { compareModal.remove(); compareModal = null; }
+}
+function showCompareSpinner(knobTitle) {
+  closeCompareModal();
+  compareModal = document.createElement('div');
+  compareModal.className = 'lm-compare-modal';
+  compareModal.innerHTML = `
+    <div class="mc-panel">
+      <div class="mc-head">
+        <div class="mc-title">Compare &middot; ${knobTitle}</div>
+        <div class="mc-sub">Running two 60-epoch trials&hellip;</div>
+      </div>
+      <div class="mc-spinner">training baseline &amp; variant&hellip;</div>
+    </div>
+  `;
+  document.body.appendChild(compareModal);
+}
+function renderMiniBoundary(canvas, grid, points) {
+  const ctx = canvas.getContext('2d');
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width * devicePixelRatio;
+  canvas.height = r.height * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const Wc = canvas.width/devicePixelRatio, Hc = canvas.height/devicePixelRatio;
+  ctx.fillStyle = pal.bgSunken || '#060607';
+  ctx.fillRect(0,0,Wc,Hc);
+  const N = grid.length;
+  const cw = Wc/N, ch = Hc/N;
+  for (let gy = 0; gy < N; gy++) {
+    for (let gx = 0; gx < N; gx++) {
+      const v = grid[N-1-gy][gx];
+      const intensity = Math.abs(v - 0.5) * 2;
+      ctx.fillStyle = v > 0.5
+        ? `rgba(32, 184, 174, ${intensity * 0.50})`
+        : `rgba(242, 92, 84, ${intensity * 0.40})`;
+      ctx.fillRect(gx*cw, gy*ch, cw+0.5, ch+0.5);
+    }
+  }
+  /* Points on top */
+  if (points) {
+    for (const p of points) {
+      const px = (p.x - XR[0]) / (XR[1]-XR[0]) * Wc;
+      const py = Hc - (p.y - YR[0]) / (YR[1]-YR[0]) * Hc;
+      ctx.fillStyle = p.cls === 1 ? pal.teal400 : pal.danger;
+      ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath(); ctx.arc(px, py, 0.9, 0, Math.PI*2); ctx.fill();
+    }
+  }
+}
+function renderMiniLoss(canvas, series, color, sharedMax) {
+  const ctx = canvas.getContext('2d');
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width * devicePixelRatio;
+  canvas.height = r.height * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const Wc = canvas.width/devicePixelRatio, Hc = canvas.height/devicePixelRatio;
+  ctx.fillStyle = pal.bgSunken || '#060607';
+  ctx.fillRect(0,0,Wc,Hc);
+  if (!series || series.length < 2) return;
+  let mn = Infinity;
+  for (const v of series) if (isFinite(v) && v < mn) mn = v;
+  if (!isFinite(mn)) mn = 0;
+  const mx = Math.max(sharedMax || 0, mn + 1e-6);
+  const padT = 10, padB = 8;
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath();
+  for (let y = 20; y < Hc - 6; y += 20) { ctx.moveTo(0, y); ctx.lineTo(Wc, y); }
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < series.length; i++) {
+    const x = (i/(series.length-1)) * Wc;
+    const v = isFinite(series[i]) ? series[i] : mx;
+    const y = padT + (1 - (v-mn)/(mx-mn)) * (Hc - padT - padB);
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+function renderCompareResults(knob, snap, variantDesc, baseline, variant) {
+  if (!compareModal) return;
+  const knobTitleMap = {
+    arch: 'Architecture',
+    act:  'Hidden activation',
+    lr:   'Learning rate α',
+    l2:   'L2 (weight decay)',
+    dp:   'Dropout'
+  };
+  const title = knobTitleMap[knob] || 'Compare';
+  const baselineLabel = {
+    arch: `arch: ${snap.arch.join('·')}`,
+    act:  `activation: ${snap.actName}`,
+    lr:   `α = ${snap.lr.toFixed(3)}`,
+    l2:   `L2 = ${snap.l2.toFixed(3)}`,
+    dp:   `dropout = ${snap.dropout.toFixed(2)}`
+  }[knob];
+
+  /* Detect broken training (NaN or wildly worse than baseline).
+     If the baseline itself diverged, don't declare the variant broken
+     for being "3× worse than NaN". */
+  const baseFinalLoss = baseline.finalLoss;
+  const varFinalLoss  = variant.finalLoss;
+  const baseBroken = !isFinite(baseFinalLoss);
+  const varBroken  = !isFinite(varFinalLoss) ||
+                     (isFinite(baseFinalLoss) && varFinalLoss > baseFinalLoss * 3);
+  const varBetter  = isFinite(baseFinalLoss) && isFinite(varFinalLoss) &&
+                     varFinalLoss < baseFinalLoss * 0.95;
+
+  compareModal.innerHTML = `
+    <div class="mc-panel">
+      <div class="mc-head">
+        <div class="mc-title">Compare &middot; ${title}</div>
+        <div class="mc-sub">60 epochs each &middot; same dataset &middot; both runs start from a fresh init &middot; ${variantDesc.archChanged ? 'different dims (independent inits)' : 'shared initial weights'}</div>
+      </div>
+      <div class="mc-grid">
+        <div class="mc-cell baseline">
+          <div class="mc-tag">Baseline</div>
+          <div class="mc-knob">${baselineLabel}</div>
+          <canvas class="mc-boundary" id="mc-b-bd"></canvas>
+          <div class="mc-loss-wrap">
+            <div class="mc-loss-label">train loss</div>
+            <canvas class="mc-loss" id="mc-b-loss"></canvas>
+          </div>
+          <div class="mc-stats">
+            <span>final loss: <span class="stat-num">${isFinite(baseline.finalLoss) ? baseline.finalLoss.toFixed(3) : 'NaN'}</span></span>
+            <span>final acc: <span class="stat-num">${(baseline.finalAcc*100).toFixed(1)}%</span></span>
+          </div>
+        </div>
+        <div class="mc-cell variant">
+          <div class="mc-tag">${variantDesc.label}</div>
+          <div class="mc-knob">${variantDesc.vs}</div>
+          <canvas class="mc-boundary" id="mc-v-bd"></canvas>
+          <div class="mc-loss-wrap">
+            <div class="mc-loss-label">train loss</div>
+            <canvas class="mc-loss" id="mc-v-loss"></canvas>
+          </div>
+          <div class="mc-stats">
+            <span>final loss: <span class="stat-num">${isFinite(variant.finalLoss) ? variant.finalLoss.toFixed(3) : 'NaN'}</span></span>
+            <span>final acc: <span class="stat-num">${(variant.finalAcc*100).toFixed(1)}%</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="mc-takeaway">
+        <strong>${baseBroken ? 'Baseline broke training.' : varBroken ? 'Variant broke training.' : varBetter ? 'Variant helped.' : 'Close call.'}</strong>
+        ${variantDesc.takeaway}
+      </div>
+      <div class="mc-foot">
+        <button id="mc-close">Close</button>
+      </div>
+    </div>
+  `;
+  const sharedMax = Math.max(
+    Math.max(...baseline.loss.filter(isFinite), 0),
+    Math.max(...variant.loss.filter(isFinite), 0)
+  );
+  renderMiniBoundary(document.getElementById('mc-b-bd'), baseline.grid, snap.trainData);
+  renderMiniBoundary(document.getElementById('mc-v-bd'), variant.grid,  snap.trainData);
+  renderMiniLoss(document.getElementById('mc-b-loss'), baseline.loss, pal.fgPrim || '#EAEAEA', sharedMax);
+  renderMiniLoss(document.getElementById('mc-v-loss'), variant.loss,  pal.teal400, sharedMax);
+  document.getElementById('mc-close').addEventListener('click', closeCompareModal);
+  compareModal.addEventListener('click', ev => { if (ev.target === compareModal) closeCompareModal(); });
+}
+
+function runCompare(knob) {
+  /* Pause live training */
+  const wasTraining = training;
+  if (wasTraining) {
+    training = false;
+    btnTrain.textContent = 'Train';
+    btnTrain.classList.remove('active');
+  }
+
+  const knobTitleMap = {
+    arch: 'Architecture', act: 'Hidden activation',
+    lr: 'Learning rate α', l2: 'L2 (weight decay)', dp: 'Dropout'
+  };
+  showCompareSpinner(knobTitleMap[knob] || 'Compare');
+
+  /* Give the spinner a paint, then run. setTimeout is used instead of rAF
+     because rAF is paused when the tab is backgrounded. */
+  setTimeout(() => {
+    const snap = snapshotState();
+    /* Seed fresh weights with current (baseline) config */
+    restoreState(snap);
+    initNetwork();
+    const seedW = W.map(l => l.map(r => r.slice()));
+    const seedB = b.map(l => l.slice());
+
+    /* --- Baseline run --- */
+    restoreState(snap);
+    useSeedWeights(seedW, seedB);
+    const baseline = runHeadlessEpochs(60);
+
+    /* --- Variant run --- */
+    restoreState(snap);
+    const variantDesc = compareApplyVariant(knob, snap);
+    if (variantDesc.archChanged) {
+      initNetwork();
+      lossHist = []; accHist = []; epoch = 0;
+    } else {
+      useSeedWeights(seedW, seedB);
+    }
+    const variant = runHeadlessEpochs(60);
+
+    /* --- Restore live state --- */
+    restoreState(snap);
+    syncThis(); renderDB(); renderNet(); updateStats();
+    drawSparkline(document.getElementById('chart-loss'), lossHist, pal.teal400);
+    drawSparkline(document.getElementById('chart-acc'),  accHist, pal.heat);
+
+    renderCompareResults(knob, snap, variantDesc, baseline, variant);
+  }, 30);
+}
+
+function injectCompareButtons() {
+  const specs = [
+    { sectionHeadMatch: 'Architecture',     knob: 'arch', label: 'compare: +1 layer' },
+    { sectionHeadMatch: 'Hidden activation', knob: 'act',  label: 'compare: swap' },
+    { sectionHeadMatch: 'Optimizer',        knob: 'lr',   label: 'compare: α × 3' },
+    { sectionHeadMatch: 'Regularization',   knob: 'l2',   label: 'compare: L2 0.05' },
+    { sectionHeadMatch: 'Regularization',   knob: 'dp',   label: 'compare: dropout 0.3' },
+  ];
+  const sections = Array.from(document.querySelectorAll('.control-section'));
+  const sectionH3Text = h => {
+    /* Use only the first child text node — once we append buttons to the h3,
+       textContent would include their labels and break future matches. */
+    if (!h) return '';
+    for (const n of h.childNodes) {
+      if (n.nodeType === 3) return n.textContent.trim();
+    }
+    return h.textContent.trim();
+  };
+  specs.forEach(s => {
+    const sec = sections.find(el => sectionH3Text(el.querySelector('h3')) === s.sectionHeadMatch);
+    if (!sec) return;
+    const h3 = sec.querySelector('h3');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lm-compare-btn lm-only lm-inline-flex';
+    btn.textContent = s.label;
+    btn.addEventListener('click', () => runCompare(s.knob));
+    h3.appendChild(btn);
+  });
+}
+
+/* ================================================================
+   LAYER 3: Dependency graph
+   ================================================================ */
+const graphData = {
+  controls: [
+    { id: 'dataset', label: 'dataset' },
+    { id: 'noise',   label: 'noise' },
+    { id: 'split',   label: 'train/test' },
+    { id: 'arch',    label: 'arch' },
+    { id: 'act',     label: 'activation' },
+    { id: 'opt',     label: 'optimizer' },
+    { id: 'lr',      label: 'α' },
+    { id: 'bs',      label: 'batch' },
+    { id: 'l2',      label: 'L2' },
+    { id: 'dp',      label: 'dropout' },
+  ],
+  outputs: [
+    { id: 'boundary', label: 'boundary' },
+    { id: 'loss',     label: 'loss' },
+    { id: 'acc',      label: 'accuracy' },
+    { id: 'net',      label: 'network' },
+    { id: 'params',   label: '#params' },
+  ],
+  edges: [
+    ['dataset', 'boundary', 'Dataset → boundary: different shape, different "correct" region.'],
+    ['dataset', 'loss',     'Dataset → loss: harder shape = higher floor for loss.'],
+    ['dataset', 'acc',      'Dataset → accuracy: harder shape lowers achievable accuracy.'],
+    ['noise',   'boundary', 'Noise → boundary: jitter scatters points off the ideal region.'],
+    ['noise',   'loss',     'Noise → loss: raises the irreducible loss floor.'],
+    ['noise',   'acc',      'Noise → accuracy: caps how high test accuracy can reach.'],
+    ['split',   'acc',      'Train/test → accuracy: small test set = noisier accuracy estimate.'],
+    ['split',   'loss',     'Train/test → loss: less training data = higher final training loss.'],
+    ['arch',    'net',      'arch → network: adds or removes neuron columns.'],
+    ['arch',    'params',   'arch → #params: grows with depth × width.'],
+    ['arch',    'boundary', 'arch → boundary: more capacity can fit more complex shapes.'],
+    ['arch',    'acc',      'arch → accuracy: under-capacity caps accuracy, over-capacity risks overfitting.'],
+    ['act',     'boundary', 'activation → boundary: ReLU is piecewise-linear, tanh smooth.'],
+    ['act',     'loss',     'activation → loss: vanishing-gradient activations stall training.'],
+    ['act',     'net',      'activation → network: wrong choice leads to dim (dead) nodes.'],
+    ['opt',     'loss',     'optimizer → loss: Adam descends smoother than SGD at the same α.'],
+    ['lr',      'loss',     'α → loss: too high and the loss bounces or explodes (NaN).'],
+    ['lr',      'acc',      'α → accuracy: right α lets loss fall and accuracy rise.'],
+    ['bs',      'loss',     'batch → loss: tiny batches make the loss curve jagged.'],
+    ['l2',      'net',      'L2 → network: weights shrink each step, lines get thinner.'],
+    ['l2',      'acc',      'L2 → accuracy: less overfit, smaller train/test gap.'],
+    ['dp',      'loss',     'dropout → loss: noisier training loss, flatter test loss.'],
+    ['dp',      'acc',      'dropout → accuracy: better generalisation on noisy data.']
+  ]
+};
+
+const nodePos = {};
+function buildGraph() {
+  const svg = document.getElementById('lm-graph');
+  if (!svg) return;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const VBW = 360, VBH = 320;
+  const colLeft = 72, colRight = 288;
+  const topPad = 30, bottomPad = 14;
+  const laneL = (VBH - topPad - bottomPad) / (graphData.controls.length - 1);
+  const laneR = (VBH - topPad - bottomPad) / (graphData.outputs.length - 1);
+  const svgNS = 'http://www.w3.org/2000/svg';
+
+  /* Column labels */
+  const lblL = document.createElementNS(svgNS, 'text');
+  lblL.setAttribute('x', colLeft); lblL.setAttribute('y', 16);
+  lblL.setAttribute('class', 'col-label');
+  lblL.setAttribute('text-anchor', 'middle');
+  lblL.textContent = 'controls';
+  svg.appendChild(lblL);
+  const lblR = document.createElementNS(svgNS, 'text');
+  lblR.setAttribute('x', colRight); lblR.setAttribute('y', 16);
+  lblR.setAttribute('class', 'col-label');
+  lblR.setAttribute('text-anchor', 'middle');
+  lblR.textContent = 'what you watch';
+  svg.appendChild(lblR);
+
+  graphData.controls.forEach((n, i) => {
+    nodePos[n.id] = { x: colLeft, y: topPad + i * laneL };
+  });
+  graphData.outputs.forEach((n, i) => {
+    nodePos[n.id] = { x: colRight, y: topPad + i * laneR };
+  });
+
+  /* Edges first (so they sit below nodes) */
+  graphData.edges.forEach((e, idx) => {
+    const [from, to, note] = e;
+    const a = nodePos[from], c = nodePos[to];
+    if (!a || !c) return;
+    const path = document.createElementNS(svgNS, 'path');
+    const midX = (a.x + c.x) / 2;
+    const d = `M ${a.x+12} ${a.y} C ${midX} ${a.y}, ${midX} ${c.y}, ${c.x-12} ${c.y}`;
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'edge');
+    path.dataset.from = from; path.dataset.to = to; path.dataset.note = note;
+    path.addEventListener('mouseenter', () => highlightEdge(idx, note));
+    path.addEventListener('mouseleave', clearGraphHighlight);
+    svg.appendChild(path);
+  });
+
+  /* Control nodes */
+  graphData.controls.forEach(n => {
+    const g = document.createElementNS(svgNS, 'g');
+    g.setAttribute('class', 'node control');
+    g.dataset.id = n.id;
+    g.setAttribute('transform', `translate(${nodePos[n.id].x}, ${nodePos[n.id].y})`);
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('r', 11);
+    g.appendChild(circle);
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', -18);
+    text.setAttribute('text-anchor', 'end');
+    text.textContent = n.label;
+    g.appendChild(text);
+    g.addEventListener('mouseenter', () => highlightNode(n.id));
+    g.addEventListener('mouseleave', clearGraphHighlight);
+    svg.appendChild(g);
+  });
+
+  /* Output nodes */
+  graphData.outputs.forEach(n => {
+    const g = document.createElementNS(svgNS, 'g');
+    g.setAttribute('class', 'node output');
+    g.dataset.id = n.id;
+    g.setAttribute('transform', `translate(${nodePos[n.id].x}, ${nodePos[n.id].y})`);
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('r', 11);
+    g.appendChild(circle);
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', 18);
+    text.setAttribute('text-anchor', 'start');
+    text.textContent = n.label;
+    g.appendChild(text);
+    g.addEventListener('mouseenter', () => highlightNode(n.id));
+    g.addEventListener('mouseleave', clearGraphHighlight);
+    svg.appendChild(g);
+  });
+}
+
+function highlightNode(nodeId) {
+  const svg = document.getElementById('lm-graph');
+  if (!svg) return;
+  const relatedEdges = [];
+  const relatedNodes = new Set([nodeId]);
+  graphData.edges.forEach(e => {
+    if (e[0] === nodeId || e[1] === nodeId) {
+      relatedEdges.push(e);
+      relatedNodes.add(e[0]); relatedNodes.add(e[1]);
+    }
+  });
+  svg.querySelectorAll('.node').forEach(n => {
+    const id = n.dataset.id;
+    n.classList.toggle('hot', id === nodeId);
+    n.classList.toggle('dim', !relatedNodes.has(id));
+  });
+  svg.querySelectorAll('.edge').forEach(p => {
+    const isHot = p.dataset.from === nodeId || p.dataset.to === nodeId;
+    p.classList.toggle('hot', isHot);
+    p.classList.toggle('dim', !isHot);
+  });
+  const note = document.getElementById('lm-graph-note');
+  if (note) {
+    const role = graphData.controls.find(c => c.id === nodeId)
+      ? 'this knob drives →'
+      : 'this panel is driven by ←';
+    const others = relatedEdges.map(e => e[0] === nodeId ? e[1] : e[0]);
+    const uniq = Array.from(new Set(others));
+    note.classList.add('hot');
+    note.innerHTML = `<strong>${nodeId}</strong> &middot; ${role} ${uniq.join(', ')}`;
+  }
+}
+function highlightEdge(idx, text) {
+  const svg = document.getElementById('lm-graph');
+  if (!svg) return;
+  const edges = svg.querySelectorAll('.edge');
+  edges.forEach((p, i) => {
+    p.classList.toggle('hot', i === idx);
+    p.classList.toggle('dim', i !== idx);
+  });
+  const [from, to] = graphData.edges[idx];
+  svg.querySelectorAll('.node').forEach(n => {
+    const id = n.dataset.id;
+    n.classList.toggle('hot', id === from || id === to);
+    n.classList.toggle('dim', id !== from && id !== to);
+  });
+  const note = document.getElementById('lm-graph-note');
+  if (note) { note.classList.add('hot'); note.textContent = text; }
+}
+function clearGraphHighlight() {
+  const svg = document.getElementById('lm-graph');
+  if (!svg) return;
+  svg.querySelectorAll('.node').forEach(n => { n.classList.remove('hot','dim'); });
+  svg.querySelectorAll('.edge').forEach(p => { p.classList.remove('hot','dim'); });
+  const note = document.getElementById('lm-graph-note');
+  if (note) { note.classList.remove('hot');
+    note.innerHTML = 'Hover a node or edge &mdash; the line between a knob and a panel says <em>what</em> that knob changes.'; }
+}
+
+/* ================================================================
+   LAYER 4: Affect-flash — pulse output panels when controls change
+   ================================================================ */
+const affectMap = {
+  /* Dataset/noise/split all call reseedData → initNetwork, so weights
+     reset and the network diagram visibly changes.
+     split and noise additionally redraw the boundary canvas. */
+  dataset:  ['boundary','loss','acc','net'],
+  noise:    ['boundary','loss','acc','net'],
+  split:    ['boundary','loss','acc','net'],
+  arch:     ['net','params','boundary','loss','acc'],
+  act:      ['boundary','net','loss'],
+  opt:      ['loss','acc'],
+  lr:       ['loss','acc'],
+  bs:       ['loss'],
+  l2:       ['net','loss','acc'],
+  dp:       ['loss','acc']
+};
+const panelMap = {
+  boundary: () => document.querySelector('#db-canvas').closest('.nnp-panel'),
+  loss:     () => document.querySelector('#chart-loss') && document.querySelector('#chart-loss').parentElement,
+  acc:      () => document.querySelector('#chart-acc')  && document.querySelector('#chart-acc').parentElement,
+  net:      () => document.querySelector('#net-canvas') && document.querySelector('#net-canvas').closest('.nnp-panel'),
+  params:   () => document.getElementById('stat-params') && document.getElementById('stat-params').closest('.nnp-stat')
+};
+function flashAffected(ctlKey) {
+  if (!lmOn) return;
+  const panels = affectMap[ctlKey] || [];
+  panels.forEach(pid => {
+    const el = panelMap[pid] && panelMap[pid]();
+    if (!el) return;
+    el.classList.remove('flash-ring');
+    /* Force reflow so the animation can restart. */
+    void el.offsetWidth;
+    el.classList.add('flash-ring');
+    setTimeout(() => el.classList.remove('flash-ring'), 1050);
+  });
+}
+/* Attach flash hooks to each control. These fire in addition to existing listeners. */
+function wireAffectFlash() {
+  const hooks = [
+    ['#noise-slider',  'noise',  'input'],
+    ['#split-slider',  'split',  'input'],
+    ['#lr-slider',     'lr',     'input'],
+    ['#bs-slider',     'bs',     'input'],
+    ['#l2-slider',     'l2',     'input'],
+    ['#dp-slider',     'dp',     'input']
+  ];
+  hooks.forEach(([sel, key, ev]) => {
+    const el = document.querySelector(sel);
+    if (el) el.addEventListener(ev, () => flashAffected(key));
+  });
+  document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => flashAffected('act')));
+  document.querySelectorAll('[data-opt]').forEach(b => b.addEventListener('click', () => flashAffected('opt')));
+  document.querySelectorAll('.ds-tile').forEach(t => t.addEventListener('click', () => flashAffected('dataset')));
+  /* Arch: delegate on the row */
+  const archEl = document.getElementById('arch-row');
+  if (archEl) archEl.addEventListener('click', () => flashAffected('arch'));
+}
+
+/* ================================================================
+   LAYER 1: Anatomy tour
+   ================================================================ */
+const tourSteps = [
+  { sel: '#lm-toggle', title: 'Learning mode', text: 'This tour runs once the first time you turn Learning mode on. Re-open it any time with <strong>Start tour</strong>.' },
+  { sel: '#dataset-grid', title: 'Dataset', text: 'Six classification puzzles. Harder shapes (Spiral, Rings) need more network capacity; Linear needs hardly any.' },
+  { sel: '#noise-slider', title: 'Noise', text: 'Jitter added to point coordinates. Higher noise raises the irreducible loss floor.' },
+  { sel: '#arch-row', title: 'Architecture', text: 'Each pill is one hidden layer. <strong>+</strong> adds width, <strong>×</strong> removes the layer. Input is always (x, y); output is one probability.' },
+  { sel: '#act-chips', title: 'Hidden activation', text: 'The non-linear function between layers. Without it, stacking is just one linear map.' },
+  { sel: '#opt-row', title: 'Optimizer', text: 'How gradients turn into weight updates. Adam adapts per weight; SGD is raw; Momentum accumulates.' },
+  { sel: '#lr-slider', title: 'Learning rate α', text: 'Step size. The single most important knob — too high and the loss diverges, too low and nothing moves.' },
+  { sel: '#bs-slider', title: 'Batch size', text: 'Samples per gradient. Tiny batches make the loss curve jagged; big batches smooth it.' },
+  { sel: '#l2-slider', title: 'L2 (weight decay)', text: 'Shrinks every weight a bit each step. The most common regulariser — fights overfitting.' },
+  { sel: '#dp-slider', title: 'Dropout', text: 'Randomly zeros hidden neurons during training. Another way to regularise.' },
+  { sel: '#btn-train', title: 'Train / Stop', text: 'Run the loop. <strong>Step</strong> runs one epoch; <strong>Reset</strong> rebuilds the dataset and re-initialises weights.' },
+  { sel: '#db-canvas', title: 'Decision boundary', text: 'Teal = class 1, red = class 0. Darker colour = higher confidence. Watch the region bend to fit the data.' },
+  { sel: '#chart-loss', title: 'Loss curve', text: 'Training loss over time. Should descend. A bouncing loss is the clearest "α is too high" symptom.' },
+  { sel: '#chart-acc', title: 'Accuracy curve', text: 'Test accuracy over epochs. If it flatlines while training loss keeps falling, you are overfitting.' },
+  { sel: '#net-canvas', title: 'Network diagram', text: 'Teal lines = positive weights, red = negative, thickness = magnitude. Dim nodes are not firing — possibly dead.' },
+];
+let tourBackdrop = null, tourRing = null, tourPopover = null, tourIdx = 0;
+function startTour() {
+  if (!lmOn) { lmOn = true; try { localStorage.setItem(LM_KEY, '1'); } catch(e) {} applyLmState(); }
+  endTour();
+  tourIdx = 0;
+  tourBackdrop = document.createElement('div');
+  tourBackdrop.className = 'lm-tour-backdrop';
+  tourBackdrop.addEventListener('click', endTour);
+  document.body.appendChild(tourBackdrop);
+  tourRing = document.createElement('div');
+  tourRing.className = 'lm-tour-ring';
+  document.body.appendChild(tourRing);
+  tourPopover = document.createElement('div');
+  tourPopover.className = 'lm-tour-popover';
+  document.body.appendChild(tourPopover);
+  showTourStep(0);
+  window.addEventListener('resize', onTourResize);
+}
+function onTourResize() { if (tourRing && tourPopover) showTourStep(tourIdx); }
+function endTour() {
+  if (tourBackdrop) { tourBackdrop.remove(); tourBackdrop = null; }
+  if (tourRing)     { tourRing.remove();     tourRing = null; }
+  if (tourPopover)  { tourPopover.remove();  tourPopover = null; }
+  window.removeEventListener('resize', onTourResize);
+}
+function showTourStep(i) {
+  tourIdx = i;
+  const step = tourSteps[i];
+  if (!step || !tourRing || !tourPopover) { endTour(); return; }
+  const target = document.querySelector(step.sel);
+  if (!target) { /* if target missing, skip */
+    if (i < tourSteps.length - 1) showTourStep(i+1); else endTour();
+    return;
+  }
+  const r = target.getBoundingClientRect();
+  const pad = 8;
+  tourRing.style.left   = (r.left - pad) + 'px';
+  tourRing.style.top    = (r.top  - pad) + 'px';
+  tourRing.style.width  = (r.width  + pad*2) + 'px';
+  tourRing.style.height = (r.height + pad*2) + 'px';
+  tourPopover.innerHTML = `
+    <div class="tour-counter">Step ${i+1} / ${tourSteps.length}</div>
+    <div class="tour-title">${step.title}</div>
+    <div class="tour-text">${step.text}</div>
+    <div class="tour-nav">
+      <button id="t-prev" ${i === 0 ? 'disabled' : ''}>&larr; Back</button>
+      <div style="display:flex; gap: var(--s-2);">
+        <button id="t-skip">Skip tour</button>
+        <button id="t-next" class="primary">${i === tourSteps.length - 1 ? 'Finish' : 'Next &rarr;'}</button>
+      </div>
+    </div>
+  `;
+  /* Position popover: pick the side with more room */
+  const pw = 340, ph = 210;   /* approximate; actual layout may differ */
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let px, py;
+  const roomRight  = vw - r.right;
+  const roomLeft   = r.left;
+  const roomBottom = vh - r.bottom;
+  if (roomRight >= pw + 20) {
+    px = r.right + 16; py = Math.max(10, Math.min(vh - ph - 10, r.top));
+  } else if (roomLeft >= pw + 20) {
+    px = r.left - pw - 16; py = Math.max(10, Math.min(vh - ph - 10, r.top));
+  } else if (roomBottom >= ph + 20) {
+    px = Math.max(10, Math.min(vw - pw - 10, r.left)); py = r.bottom + 14;
+  } else {
+    px = Math.max(10, Math.min(vw - pw - 10, r.left)); py = Math.max(10, r.top - ph - 14);
+  }
+  tourPopover.style.left = px + 'px';
+  tourPopover.style.top  = py + 'px';
+  document.getElementById('t-prev').addEventListener('click', () => showTourStep(Math.max(0, i-1)));
+  document.getElementById('t-skip').addEventListener('click', endTour);
+  document.getElementById('t-next').addEventListener('click', () => {
+    if (i === tourSteps.length - 1) endTour();
+    else showTourStep(i + 1);
+  });
+}
+
+/* Start-tour button */
+const startTourBtn = document.getElementById('lm-start-tour');
+if (startTourBtn) startTourBtn.addEventListener('click', startTour);
+
+/* ================================================================
+   Boot everything Learning-mode related
+   ================================================================ */
+function initLearningMode() {
+  injectInfoButtons();
+  injectCompareButtons();
+  buildGraph();
+  wireAffectFlash();
+}
+/* initLearningMode is called at the end of init() so the base UI
+   (dataset tiles, arch pills, etc.) is in place first. */
 
 })();
 </script>
