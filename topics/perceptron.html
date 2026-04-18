@@ -3,644 +3,1140 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Perceptron - AI Visualized</title>
+  <title>Perceptron — AI Visualized</title>
+  <meta name="description" content="Rosenblatt's 1958 perceptron in your browser. Watch the decision line rotate toward zero error one mistake at a time — and see exactly why the XOR myth killed a generation of neural nets.">
   <link rel="stylesheet" href="../css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    .pr-main {
+      width: 100%; height: 100%;
+      display: grid;
+      grid-template-columns: 2.2fr 1fr;
+      grid-template-rows: 1.3fr 1fr auto;
+      gap: var(--s-3);
+      padding: var(--s-4);
+      overflow: hidden;
+    }
+    .pr-panel {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      position: relative;
+      min-height: 0;
+    }
+    .pr-panel-head {
+      padding: var(--s-3) var(--s-4);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+    }
+    .pr-panel-head h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      margin: 0;
+    }
+    .pr-panel-head .meta {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .pr-panel-body {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+    }
+    .pr-panel-body canvas { display: block; width: 100%; height: 100%; }
+
+    .pr-plane  { grid-column: 1; grid-row: 1 / span 2; }
+    .pr-ctrls  { grid-column: 2; grid-row: 1; overflow-y: auto; }
+    .pr-side   { grid-column: 2; grid-row: 2; overflow-y: auto; }
+
+    .pr-plane-canvas { background: var(--bg-sunken); cursor: crosshair; }
+
+    .pr-stats {
+      grid-column: 1 / -1; grid-row: 3;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--s-3);
+    }
+    .pr-stat {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-md);
+      padding: var(--s-3) var(--s-4);
+      display: flex; flex-direction: column; gap: 2px;
+      min-height: 66px;
+    }
+    .pr-stat .label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+    }
+    .pr-stat .value {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      color: var(--fg-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pr-stat.accent .value { color: var(--teal-300); }
+    .pr-stat.heat .value   { color: var(--heat-400); }
+
+    .pr-ctrl-body { padding: var(--s-3) var(--s-4) var(--s-4); overflow-y: auto; }
+    .ctl-group { margin-bottom: var(--s-4); }
+    .ctl-group h5 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 var(--s-2);
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill {
+      padding: 6px 10px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pill:hover { color: var(--fg-primary); border-color: var(--border-strong); }
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .slider-wrap { display:flex; flex-direction:column; gap: 4px; margin-bottom: var(--s-3); }
+    .slider-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      font-family: var(--font-mono); font-size: var(--fs-small);
+      color: var(--fg-secondary);
+    }
+    .slider-row .v { color: var(--teal-300); font-weight: 500; }
+    input[type=range].pr-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; background: var(--border-default);
+      border-radius: 2px; outline: none;
+    }
+    input[type=range].pr-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    input[type=range].pr-slider::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--teal-400); cursor: pointer; border: 2px solid var(--bg-raised);
+    }
+    .btn-row { display: flex; gap: 6px; }
+    .pr-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      color: var(--fg-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .pr-btn:hover { border-color: var(--border-strong); }
+    .pr-btn.primary {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--teal-200);
+    }
+    .pr-btn.primary:hover { background: var(--accent-ring); color: var(--teal-100); }
+    .pr-btn.heat {
+      background: var(--sub-accent-soft);
+      border-color: rgba(255,122,41,0.3);
+      color: var(--heat-300);
+    }
+    .pr-btn.heat:hover { background: rgba(255,122,41,0.22); color: var(--heat-200); }
+
+    /* Dataset thumbnails */
+    .ds-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .ds-thumb {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-default);
+      border-radius: var(--r-sm);
+      padding: 6px;
+      cursor: pointer;
+      transition: all 120ms ease;
+      text-align: center;
+    }
+    .ds-thumb:hover { border-color: var(--border-strong); }
+    .ds-thumb.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+    }
+    .ds-thumb .name {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-primary);
+      margin-bottom: 3px;
+    }
+    .ds-thumb canvas { width: 100%; height: 40px; display: block; }
+
+    /* Side panel: weight vector + history */
+    .pr-side-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+    .eq-line {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      padding: 8px 10px;
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      color: var(--teal-200);
+      margin-bottom: 8px;
+      line-height: 1.55;
+      overflow-x: auto; white-space: nowrap;
+    }
+    .eq-line .muted { color: var(--fg-muted); }
+    .eq-line .heat  { color: var(--heat-400); }
+
+    .mini-charts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--s-2);
+      margin-top: var(--s-2);
+    }
+    .mini {
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: var(--s-2) var(--s-3);
+      min-height: 130px;
+      position: relative;
+    }
+    .mini h6 {
+      font-family: var(--font-mono);
+      font-size: var(--fs-micro);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--fg-muted);
+      margin: 0 0 4px;
+    }
+    .mini canvas { display: block; width: 100%; height: 100px; }
+
+    .pr-note {
+      font-family: var(--font-sans);
+      font-size: 12px; line-height: 1.6;
+      color: var(--fg-tertiary);
+      padding: var(--s-3);
+      background: var(--bg-sunken);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      margin-top: var(--s-3);
+    }
+    .pr-note strong { color: var(--teal-200); font-weight: 600; }
+    .pr-note code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--bg-raised);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--teal-300);
+    }
+
+    .pr-legend {
+      position: absolute; top: 12px; left: 12px;
+      padding: 8px 10px;
+      background: rgba(10,10,11,0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-tertiary);
+      z-index: 2; pointer-events: none;
+      line-height: 1.55;
+    }
+    .pr-legend .key { display: flex; align-items: center; gap: 6px; }
+    .pr-legend .key .sw { width: 10px; height: 10px; border-radius: 50%; }
+
+    .pr-hud {
+      position: absolute; top: 12px; right: 12px;
+      padding: 8px 10px;
+      background: rgba(10,10,11,0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--fg-tertiary);
+      z-index: 2;
+      max-width: 260px;
+      line-height: 1.55;
+    }
+    .pr-hud .hud-title {
+      font-family: var(--font-display); font-size: 11.5px; font-weight: 500;
+      color: var(--teal-300); margin-bottom: 2px;
+    }
+
+    @media (max-width: 1000px) {
+      .pr-main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 0.9fr auto auto auto;
+      }
+      .pr-plane { grid-column: 1; grid-row: 1; }
+      .pr-ctrls { grid-column: 1; grid-row: 2; }
+      .pr-side  { grid-column: 1; grid-row: 3; }
+      .pr-stats { grid-row: 4; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
-
-  <div class="topic-page">
-
-    <!-- Header -->
-    <div class="topic-header">
-      <a href="../index.html" class="back-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Back
-      </a>
-      <h1>The Perceptron</h1>
-      <span class="topic-desc">Click to place data points, then train or manually adjust the decision boundary</span>
-    </div>
-
-    <!-- Canvas Area -->
-    <div class="canvas-area">
-      <canvas id="canvas"></canvas>
-      <div class="canvas-overlay" id="overlay">
-        Left-click to add <span class="value">blue</span> points &mdash; Right-click for <span class="value" style="color:#f87171">red</span> points
-      </div>
-    </div>
-
-    <!-- Control Panel -->
-    <div class="control-panel">
-
-      <div class="control-section">
-        <h3>Data Points</h3>
-        <div class="btn-group">
-          <button class="btn btn-secondary active" id="class-0" style="border-color: #6366f1;">
-            <span style="color:#6366f1;">&#9679;</span> Class 0
-          </button>
-          <button class="btn btn-secondary" id="class-1" style="border-color: transparent;">
-            <span style="color:#f87171;">&#9679;</span> Class 1
-          </button>
-        </div>
-        <div class="btn-group" style="margin-top: 8px;">
-          <button class="btn btn-secondary" id="btn-preset-linear">Linear Data</button>
-          <button class="btn btn-secondary" id="btn-preset-cluster">Clusters</button>
-        </div>
-        <button class="btn btn-secondary" id="btn-clear" style="width:100%; margin-top: 6px;">Clear All Points</button>
-      </div>
-
-      <div class="control-section">
-        <h3>Weights</h3>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>w1 (x-axis)</span>
-            <span class="slider-value" id="w1-value">0.50</span>
-          </div>
-          <input type="range" id="w1-slider" min="-3" max="3" step="0.01" value="0.5">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>w2 (y-axis)</span>
-            <span class="slider-value" id="w2-value">-0.30</span>
-          </div>
-          <input type="range" id="w2-slider" min="-3" max="3" step="0.01" value="-0.3">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>bias (b)</span>
-            <span class="slider-value" id="b-value">0.00</span>
-          </div>
-          <input type="range" id="b-slider" min="-3" max="3" step="0.01" value="0">
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Training</h3>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Learning Rate</span>
-            <span class="slider-value" id="lr-value">0.10</span>
-          </div>
-          <input type="range" id="lr-slider" min="0.01" max="1.0" step="0.01" value="0.10">
-        </div>
-
-        <div class="btn-group">
-          <button class="btn btn-primary" id="btn-train-step">Step</button>
-          <button class="btn btn-primary" id="btn-train-run">Train</button>
-          <button class="btn btn-secondary" id="btn-train-stop" style="display:none">Stop</button>
-        </div>
-
-        <div class="info-box" id="train-info" style="margin-top: 8px; font-family: var(--font-mono); font-size: 0.78rem;">
-          Epoch: <span class="value" id="epoch-count">0</span><br>
-          Accuracy: <span class="value" id="accuracy">-</span><br>
-          Errors: <span class="value" id="error-count">-</span>
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Neuron Diagram</h3>
-        <canvas id="neuron-canvas" width="280" height="160" style="width:100%; border-radius: var(--radius); background: var(--bg-card); border: 1px solid var(--border);"></canvas>
-      </div>
-
-      <div class="control-section">
-        <h3>How It Works</h3>
-        <div class="info-box">
-          A <strong>perceptron</strong> is the simplest neural unit. It computes a weighted sum of inputs plus a bias, then applies a step function:<br><br>
-          <code>output = step(w1*x + w2*y + b)</code><br><br>
-          The <strong>decision boundary</strong> is the line where <code>w1*x + w2*y + b = 0</code>. Points on one side are class 0, the other side class 1.
-        </div>
-      </div>
-
-      <div class="control-section">
-        <h3>Formula</h3>
-        <div class="formula">
-          y = step(w &middot; x + b)
-        </div>
-      </div>
-
-    </div>
+<div class="topic-page">
+  <div class="topic-header">
+    <a href="../index.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </a>
+    <h1>The perceptron</h1>
+    <span class="topic-desc">1958 &rarr; today. A single neuron, a single line, and the rule that moved it one mistake at a time.</span>
   </div>
 
+  <div class="pr-main">
+
+    <!-- Main plane -->
+    <section class="pr-panel pr-plane">
+      <header class="pr-panel-head">
+        <h4>2D decision plane</h4>
+        <span class="meta" id="plane-meta">linearly-separable &middot; step 0</span>
+      </header>
+      <div class="pr-panel-body">
+        <canvas id="plane-canvas" class="pr-plane-canvas"></canvas>
+        <div class="pr-legend">
+          <div class="key"><span class="sw" style="background: var(--teal-300)"></span>class +1</div>
+          <div class="key"><span class="sw" style="background: var(--heat-400)"></span>class &minus;1</div>
+          <div class="key"><span class="sw" style="background: rgba(255,255,255,0.65)"></span>current w &middot; x + b = 0</div>
+          <div style="margin-top:4px; color: var(--fg-muted)">click empty space: add + point &middot; right-click: add &minus;</div>
+        </div>
+        <div class="pr-hud" id="hud">
+          <span class="hud-title">Ready</span>
+          <div id="hud-body">Hit <strong>Step</strong> to update on one misclassified point, or <strong>Train</strong> to run the rule until zero errors.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="pr-panel pr-ctrls">
+      <header class="pr-panel-head">
+        <h4>Controls</h4>
+        <span class="meta" id="ctl-meta">rosenblatt rule</span>
+      </header>
+      <div class="pr-ctrl-body">
+
+        <div class="ctl-group">
+          <h5>Dataset</h5>
+          <div class="ds-grid" id="ds-grid"></div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Rule</h5>
+          <div class="pill-row" id="rule-pills">
+            <span class="pill active" data-rule="rosen">rosenblatt</span>
+            <span class="pill" data-rule="margin">margin (pocket)</span>
+            <span class="pill" data-rule="delta">delta (LMS)</span>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Learning rate</h5>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>&eta;</span><span class="v" id="eta-val">0.20</span></div>
+            <input type="range" class="pr-slider" id="eta-slider" min="0.01" max="1" step="0.01" value="0.20">
+          </div>
+          <div class="slider-wrap">
+            <div class="slider-row"><span>max epochs</span><span class="v" id="epoch-val">100</span></div>
+            <input type="range" class="pr-slider" id="epoch-slider" min="10" max="500" step="10" value="100">
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Run</h5>
+          <div class="btn-row">
+            <button class="pr-btn primary" id="btn-step">Step &rarr;</button>
+            <button class="pr-btn primary" id="btn-train">Train</button>
+          </div>
+          <div class="btn-row" style="margin-top:6px">
+            <button class="pr-btn heat" id="btn-reset">Reset w</button>
+            <button class="pr-btn" id="btn-clear">Clear data</button>
+          </div>
+          <div class="btn-row" style="margin-top:6px">
+            <button class="pr-btn" id="btn-random">Random w</button>
+            <button class="pr-btn" id="btn-speed">Speed: 1x</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <h5>Display</h5>
+          <div class="pill-row" id="disp-pills">
+            <span class="pill active" data-disp="region">shaded region</span>
+            <span class="pill active" data-disp="wvec">w arrow</span>
+            <span class="pill" data-disp="margin">margin band</span>
+            <span class="pill" data-disp="trail">update trail</span>
+          </div>
+        </div>
+
+        <div class="pr-note">
+          <strong>Rosenblatt's rule.</strong> For each training example <code>(x, y)</code> with <code>y &isin; {&minus;1, +1}</code>, predict <code>&ycirc; = sign(w&middot;x + b)</code>. If <code>&ycirc; &ne; y</code>, push: <code>w &larr; w + &eta; y x</code>, <code>b &larr; b + &eta; y</code>. The weight vector chases the misclassified point; the decision line tilts toward a better split. <strong>Novikoff's theorem</strong> (1962) guarantees this finishes in finite steps if a separator exists.
+        </div>
+      </div>
+    </section>
+
+    <!-- Side: weight + history -->
+    <section class="pr-panel pr-side">
+      <header class="pr-panel-head">
+        <h4>Current state</h4>
+        <span class="meta" id="side-meta">no updates yet</span>
+      </header>
+      <div class="pr-side-body">
+        <div class="eq-line" id="eq-w">w = &mdash;</div>
+        <div class="eq-line" id="eq-b">b = &mdash;</div>
+        <div class="eq-line" id="eq-rule">&ycirc; = sign(w &middot; x + b)</div>
+
+        <div class="mini-charts">
+          <div class="mini">
+            <h6>Errors / step</h6>
+            <canvas id="err-mini"></canvas>
+          </div>
+          <div class="mini">
+            <h6>Margin over time</h6>
+            <canvas id="mar-mini"></canvas>
+          </div>
+        </div>
+
+        <div class="pr-note" id="tip-note">
+          Pick a dataset on the right. Then step through or train until the line separates the two classes. Try the <strong>XOR</strong> dataset to see the 1969 Minsky &amp; Papert critique in action &mdash; no single line can split those four points.
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom stats -->
+    <section class="pr-stats">
+      <div class="pr-stat"><div class="label">dataset</div><div class="value" id="s-ds">linear</div></div>
+      <div class="pr-stat accent"><div class="label">steps</div><div class="value" id="s-steps">0</div></div>
+      <div class="pr-stat"><div class="label">epoch</div><div class="value" id="s-epoch">0</div></div>
+      <div class="pr-stat heat"><div class="label">errors</div><div class="value" id="s-err">&mdash;</div></div>
+      <div class="pr-stat"><div class="label">accuracy</div><div class="value" id="s-acc">&mdash;</div></div>
+      <div class="pr-stat"><div class="label">min margin (signed)</div><div class="value" id="s-mar">&mdash;</div></div>
+    </section>
+
+  </div>
+</div>
+
 <script>
-(function() {
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const overlay = document.getElementById('overlay');
-  const neuronCanvas = document.getElementById('neuron-canvas');
-  const nCtx = neuronCanvas.getContext('2d');
+"use strict";
+/* ------------------------------------------------------------------
+   THE PERCEPTRON — Rosenblatt, 1958.
 
-  let W, H, dpr;
+   The model:
+     y_hat = sign(w · x + b)
+   where w ∈ R², b ∈ R, and sign(0) is treated as +1.
 
-  // State
-  let points = []; // {x, y, label: 0|1}
-  let w1 = 0.5, w2 = -0.3, b = 0;
-  let lr = 0.1;
-  let activeClass = 0;
-  let training = false;
-  let epoch = 0;
+   The rules:
+     rosenblatt:  if y_hat ≠ y,         w ← w + η y x; b ← b + η y
+     margin:      if y (w·x + b) < 1,   w ← w + η y x; b ← b + η y
+                  (pocket variant: keep best-seen w)
+     delta (LMS): a smooth target using tanh(w·x+b) and full-batch GD
 
-  // Domain [-4, 4]
-  const domain = { xMin: -4, xMax: 4, yMin: -4, yMax: 4 };
+   Datasets: 6 — linear, margin-tight, xor (famous failure), quadratic,
+   circle, noisy. Two-click edit: left adds +1, right adds −1.
+   ------------------------------------------------------------------ */
 
-  function resize() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    dpr = window.devicePixelRatio || 1;
-    W = rect.width;
-    H = rect.height;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawFrame();
-  }
+(function(){
 
-  function toCanvas(x, y) {
-    const px = ((x - domain.xMin) / (domain.xMax - domain.xMin)) * W;
-    const py = H - ((y - domain.yMin) / (domain.yMax - domain.yMin)) * H;
-    return [px, py];
-  }
-
-  function toDomain(px, py) {
-    const x = domain.xMin + (px / W) * (domain.xMax - domain.xMin);
-    const y = domain.yMin + ((H - py) / H) * (domain.yMax - domain.yMin);
-    return [x, y];
-  }
-
-  function predict(x, y) {
-    return w1 * x + w2 * y + b;
-  }
-
-  function drawDecisionRegions() {
-    const res = 6;
-    const cols = Math.ceil(W / res);
-    const rows = Math.ceil(H / res);
-
-    for (let j = 0; j < rows; j++) {
-      for (let i = 0; i < cols; i++) {
-        const [x, y] = toDomain(i * res + res/2, j * res + res/2);
-        const val = predict(x, y);
-        if (val >= 0) {
-          ctx.fillStyle = 'rgba(248, 113, 113, 0.07)';
-        } else {
-          ctx.fillStyle = 'rgba(99, 102, 241, 0.07)';
-        }
-        ctx.fillRect(i * res, j * res, res, res);
-      }
-    }
-  }
-
-  function drawGrid() {
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-
-    for (let x = Math.ceil(domain.xMin); x <= domain.xMax; x++) {
-      const [px] = toCanvas(x, 0);
-      ctx.beginPath();
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, H);
-      ctx.stroke();
-    }
-
-    for (let y = Math.ceil(domain.yMin); y <= domain.yMax; y++) {
-      const [, py] = toCanvas(0, y);
-      ctx.beginPath();
-      ctx.moveTo(0, py);
-      ctx.lineTo(W, py);
-      ctx.stroke();
-    }
-
-    // Axes
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1.5;
-    const [ox, oy] = toCanvas(0, 0);
-    ctx.beginPath();
-    ctx.moveTo(0, oy); ctx.lineTo(W, oy);
-    ctx.moveTo(ox, 0); ctx.lineTo(ox, H);
-    ctx.stroke();
-
-    // Labels
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-    ctx.textAlign = 'center';
-    for (let x = Math.ceil(domain.xMin); x <= domain.xMax; x++) {
-      if (x === 0) continue;
-      const [px] = toCanvas(x, 0);
-      ctx.fillText(x.toString(), px, oy + 14);
-    }
-    ctx.textAlign = 'right';
-    for (let y = Math.ceil(domain.yMin); y <= domain.yMax; y++) {
-      if (y === 0) continue;
-      const [, py] = toCanvas(0, y);
-      ctx.fillText(y.toString(), ox - 6, py + 4);
-    }
-
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '12px Inter, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('x₁', W - 20, oy - 8);
-    ctx.fillText('x₂', ox + 8, 16);
-  }
-
-  function drawDecisionBoundary() {
-    // Line: w1*x + w2*y + b = 0 => y = -(w1*x + b) / w2
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = 'rgba(251, 191, 36, 0.4)';
-    ctx.shadowBlur = 8;
-
-    if (Math.abs(w2) > 0.001) {
-      const x0 = domain.xMin;
-      const x1 = domain.xMax;
-      const y0 = -(w1 * x0 + b) / w2;
-      const y1 = -(w1 * x1 + b) / w2;
-      const [px0, py0] = toCanvas(x0, y0);
-      const [px1, py1] = toCanvas(x1, y1);
-
-      ctx.beginPath();
-      ctx.moveTo(px0, py0);
-      ctx.lineTo(px1, py1);
-      ctx.stroke();
-    } else if (Math.abs(w1) > 0.001) {
-      // Vertical line: x = -b / w1
-      const x = -b / w1;
-      const [px] = toCanvas(x, 0);
-      ctx.beginPath();
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, H);
-      ctx.stroke();
-    }
-
-    ctx.shadowBlur = 0;
-
-    // Normal vector from origin
-    const norm = Math.sqrt(w1*w1 + w2*w2);
-    if (norm > 0.01) {
-      const scale = 0.8;
-      const nx = w1 / norm * scale;
-      const ny = w2 / norm * scale;
-      const [ox, oy] = toCanvas(0, 0);
-      const [ex, ey] = toCanvas(nx, ny);
-
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(ox, oy);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Arrowhead
-      const angle = Math.atan2(oy - ey, ox - ex);
-      ctx.fillStyle = 'rgba(251, 191, 36, 0.4)';
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex + 8 * Math.cos(angle + 0.4), ey + 8 * Math.sin(angle + 0.4));
-      ctx.lineTo(ex + 8 * Math.cos(angle - 0.4), ey + 8 * Math.sin(angle - 0.4));
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  function drawPoints() {
-    points.forEach(p => {
-      const [px, py] = toCanvas(p.x, p.y);
-      const predicted = predict(p.x, p.y) >= 0 ? 1 : 0;
-      const correct = predicted === p.label;
-
-      // Outer ring for misclassified
-      if (!correct) {
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(px, py, 10, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Point
-      ctx.fillStyle = p.label === 0 ? '#6366f1' : '#f87171';
-      ctx.shadowColor = p.label === 0 ? 'rgba(99,102,241,0.5)' : 'rgba(248,113,113,0.5)';
-      ctx.shadowBlur = 6;
-      ctx.beginPath();
-      ctx.arc(px, py, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // White center
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.beginPath();
-      ctx.arc(px, py, 2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-
-  function drawFrame() {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#08080f';
-    ctx.fillRect(0, 0, W, H);
-
-    drawDecisionRegions();
-    drawGrid();
-    drawDecisionBoundary();
-    drawPoints();
-    drawNeuronDiagram();
-  }
-
-  function drawNeuronDiagram() {
-    const c = nCtx;
-    const cw = neuronCanvas.width;
-    const ch = neuronCanvas.height;
-    c.clearRect(0, 0, cw, ch);
-    c.fillStyle = '#12121f';
-    c.fillRect(0, 0, cw, ch);
-
-    const inputs = [
-      { label: 'x₁', y: 40, weight: w1 },
-      { label: 'x₂', y: 80, weight: w2 },
-      { label: '1', y: 120, weight: b }
-    ];
-
-    const nodeX = 60, sumX = 170, outX = 240;
-    const sumY = 80;
-
-    inputs.forEach(inp => {
-      // Connection line
-      const intensity = Math.min(1, Math.abs(inp.weight) / 2);
-      const color = inp.weight >= 0 ? `rgba(52,211,153,${0.3 + intensity * 0.7})` : `rgba(248,113,113,${0.3 + intensity * 0.7})`;
-      c.strokeStyle = color;
-      c.lineWidth = 1 + intensity * 2;
-      c.beginPath();
-      c.moveTo(nodeX + 14, inp.y);
-      c.lineTo(sumX - 16, sumY);
-      c.stroke();
-
-      // Weight label
-      c.font = '10px JetBrains Mono, monospace';
-      c.fillStyle = color;
-      const mx = (nodeX + 14 + sumX - 16) / 2;
-      const my = (inp.y + sumY) / 2 - 6;
-      c.textAlign = 'center';
-      c.fillText(inp.weight.toFixed(2), mx, my);
-
-      // Input node
-      c.fillStyle = '#1e1e35';
-      c.strokeStyle = '#3d3d6b';
-      c.lineWidth = 1.5;
-      c.beginPath();
-      c.arc(nodeX, inp.y, 14, 0, Math.PI * 2);
-      c.fill();
-      c.stroke();
-
-      c.fillStyle = '#e8eaf0';
-      c.font = '11px Inter, sans-serif';
-      c.textAlign = 'center';
-      c.fillText(inp.label, nodeX, inp.y + 4);
-    });
-
-    // Sum node
-    c.fillStyle = '#1e1e35';
-    c.strokeStyle = '#fbbf24';
-    c.lineWidth = 2;
-    c.beginPath();
-    c.arc(sumX, sumY, 16, 0, Math.PI * 2);
-    c.fill();
-    c.stroke();
-
-    c.fillStyle = '#fbbf24';
-    c.font = '13px Inter, sans-serif';
-    c.textAlign = 'center';
-    c.fillText('Σ', sumX, sumY + 5);
-
-    // Arrow to output
-    c.strokeStyle = '#fbbf24';
-    c.lineWidth = 1.5;
-    c.beginPath();
-    c.moveTo(sumX + 16, sumY);
-    c.lineTo(outX - 16, sumY);
-    c.stroke();
-
-    // Step label
-    c.fillStyle = 'rgba(255,255,255,0.4)';
-    c.font = '9px JetBrains Mono, monospace';
-    c.fillText('step()', (sumX + outX) / 2, sumY - 8);
-
-    // Output node
-    c.fillStyle = '#1e1e35';
-    c.strokeStyle = '#22d3ee';
-    c.lineWidth = 2;
-    c.beginPath();
-    c.arc(outX, sumY, 14, 0, Math.PI * 2);
-    c.fill();
-    c.stroke();
-
-    c.fillStyle = '#22d3ee';
-    c.font = '11px Inter, sans-serif';
-    c.fillText('ŷ', outX, sumY + 4);
-  }
-
-  function computeAccuracy() {
-    if (points.length === 0) return { acc: '-', errors: '-' };
-    let correct = 0;
-    points.forEach(p => {
-      const pred = predict(p.x, p.y) >= 0 ? 1 : 0;
-      if (pred === p.label) correct++;
-    });
-    const errors = points.length - correct;
-    return {
-      acc: (correct / points.length * 100).toFixed(1) + '%',
-      errors: errors.toString()
+  // ----------------------------------------------------------------
+  // 1) DATASETS. Each is a list of { x:[x1,x2], y: ±1 }.
+  //    World: [-1, 1] × [-1, 1].
+  // ----------------------------------------------------------------
+  const rng = (() => {
+    let seed = 0x2a1de4c5 >>> 0;
+    return () => {
+      seed = (seed + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+  })();
+
+  function makeLinear() {
+    const out = [];
+    for (let i = 0; i < 40; i++) {
+      const x1 = rng() * 1.8 - 0.9;
+      const x2 = rng() * 1.8 - 0.9;
+      const y = (x1 + x2 > 0.1) ? 1 : -1;
+      const offs = y * 0.08;
+      out.push({ x:[x1 + offs, x2 + offs], y });
+    }
+    return out;
+  }
+  function makeTightMargin() {
+    const out = [];
+    for (let i = 0; i < 40; i++) {
+      const x1 = rng() * 1.8 - 0.9;
+      const x2 = rng() * 1.8 - 0.9;
+      const s = 0.2 * x1 + 0.95 * x2 - 0.1;
+      if (Math.abs(s) < 0.05) continue;
+      out.push({ x:[x1, x2], y: s > 0 ? 1 : -1 });
+    }
+    return out;
+  }
+  function makeXor() {
+    return [
+      { x:[-0.6, -0.6], y: -1 },
+      { x:[ 0.6,  0.6], y: -1 },
+      { x:[-0.6,  0.6], y:  1 },
+      { x:[ 0.6, -0.6], y:  1 },
+    ];
+  }
+  function makeCircle() {
+    const out = [];
+    for (let i = 0; i < 60; i++) {
+      const a = rng() * 2 * Math.PI;
+      const inside = rng() < 0.5;
+      const r = inside ? rng() * 0.4 : 0.65 + rng() * 0.3;
+      out.push({ x:[r * Math.cos(a), r * Math.sin(a)], y: inside ? 1 : -1 });
+    }
+    return out;
+  }
+  function makeQuadratic() {
+    const out = [];
+    for (let i = 0; i < 50; i++) {
+      const x = rng() * 1.8 - 0.9;
+      const y = rng() * 1.8 - 0.9;
+      out.push({ x:[x, y], y: (y > x*x - 0.2) ? 1 : -1 });
+    }
+    return out;
+  }
+  function makeNoisy() {
+    const out = makeLinear();
+    for (const d of out) if (rng() < 0.12) d.y = -d.y;
+    return out;
   }
 
-  function updateInfo() {
-    document.getElementById('epoch-count').textContent = epoch;
-    const { acc, errors } = computeAccuracy();
-    document.getElementById('accuracy').textContent = acc;
-    document.getElementById('error-count').textContent = errors;
+  const DATASETS = {
+    linear:    { label: 'linear',       build: makeLinear,     note: 'Cleanly separable. The rule WILL converge in finite steps by Novikoff\u2019s theorem.' },
+    margin:    { label: 'tight margin', build: makeTightMargin,note: 'Still separable but the safe corridor is thin. Expect many tiny nudges before convergence.' },
+    xor:       { label: 'xor',          build: makeXor,        note: 'The 1969 Minsky-Papert example. No single line separates these four points. Watch the rule churn forever.' },
+    quadratic: { label: 'quadratic',    build: makeQuadratic,  note: 'Classes split by a parabola. The perceptron has no curvature in its vocabulary &mdash; best it can do is a crude average.' },
+    circle:    { label: 'circle',       build: makeCircle,     note: 'Ring vs center. Needs a kernel trick (or a neural net) to solve &mdash; a bare perceptron can\u2019t.' },
+    noisy:     { label: 'noisy-linear', build: makeNoisy,      note: 'Mostly linear, 12% label flips. Plain Rosenblatt never stops; pocket keeps the best snapshot instead.' },
+  };
+
+  // ----------------------------------------------------------------
+  // 2) STATE.
+  // ----------------------------------------------------------------
+  const state = {
+    dsKey: 'linear',
+    data: [],
+    w: [0.5, -0.3],
+    b: 0.0,
+    rule: 'rosen',
+    eta: 0.2,
+    maxEpochs: 100,
+    steps: 0,
+    epoch: 0,
+    errors: 0,
+    history: { err: [], margin: [] },
+    pocket: { w:[0,0], b:0, bestErr: Infinity },
+    training: false,
+    speed: 1,
+    highlightIdx: -1,
+    trail: [],
+    display: { region: true, wvec: true, margin: false, trail: false },
+  };
+
+  function loadDataset() {
+    state.data = DATASETS[state.dsKey].build();
+    resetWeights();
+    document.getElementById('tip-note').innerHTML = DATASETS[state.dsKey].note;
+    document.getElementById('s-ds').textContent = DATASETS[state.dsKey].label;
+  }
+  function resetWeights() {
+    state.w = [0.5 * (rng()*2-1), 0.5 * (rng()*2-1)];
+    state.b = 0.0;
+    state.steps = 0; state.epoch = 0;
+    state.errors = countErrors();
+    state.history = { err: [state.errors], margin: [marginNow()] };
+    state.pocket = { w: state.w.slice(), b: state.b, bestErr: state.errors };
+    state.trail = [];
+    state.highlightIdx = -1;
   }
 
-  // Perceptron learning rule: single pass
-  function trainStep() {
-    if (points.length === 0) return;
+  // ----------------------------------------------------------------
+  // 3) PERCEPTRON MATH.
+  // ----------------------------------------------------------------
+  function score(x) {
+    return state.w[0]*x[0] + state.w[1]*x[1] + state.b;
+  }
+  function predict(x) {
+    return score(x) >= 0 ? 1 : -1;
+  }
+  function countErrors() {
+    let e = 0;
+    for (const d of state.data) if (predict(d.x) !== d.y) e++;
+    return e;
+  }
+  function marginNow() {
+    // Geometric margin = min_i y_i (w·x_i + b) / ||w||
+    const n = Math.hypot(state.w[0], state.w[1]);
+    if (n < 1e-9 || state.data.length === 0) return 0;
+    let m = Infinity;
+    for (const d of state.data) {
+      const s = d.y * score(d.x) / n;
+      if (s < m) m = s;
+    }
+    return isFinite(m) ? m : 0;
+  }
 
-    let anyUpdate = false;
-    // Shuffle points for stochastic update
-    const shuffled = [...points].sort(() => Math.random() - 0.5);
+  // ----------------------------------------------------------------
+  // 4) ONE STEP OF THE CHOSEN RULE.
+  //    Returns true iff an update occurred.
+  // ----------------------------------------------------------------
+  function stepOnce() {
+    if (state.data.length === 0) return false;
 
-    for (const p of shuffled) {
-      const pred = predict(p.x, p.y) >= 0 ? 1 : 0;
-      const error = p.label - pred;
+    if (state.rule === 'delta') {
+      // Full-batch gradient descent on L = ½ Σ (y_i - tanh(w·x_i+b))²
+      let gw0 = 0, gw1 = 0, gb = 0;
+      for (const d of state.data) {
+        const s  = score(d.x);
+        const yh = Math.tanh(s);
+        const err = d.y - yh;          // target - output
+        const dsig = 1 - yh*yh;        // d tanh / d s
+        const coef = err * dsig;
+        gw0 += coef * d.x[0];
+        gw1 += coef * d.x[1];
+        gb  += coef;
+      }
+      const n = state.data.length;
+      state.w[0] += state.eta * gw0 / n;
+      state.w[1] += state.eta * gw1 / n;
+      state.b    += state.eta * gb / n;
+      state.steps++;
+      state.epoch++;
+      state.errors = countErrors();
+      state.history.err.push(state.errors);
+      state.history.margin.push(marginNow());
+      pushTrail();
+      return true;
+    }
 
-      if (error !== 0) {
-        w1 += lr * error * p.x;
-        w2 += lr * error * p.y;
-        b += lr * error;
-        anyUpdate = true;
+    // SGD-like rules: scan cyclically for one mistake
+    const n = state.data.length;
+    const start = state.steps % n;
+    for (let k = 0; k < n; k++) {
+      const i = (start + k) % n;
+      const d = state.data[i];
+      const s = score(d.x);
+      const mistake = state.rule === 'rosen'
+        ? ((s >= 0 ? 1 : -1) !== d.y)
+        : (d.y * s < 1);
+      if (mistake) {
+        state.w[0] += state.eta * d.y * d.x[0];
+        state.w[1] += state.eta * d.y * d.x[1];
+        state.b    += state.eta * d.y;
+        state.steps++;
+        state.highlightIdx = i;
+        state.errors = countErrors();
+        if (state.rule === 'margin' && state.errors < state.pocket.bestErr) {
+          state.pocket = { w: state.w.slice(), b: state.b, bestErr: state.errors };
+        }
+        if (state.steps % Math.max(1, n) === 0) state.epoch++;
+        state.history.err.push(state.errors);
+        state.history.margin.push(marginNow());
+        pushTrail();
+        return true;
+      }
+    }
+    // no mistake found — converged
+    state.highlightIdx = -1;
+    return false;
+  }
+
+  function pushTrail() {
+    state.trail.push({ w: state.w.slice(), b: state.b });
+    if (state.trail.length > 120) state.trail.shift();
+  }
+
+  // ----------------------------------------------------------------
+  // 5) TRAIN LOOP.
+  // ----------------------------------------------------------------
+  let trainTimer = null;
+  function startTrain() {
+    if (state.training) return;
+    state.training = true;
+    document.getElementById('btn-train').textContent = 'Stop';
+    const tick = () => {
+      if (!state.training) return;
+      let batch = state.speed;
+      if (state.rule === 'delta') batch = 1;
+      let progressed = false;
+      for (let i = 0; i < batch; i++) {
+        const did = stepOnce();
+        if (did) progressed = true;
+        if (!did && (state.rule === 'rosen' || state.rule === 'margin')) break;
+      }
+      if (!progressed && (state.rule === 'rosen' || state.rule === 'margin')) { stopTrain(); return; }
+      if (state.epoch >= state.maxEpochs) { stopTrain(); return; }
+      drawAll();
+      trainTimer = requestAnimationFrame(tick);
+    };
+    trainTimer = requestAnimationFrame(tick);
+  }
+  function stopTrain() {
+    state.training = false;
+    if (trainTimer) cancelAnimationFrame(trainTimer);
+    trainTimer = null;
+    document.getElementById('btn-train').textContent = 'Train';
+    drawAll();
+  }
+
+  // ----------------------------------------------------------------
+  // 6) CANVAS SETUP + COORDINATE HELPERS.
+  // ----------------------------------------------------------------
+  const planeCanvas = document.getElementById('plane-canvas');
+  const pctx = planeCanvas.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+  let PW = 0, PH = 0;
+  function resizePlane() {
+    const r = planeCanvas.getBoundingClientRect();
+    PW = r.width; PH = r.height;
+    planeCanvas.width = PW * DPR; planeCanvas.height = PH * DPR;
+    pctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  const EXT = 1.1;
+  function viewport() {
+    const L = 24, R = 24, T = 24, B = 24;
+    const pw = PW - L - R, ph = PH - T - B;
+    const side = Math.min(pw, ph);
+    const cx = L + pw/2, cy = T + ph/2;
+    return { cx, cy, side };
+  }
+  function mathToPx(x, y) {
+    const v = viewport();
+    return [v.cx + x / EXT * v.side/2, v.cy - y / EXT * v.side/2];
+  }
+  function pxToMath(px, py) {
+    const v = viewport();
+    return [(px - v.cx) / (v.side/2) * EXT, -(py - v.cy) / (v.side/2) * EXT];
+  }
+
+  // ----------------------------------------------------------------
+  // 7) PLANE RENDERING.
+  // ----------------------------------------------------------------
+  function drawPlane() {
+    resizePlane();
+    pctx.clearRect(0, 0, PW, PH);
+
+    // shaded decision regions via a small offscreen image
+    if (state.display.region) {
+      const gridN = 64;
+      const c = document.createElement('canvas');
+      c.width = gridN; c.height = gridN;
+      const cx = c.getContext('2d');
+      const img = cx.createImageData(gridN, gridN);
+      for (let i = 0; i < gridN; i++) {
+        for (let j = 0; j < gridN; j++) {
+          const mx = -EXT + (i + 0.5) / gridN * (2 * EXT);
+          const my =  EXT - (j + 0.5) / gridN * (2 * EXT);
+          const s = state.w[0]*mx + state.w[1]*my + state.b;
+          const p = (i + j * gridN) * 4;
+          if (s >= 0) {
+            img.data[p] = 30; img.data[p+1] = 150; img.data[p+2] = 140; img.data[p+3] = 58;
+          } else {
+            img.data[p] = 220; img.data[p+1] = 110; img.data[p+2] = 50; img.data[p+3] = 58;
+          }
+        }
+      }
+      cx.putImageData(img, 0, 0);
+      const [x0, y0] = mathToPx(-EXT, EXT);
+      const [x1, y1] = mathToPx( EXT, -EXT);
+      pctx.imageSmoothingEnabled = true;
+      pctx.drawImage(c, x0, y0, x1 - x0, y1 - y0);
+    }
+
+    // axes
+    pctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    pctx.lineWidth = 1;
+    const [ox, oy] = mathToPx(0, 0);
+    pctx.beginPath(); pctx.moveTo(24, oy); pctx.lineTo(PW - 24, oy); pctx.stroke();
+    pctx.beginPath(); pctx.moveTo(ox, 24); pctx.lineTo(ox, PH - 24); pctx.stroke();
+
+    // subtle grid
+    pctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    for (let x = -1; x <= 1; x += 0.25) {
+      if (Math.abs(x) < 1e-6) continue;
+      const [px] = mathToPx(x, 0);
+      pctx.beginPath(); pctx.moveTo(px, 24); pctx.lineTo(px, PH - 24); pctx.stroke();
+    }
+    for (let y = -1; y <= 1; y += 0.25) {
+      if (Math.abs(y) < 1e-6) continue;
+      const [, py] = mathToPx(0, y);
+      pctx.beginPath(); pctx.moveTo(24, py); pctx.lineTo(PW - 24, py); pctx.stroke();
+    }
+
+    // update trail
+    if (state.display.trail && state.trail.length > 1) {
+      for (let i = 0; i < state.trail.length; i++) {
+        const t = state.trail[i];
+        const alpha = 0.05 + 0.35 * (i / state.trail.length);
+        drawDecisionLine(t.w, t.b, 'rgba(95,210,203,' + alpha + ')', 1);
       }
     }
 
-    // Clamp weights for slider range
-    w1 = Math.max(-3, Math.min(3, w1));
-    w2 = Math.max(-3, Math.min(3, w2));
-    b = Math.max(-3, Math.min(3, b));
+    // margin band
+    if (state.display.margin) drawMarginBand();
 
-    // Update sliders
-    document.getElementById('w1-slider').value = w1;
-    document.getElementById('w2-slider').value = w2;
-    document.getElementById('b-slider').value = b;
-    document.getElementById('w1-value').textContent = w1.toFixed(2);
-    document.getElementById('w2-value').textContent = w2.toFixed(2);
-    document.getElementById('b-value').textContent = b.toFixed(2);
+    // main decision line
+    drawDecisionLine(state.w, state.b, 'rgba(245,245,247,0.95)', 2.2);
 
-    epoch++;
-    updateInfo();
-    drawFrame();
+    // w arrow
+    if (state.display.wvec) drawWArrow();
 
-    return anyUpdate;
-  }
-
-  // Click to add points
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const [x, y] = toDomain(e.clientX - rect.left, e.clientY - rect.top);
-    points.push({ x, y, label: activeClass });
-    updateInfo();
-    drawFrame();
-  });
-
-  canvas.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const [x, y] = toDomain(e.clientX - rect.left, e.clientY - rect.top);
-    points.push({ x, y, label: 1 });
-    updateInfo();
-    drawFrame();
-  });
-
-  // Class toggle
-  document.getElementById('class-0').addEventListener('click', () => {
-    activeClass = 0;
-    document.getElementById('class-0').classList.add('active');
-    document.getElementById('class-0').style.borderColor = '#6366f1';
-    document.getElementById('class-1').classList.remove('active');
-    document.getElementById('class-1').style.borderColor = 'transparent';
-    overlay.innerHTML = 'Left-click to add <span class="value">blue</span> points &mdash; Right-click for <span class="value" style="color:#f87171">red</span> points';
-  });
-
-  document.getElementById('class-1').addEventListener('click', () => {
-    activeClass = 1;
-    document.getElementById('class-1').classList.add('active');
-    document.getElementById('class-1').style.borderColor = '#f87171';
-    document.getElementById('class-0').classList.remove('active');
-    document.getElementById('class-0').style.borderColor = 'transparent';
-    overlay.innerHTML = 'Left-click to add <span class="value" style="color:#f87171">red</span> points &mdash; Right-click for <span class="value">blue</span> points';
-  });
-
-  // Weight sliders
-  document.getElementById('w1-slider').addEventListener('input', (e) => {
-    w1 = parseFloat(e.target.value);
-    document.getElementById('w1-value').textContent = w1.toFixed(2);
-    updateInfo();
-    drawFrame();
-  });
-
-  document.getElementById('w2-slider').addEventListener('input', (e) => {
-    w2 = parseFloat(e.target.value);
-    document.getElementById('w2-value').textContent = w2.toFixed(2);
-    updateInfo();
-    drawFrame();
-  });
-
-  document.getElementById('b-slider').addEventListener('input', (e) => {
-    b = parseFloat(e.target.value);
-    document.getElementById('b-value').textContent = b.toFixed(2);
-    updateInfo();
-    drawFrame();
-  });
-
-  document.getElementById('lr-slider').addEventListener('input', (e) => {
-    lr = parseFloat(e.target.value);
-    document.getElementById('lr-value').textContent = lr.toFixed(2);
-  });
-
-  // Train buttons
-  document.getElementById('btn-train-step').addEventListener('click', trainStep);
-
-  let trainInterval = null;
-  document.getElementById('btn-train-run').addEventListener('click', () => {
-    if (training) return;
-    training = true;
-    document.getElementById('btn-train-run').style.display = 'none';
-    document.getElementById('btn-train-stop').style.display = '';
-
-    trainInterval = setInterval(() => {
-      const updated = trainStep();
-      if (!updated) {
-        // Converged
-        stopTraining();
+    // data points
+    for (let i = 0; i < state.data.length; i++) {
+      const d = state.data[i];
+      const [px, py] = mathToPx(d.x[0], d.x[1]);
+      const correct = predict(d.x) === d.y;
+      const fill = d.y === 1 ? 'rgba(95,210,203,0.95)' : 'rgba(255,122,41,0.95)';
+      const stroke = correct ? 'rgba(10,10,11,0.85)' : 'rgba(245,245,247,0.95)';
+      pctx.fillStyle = fill; pctx.strokeStyle = stroke;
+      pctx.lineWidth = correct ? 1.5 : 2.5;
+      const r = (i === state.highlightIdx) ? 7 : 5;
+      pctx.beginPath(); pctx.arc(px, py, r, 0, Math.PI*2);
+      pctx.fill(); pctx.stroke();
+      if (!correct) {
+        pctx.strokeStyle = 'rgba(255,122,41,0.45)';
+        pctx.lineWidth = 1;
+        pctx.beginPath(); pctx.arc(px, py, r + 4, 0, Math.PI*2); pctx.stroke();
       }
-    }, 100);
-  });
+    }
 
-  document.getElementById('btn-train-stop').addEventListener('click', stopTraining);
-
-  function stopTraining() {
-    training = false;
-    clearInterval(trainInterval);
-    document.getElementById('btn-train-run').style.display = '';
-    document.getElementById('btn-train-stop').style.display = 'none';
+    // axis labels
+    pctx.fillStyle = 'rgba(155,155,163,0.9)';
+    pctx.font = "10.5px 'JetBrains Mono', monospace";
+    pctx.textAlign = 'center';
+    pctx.fillText('x\u2081', PW - 24, oy - 6);
+    pctx.fillText('x\u2082', ox + 8, 32);
+    pctx.textAlign = 'left';
   }
 
-  // Presets
-  document.getElementById('btn-preset-linear').addEventListener('click', () => {
-    points = [];
-    // Linearly separable data
-    for (let i = 0; i < 15; i++) {
-      points.push({ x: -1 - Math.random() * 2, y: Math.random() * 4 - 2, label: 0 });
-      points.push({ x: 1 + Math.random() * 2, y: Math.random() * 4 - 2, label: 1 });
+  // Line w1 x1 + w2 x2 + b = 0  ⇔  x2 = -(w1 x1 + b) / w2  (when w2 ≠ 0)
+  function drawDecisionLine(w, b, stroke, width) {
+    const n = Math.hypot(w[0], w[1]);
+    if (n < 1e-9) return;
+    pctx.strokeStyle = stroke; pctx.lineWidth = width;
+    pctx.beginPath();
+    if (Math.abs(w[1]) > 1e-9) {
+      const y1 = -(w[0]*(-EXT) + b) / w[1];
+      const y2 = -(w[0]*( EXT) + b) / w[1];
+      const [px1, py1] = mathToPx(-EXT, y1);
+      const [px2, py2] = mathToPx( EXT, y2);
+      pctx.moveTo(px1, py1); pctx.lineTo(px2, py2);
+    } else {
+      // vertical line x1 = -b/w1
+      const x = -b / w[0];
+      const [px1, py1] = mathToPx(x, -EXT);
+      const [px2, py2] = mathToPx(x,  EXT);
+      pctx.moveTo(px1, py1); pctx.lineTo(px2, py2);
     }
-    epoch = 0;
-    updateInfo();
-    drawFrame();
-  });
+    pctx.stroke();
+  }
 
-  document.getElementById('btn-preset-cluster').addEventListener('click', () => {
-    points = [];
-    // Two clusters
-    for (let i = 0; i < 20; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = Math.random() * 1.2;
-      points.push({ x: -1.5 + r * Math.cos(a), y: 1.5 + r * Math.sin(a), label: 0 });
-    }
-    for (let i = 0; i < 20; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = Math.random() * 1.2;
-      points.push({ x: 1.5 + r * Math.cos(a), y: -1.5 + r * Math.sin(a), label: 1 });
-    }
-    epoch = 0;
-    updateInfo();
-    drawFrame();
-  });
+  function drawMarginBand() {
+    const n = Math.hypot(state.w[0], state.w[1]);
+    if (n < 1e-9) return;
+    const m = marginNow();
+    if (m <= 0) return;
+    // Parallel lines at signed offset ±m ||w||:  w·x + (b ± m||w||) = 0
+    const bP = state.b - m * n;
+    const bN = state.b + m * n;
+    const lineEnds = (bb) => {
+      if (Math.abs(state.w[1]) > 1e-9) {
+        const y1 = -(state.w[0]*(-EXT) + bb)/state.w[1];
+        const y2 = -(state.w[0]*( EXT) + bb)/state.w[1];
+        return [[-EXT, y1], [EXT, y2]];
+      }
+      const x = -bb / state.w[0];
+      return [[x, -EXT], [x, EXT]];
+    };
+    const [p1, p2] = lineEnds(bP);
+    const [p3, p4] = lineEnds(bN);
+    const pts = [mathToPx(p1[0], p1[1]), mathToPx(p2[0], p2[1]),
+                 mathToPx(p4[0], p4[1]), mathToPx(p3[0], p3[1])];
+    pctx.fillStyle = 'rgba(95,210,203,0.08)';
+    pctx.beginPath();
+    pctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) pctx.lineTo(pts[i][0], pts[i][1]);
+    pctx.closePath();
+    pctx.fill();
+    drawDecisionLine(state.w, bP, 'rgba(95,210,203,0.45)', 1);
+    drawDecisionLine(state.w, bN, 'rgba(95,210,203,0.45)', 1);
+  }
 
+  function drawWArrow() {
+    const n = Math.hypot(state.w[0], state.w[1]);
+    if (n < 1e-9) return;
+    const len = 0.45;
+    const ux = state.w[0] / n * len;
+    const uy = state.w[1] / n * len;
+    // anchor on the decision line closest to origin:  x0 = -b w / ||w||²
+    const x0 = -state.b * state.w[0] / (n*n);
+    const y0 = -state.b * state.w[1] / (n*n);
+    const [ax, ay] = mathToPx(x0, y0);
+    const [bx, by] = mathToPx(x0 + ux, y0 + uy);
+    pctx.strokeStyle = 'rgba(255,122,41,0.95)';
+    pctx.fillStyle = 'rgba(255,122,41,0.95)';
+    pctx.lineWidth = 2.4;
+    pctx.beginPath(); pctx.moveTo(ax, ay); pctx.lineTo(bx, by); pctx.stroke();
+    const ang = Math.atan2(by - ay, bx - ax);
+    const ah = 9;
+    pctx.beginPath();
+    pctx.moveTo(bx, by);
+    pctx.lineTo(bx - ah*Math.cos(ang - Math.PI/7), by - ah*Math.sin(ang - Math.PI/7));
+    pctx.lineTo(bx - ah*Math.cos(ang + Math.PI/7), by - ah*Math.sin(ang + Math.PI/7));
+    pctx.closePath(); pctx.fill();
+    pctx.font = "10.5px 'JetBrains Mono', monospace";
+    pctx.fillText('w', bx + 6, by - 4);
+  }
+
+  // ----------------------------------------------------------------
+  // 8) MINI CHARTS.
+  // ----------------------------------------------------------------
+  function drawMini(canvas, arr, color, fillRgba, label) {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * DPR; canvas.height = rect.height * DPR;
+    const c = canvas.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const w = rect.width, h = rect.height;
+    c.clearRect(0, 0, w, h);
+    if (arr.length < 2) {
+      c.fillStyle = 'rgba(108,108,116,0.55)';
+      c.font = "10px 'JetBrains Mono', monospace";
+      c.fillText(label + ' — no data yet', 6, 14);
+      return;
+    }
+    let mn = Infinity, mx = -Infinity;
+    for (const v of arr) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    if (mx - mn < 1e-9) { mx = mn + 1; }
+    const pad = 4;
+    const x = (i) => pad + (w - 2*pad) * (i / Math.max(1, arr.length-1));
+    const y = (v) => h - pad - (h - 2*pad) * ((v - mn) / (mx - mn));
+    c.strokeStyle = color; c.lineWidth = 1.5;
+    c.beginPath();
+    for (let i = 0; i < arr.length; i++) {
+      if (i === 0) c.moveTo(x(i), y(arr[i])); else c.lineTo(x(i), y(arr[i]));
+    }
+    c.stroke();
+    if (fillRgba) {
+      c.fillStyle = fillRgba;
+      c.lineTo(w - pad, h - pad); c.lineTo(pad, h - pad); c.closePath(); c.fill();
+    }
+    c.fillStyle = color;
+    c.font = "10px 'JetBrains Mono', monospace";
+    c.fillText(label + ' ' + arr[arr.length-1].toFixed(3), 6, 12);
+  }
+
+  // ----------------------------------------------------------------
+  // 9) DATASET THUMBNAILS.
+  // ----------------------------------------------------------------
+  let dsSamples = null; // cache one sample build per dataset for thumbnails
+  function buildDsGrid() {
+    if (!dsSamples) {
+      dsSamples = {};
+      for (const k of Object.keys(DATASETS)) dsSamples[k] = DATASETS[k].build();
+    }
+    const g = document.getElementById('ds-grid');
+    g.innerHTML = '';
+    for (const key of Object.keys(DATASETS)) {
+      const def = DATASETS[key];
+      const el = document.createElement('div');
+      el.className = 'ds-thumb' + (key === state.dsKey ? ' active' : '');
+      el.innerHTML = '<div class="name">' + def.label + '</div><canvas></canvas>';
+      el.addEventListener('click', () => {
+        state.dsKey = key;
+        document.querySelectorAll('.ds-thumb').forEach(d => d.classList.remove('active'));
+        el.classList.add('active');
+        loadDataset();
+        drawAll();
+      });
+      g.appendChild(el);
+    }
+    requestAnimationFrame(() => {
+      const keys = Object.keys(DATASETS);
+      document.querySelectorAll('.ds-thumb canvas').forEach((c, i) => {
+        drawDsThumb(c, dsSamples[keys[i]]);
+      });
+    });
+  }
+  function drawDsThumb(canvas, data) {
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * DPR; canvas.height = r.height * DPR;
+    const c = canvas.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const w = r.width, h = r.height;
+    c.clearRect(0, 0, w, h);
+    for (const d of data) {
+      const x = (d.x[0] + 1) / 2 * w;
+      const y = h - (d.x[1] + 1) / 2 * h;
+      c.fillStyle = d.y === 1 ? 'rgba(95,210,203,0.85)' : 'rgba(255,122,41,0.85)';
+      c.beginPath(); c.arc(x, y, 1.6, 0, Math.PI*2); c.fill();
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 10) UI WIRING.
+  // ----------------------------------------------------------------
+  document.getElementById('btn-step').addEventListener('click', () => {
+    const did = stepOnce();
+    if (!did) setHud('Converged', 'No misclassified points. Decision line separates the data.');
+    drawAll();
+  });
+  document.getElementById('btn-train').addEventListener('click', () => {
+    state.training ? stopTrain() : startTrain();
+  });
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    stopTrain(); resetWeights(); drawAll();
+  });
   document.getElementById('btn-clear').addEventListener('click', () => {
-    points = [];
-    epoch = 0;
-    stopTraining();
-    updateInfo();
-    drawFrame();
+    state.data = []; resetWeights(); drawAll();
+  });
+  document.getElementById('btn-random').addEventListener('click', () => {
+    stopTrain();
+    state.w = [rng()*2-1, rng()*2-1];
+    state.b = (rng()*2-1) * 0.5;
+    state.steps = 0; state.epoch = 0;
+    state.errors = countErrors();
+    state.history = { err: [state.errors], margin: [marginNow()] };
+    state.pocket = { w: state.w.slice(), b: state.b, bestErr: state.errors };
+    state.trail = [];
+    drawAll();
+  });
+  document.getElementById('btn-speed').addEventListener('click', (ev) => {
+    const speeds = [1, 2, 4, 8];
+    const next = speeds[(speeds.indexOf(state.speed) + 1) % speeds.length];
+    state.speed = next;
+    ev.target.textContent = 'Speed: ' + next + 'x';
   });
 
-  // Init
-  resize();
-  updateInfo();
-  window.addEventListener('resize', resize);
+  document.querySelectorAll('#rule-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#rule-pills .pill').forEach(q => q.classList.remove('active'));
+      p.classList.add('active');
+      state.rule = p.dataset.rule;
+      document.getElementById('ctl-meta').textContent = state.rule === 'rosen' ? 'rosenblatt rule' : state.rule + ' rule';
+      if (state.rule === 'delta') {
+        document.getElementById('eq-rule').innerHTML = '&ycirc; = tanh(w &middot; x + b) <span class="muted">// smooth target</span>';
+      } else if (state.rule === 'margin') {
+        document.getElementById('eq-rule').innerHTML = 'update iff y (w &middot; x + b) &lt; 1 <span class="muted">// margin rule</span>';
+      } else {
+        document.getElementById('eq-rule').innerHTML = '&ycirc; = sign(w &middot; x + b)';
+      }
+      drawAll();
+    });
+  });
+  document.querySelectorAll('#disp-pills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      p.classList.toggle('active');
+      state.display[p.dataset.disp] = p.classList.contains('active');
+      drawAll();
+    });
+  });
+
+  document.getElementById('eta-slider').addEventListener('input', (ev) => {
+    state.eta = parseFloat(ev.target.value);
+    document.getElementById('eta-val').textContent = state.eta.toFixed(2);
+  });
+  document.getElementById('epoch-slider').addEventListener('input', (ev) => {
+    state.maxEpochs = parseInt(ev.target.value, 10);
+    document.getElementById('epoch-val').textContent = state.maxEpochs;
+  });
+
+  // Click: left = +1, right = −1.
+  planeCanvas.addEventListener('mousedown', (ev) => {
+    if (ev.button !== 0 && ev.button !== 2) return;
+    ev.preventDefault();
+    const rect = planeCanvas.getBoundingClientRect();
+    const [mx, my] = pxToMath(ev.clientX - rect.left, ev.clientY - rect.top);
+    if (Math.abs(mx) > EXT || Math.abs(my) > EXT) return;
+    state.data.push({ x: [mx, my], y: ev.button === 0 ? 1 : -1 });
+    state.errors = countErrors();
+    state.history = { err: [state.errors], margin: [marginNow()] };
+    drawAll();
+  });
+  planeCanvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.target.tagName === 'INPUT') return;
+    if (ev.key === 's' || ev.key === 'S') { stepOnce(); drawAll(); }
+    if (ev.key === 't' || ev.key === 'T') state.training ? stopTrain() : startTrain();
+    if (ev.key === 'r' || ev.key === 'R') { stopTrain(); resetWeights(); drawAll(); }
+  });
+
+  window.addEventListener('resize', () => {
+    drawAll();
+    buildDsGrid();
+  });
+
+  // ----------------------------------------------------------------
+  // 11) FULL RENDER PASS.
+  // ----------------------------------------------------------------
+  function setHud(title, body) {
+    document.getElementById('hud').querySelector('.hud-title').textContent = title;
+    document.getElementById('hud-body').innerHTML = body;
+  }
+  function updateStats() {
+    const err = countErrors();
+    const acc = state.data.length ? (1 - err / state.data.length) * 100 : 0;
+    document.getElementById('s-steps').textContent = state.steps;
+    document.getElementById('s-epoch').textContent = state.epoch;
+    document.getElementById('s-err').textContent = err;
+    document.getElementById('s-acc').textContent = acc.toFixed(1) + '%';
+    document.getElementById('s-mar').textContent = marginNow().toFixed(3);
+    document.getElementById('eq-w').innerHTML = 'w = [<span class="heat">' + state.w[0].toFixed(3) + '</span>, <span class="heat">' + state.w[1].toFixed(3) + '</span>]';
+    document.getElementById('eq-b').innerHTML = 'b = <span class="heat">' + state.b.toFixed(3) + '</span>';
+    document.getElementById('plane-meta').textContent = DATASETS[state.dsKey].label + ' \u00b7 step ' + state.steps;
+    document.getElementById('side-meta').textContent = state.steps + ' updates';
+  }
+
+  function drawAll() {
+    drawPlane();
+    drawMini(document.getElementById('err-mini'),
+             state.history.err, 'rgba(255,122,41,0.9)', 'rgba(255,122,41,0.15)', 'err');
+    drawMini(document.getElementById('mar-mini'),
+             state.history.margin, 'rgba(95,210,203,0.9)', 'rgba(95,210,203,0.15)', 'm');
+    updateStats();
+  }
+
+  // ----------------------------------------------------------------
+  // 12) INIT.
+  // ----------------------------------------------------------------
+  buildDsGrid();
+  loadDataset();
+  drawAll();
+  setHud('Ready', 'Step = one update on one misclassified point. Train = loop until no mistakes (or max epochs). Try XOR to see where the perceptron breaks.');
+
 })();
 </script>
-
 </body>
 </html>
